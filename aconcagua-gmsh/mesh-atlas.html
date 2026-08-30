@@ -1,0 +1,762 @@
+<title>Aconcagua Mesh Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+:root{
+  --ground:#EDF1F2; --panel:#FFFFFF; --panel-2:#F5F8F9;
+  --ink:#15222B; --ink-2:#33454F; --muted:#5C6E78; --faint:#8195A0;
+  --rule:#CFD9DD; --rule-2:#E2EAED;
+  --copper:#9E4E24; --copper-soft:#F0E0D6;
+  --l0:#6C5A7C; --l1:#9A86A8; --l2:#9E4E24; --l3:#376E8D; --l4:#7CA3B8;
+  --ok:#2C6F4F; --warn:#93670F; --crit:#A63535;
+  --ok-bg:#E3EFE8; --warn-bg:#F6EDD9; --crit-bg:#F5E2E2;
+  --shadow:0 1px 2px rgba(21,34,43,.06),0 8px 24px -12px rgba(21,34,43,.18);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1418; --panel:#161F25; --panel-2:#1B262D;
+  --ink:#E3EBEF; --ink-2:#C0CED6; --muted:#93A6B0; --faint:#6D818C;
+  --rule:#27343C; --rule-2:#1F2A31;
+  --copper:#D98A55; --copper-soft:#33241B;
+  --l0:#A793B8; --l1:#7E6D8E; --l2:#D98A55; --l3:#6BA5C6; --l4:#48697C;
+  --ok:#6FBE93; --warn:#D9AE55; --crit:#DE8080;
+  --ok-bg:#152219; --warn-bg:#241E10; --crit-bg:#241414;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+}}
+:root[data-theme="dark"]{
+  --ground:#0E1418; --panel:#161F25; --panel-2:#1B262D;
+  --ink:#E3EBEF; --ink-2:#C0CED6; --muted:#93A6B0; --faint:#6D818C;
+  --rule:#27343C; --rule-2:#1F2A31;
+  --copper:#D98A55; --copper-soft:#33241B;
+  --l0:#A793B8; --l1:#7E6D8E; --l2:#D98A55; --l3:#6BA5C6; --l4:#48697C;
+  --ok:#6FBE93; --warn:#D9AE55; --crit:#DE8080;
+  --ok-bg:#152219; --warn-bg:#241E10; --crit-bg:#241414;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:"IBM Plex Serif",Georgia,serif;font-size:16.5px;line-height:1.62;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 26px 96px;
+  display:grid;grid-template-columns:206px minmax(0,1fr);gap:44px;align-items:start}
+@media(max-width:940px){.wrap{grid-template-columns:1fr;gap:0}}
+
+h1,h2,h3,.sans{font-family:"IBM Plex Sans",system-ui,sans-serif}
+code,kbd,.mono,table,.num{font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+/* ---- masthead ---- */
+header{grid-column:1/-1;padding:56px 0 30px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--copper);margin:0 0 14px}
+h1{font-size:clamp(34px,5vw,52px);line-height:1.03;margin:0;font-weight:600;
+  letter-spacing:-.022em;text-wrap:balance}
+.sub{margin:16px 0 0;max-width:62ch;color:var(--ink-2);font-size:17px}
+.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 46px}
+.stat{background:var(--panel);padding:15px 16px 14px}
+.stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:600;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
+.stat span{display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+
+/* ---- nav ---- */
+nav{position:sticky;top:22px;font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+@media(max-width:940px){nav{position:static;margin:0 0 40px;
+  border-bottom:1px solid var(--rule);padding-bottom:18px}}
+nav ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+@media(max-width:940px){nav ol{flex-direction:row;flex-wrap:wrap;gap:6px 16px}}
+nav a{display:block;color:var(--muted);text-decoration:none;padding:4px 0;
+  border-left:2px solid transparent;padding-left:11px;transition:color .12s,border-color .12s}
+@media(max-width:940px){nav a{border-left:0;padding-left:0}}
+nav a:hover,nav a:focus-visible{color:var(--copper);border-left-color:var(--copper)}
+nav .navnum{color:var(--faint);margin-right:8px}
+
+main{min-width:0;display:flex;flex-direction:column;gap:52px}
+section{scroll-margin-top:24px}
+h2{font-size:26px;font-weight:600;letter-spacing:-.018em;margin:0 0 6px;text-wrap:balance}
+h2 .h2n{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--copper);
+  display:block;letter-spacing:.12em;margin-bottom:9px;font-weight:500}
+h3{font-size:16px;font-weight:600;margin:30px 0 8px;letter-spacing:-.008em}
+p{margin:0 0 14px;max-width:66ch}
+main>section>p:first-of-type{color:var(--ink-2)}
+a{color:var(--copper)}
+strong{font-weight:600}
+em{font-style:italic}
+
+/* ---- tables ---- */
+.tw{overflow-x:auto;border:1px solid var(--rule);background:var(--panel);margin:18px 0}
+table{border-collapse:collapse;width:100%;font-size:12.8px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+th,td{padding:7px 13px;text-align:right;border-bottom:1px solid var(--rule-2)}
+th:first-child,td:first-child{text-align:left}
+th.l,td.l{text-align:left}
+thead th{background:var(--panel-2);color:var(--muted);font-weight:500;font-size:10.5px;
+  letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid var(--rule);
+  position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+.nocaps{text-transform:none!important;letter-spacing:.02em}
+tr.tot td{background:var(--panel-2);font-weight:600;border-top:1px solid var(--rule)}
+td.dim{color:var(--faint)}
+
+/* ---- level chips ---- */
+.lv{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;white-space:nowrap}
+.lv::before{content:"";width:9px;height:9px;border-radius:1px;background:var(--c)}
+.lv0{--c:var(--l0)}.lv1{--c:var(--l1)}.lv2{--c:var(--l2)}.lv3{--c:var(--l3)}.lv4{--c:var(--l4)}
+
+/* ---- figures ---- */
+figure{margin:22px 0;background:var(--panel);border:1px solid var(--rule);padding:20px 20px 14px}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);
+  margin-top:14px;padding-top:12px;border-top:1px solid var(--rule-2);line-height:1.55;
+  white-space:normal}
+.dlab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--muted)}
+.dkey{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--ink)}
+figure.wide svg{max-width:100%}
+figure.narrow{max-width:560px;margin-inline:auto}
+td.txt,th.txt{white-space:normal;min-width:15ch}
+
+/* ---- budget bar ---- */
+.bud{display:flex;flex-direction:column;gap:5px;margin:18px 0}
+.budrow{display:grid;grid-template-columns:58px 1fr 124px;gap:12px;align-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.budbar{display:flex;height:19px;background:var(--panel-2);border:1px solid var(--rule-2)}
+.budbar i{display:block;height:100%}
+.budval{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:14px 0 0;
+  padding-top:12px;border-top:1px solid var(--rule-2)}
+
+/* ---- callouts ---- */
+.note{border-left:3px solid var(--c,var(--copper));background:var(--bg,var(--panel));
+  padding:15px 18px;margin:20px 0;font-size:15.5px}
+.note p{margin:0 0 9px}.note p:last-child{margin:0}
+.note .tag{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--c,var(--copper));display:block;margin-bottom:7px;font-weight:600}
+.note.warn{--c:var(--warn);--bg:var(--warn-bg)}
+.note.crit{--c:var(--crit);--bg:var(--crit-bg)}
+.note.ok{--c:var(--ok);--bg:var(--ok-bg)}
+
+pre{background:var(--panel);border:1px solid var(--rule);padding:14px 16px;overflow-x:auto;
+  font-size:12.6px;line-height:1.62;margin:16px 0}
+pre b{color:var(--copper);font-weight:600}
+pre i{color:var(--faint);font-style:normal}
+code{background:var(--panel-2);border:1px solid var(--rule-2);padding:.08em .35em;
+  font-size:.87em;border-radius:2px}
+pre code{background:none;border:0;padding:0;font-size:inherit}
+
+.eq{background:var(--panel);border:1px solid var(--rule);padding:16px 20px;margin:16px 0;
+  font-family:"IBM Plex Mono",monospace;font-size:13.5px;line-height:2;overflow-x:auto}
+.eq b{color:var(--copper);font-weight:600}
+
+dl.kv{margin:16px 0;display:grid;grid-template-columns:auto 1fr;gap:0;
+  border:1px solid var(--rule);background:var(--panel)}
+dl.kv dt{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;
+  padding:10px 14px;border-bottom:1px solid var(--rule-2);color:var(--copper);white-space:nowrap}
+dl.kv dd{margin:0;padding:10px 16px;border-bottom:1px solid var(--rule-2);font-size:14.6px}
+dl.kv dt:last-of-type,dl.kv dd:last-of-type{border-bottom:0}
+@media(max-width:640px){dl.kv{grid-template-columns:1fr}
+  dl.kv dt{border-bottom:0;padding-bottom:0}}
+
+footer{grid-column:1/-1;margin-top:70px;padding-top:22px;border-top:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted)}
+:focus-visible{outline:2px solid var(--copper);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Structured hex mesh · gmsh 4.15 · OpenFOAM ESI v2412</p>
+  <h1>Aconcagua Mesh Atlas</h1>
+  <p class="sub">Every block, every index, and every knob that moves them — so a refinement
+  change is a decision you make, not one you discover afterwards.</p>
+</header>
+
+<div class="stats">
+  <div class="stat"><b>2,270,988</b><span>cells</span></div>
+  <div class="stat"><b>100%</b><span>hexahedra</span></div>
+  <div class="stat"><b>177</b><span>blocks</span></div>
+  <div class="stat"><b>31</b><span>cells in δ</span></div>
+  <div class="stat"><b>303 µm</b><span>first cell y₁</span></div>
+  <div class="stat"><b>0.00 nm</b><span>wall residual</span></div>
+</div>
+
+<nav aria-label="Contents">
+  <ol>
+    <li><a href="#structure"><span class="navnum">01</span>Structure</a></li>
+    <li><a href="#budget"><span class="navnum">02</span>Cell budget</a></li>
+    <li><a href="#handles"><span class="navnum">03</span>Refinement handles</a></li>
+    <li><a href="#law"><span class="navnum">04</span>The sizing law</a></li>
+    <li><a href="#current"><span class="navnum">05</span>What you have now</a></li>
+    <li><a href="#recipes"><span class="navnum">06</span>Recipes</a></li>
+    <li><a href="#invariants"><span class="navnum">07</span>Invariants</a></li>
+    <li><a href="#traps"><span class="navnum">08</span>Traps</a></li>
+    <li><a href="#files"><span class="navnum">09</span>Files</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="structure">
+  <h2><span class="h2n">01</span>The block structure</h2>
+  <p>The fluid around a pointed body of revolution is topologically an annulus whose hole
+  <strong>closes at the nose tip and reopens at the base</strong>. A single radial O-grid cannot
+  cover it — carried into the tip, every radial line converges on one point and the cells
+  collapse. That is a property of the shape, not of the mesher, and it is why the topology
+  changes in exactly two places and nowhere else.</p>
+
+  <p>Two indices describe every block: a <strong>level</strong> (radial position in the
+  cross-plane) and a <strong>segment</strong> (streamwise position). Refinement is always a
+  statement about one of those two directions, or about the azimuthal one that runs through
+  all of them.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 928 330" role="img" aria-label="Meridional map of the block structure">
+<defs><pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink)" stroke-width="1" opacity=".18"/></pattern></defs>
+<rect x="62.0" y="44.0" width="770.0" height="48.0" fill="var(--l4)" opacity=".14"/>
+<rect x="62.0" y="92.0" width="770.0" height="54.0" fill="var(--l3)" opacity=".14"/>
+<rect x="62.0" y="146.0" width="770.0" height="122.0" fill="var(--l2)" opacity=".14"/>
+<polygon points="62.00,268.0 62.00,172.52 65.85,172.99 69.69,173.48 73.54,173.97 77.38,174.48 81.23,174.99 85.08,175.52 88.92,176.06 92.77,176.62 96.62,177.19 100.46,177.77 104.31,178.37 108.15,178.99 112.00,179.62 115.85,180.27 119.69,180.94 123.54,181.62 127.38,182.33 131.23,183.06 135.08,183.81 138.92,184.59 142.77,185.39 146.62,186.22 150.46,187.09 154.31,187.98 158.15,188.92 162.00,189.89 165.85,190.91 169.69,191.98 173.54,193.11 177.38,194.30 181.23,195.57 185.08,196.93 188.92,198.40 192.77,200.01 196.62,201.80 200.46,209.88 204.31,220.30 208.15,233.88 212.00,261.40 212.00,268.0" fill="var(--l1)" opacity=".22"/>
+<polygon points="62.00,268.0 62.00,197.21 65.85,197.42 69.69,197.64 73.54,197.86 77.38,198.09 81.23,198.32 85.08,198.56 88.92,198.80 92.77,199.05 96.62,199.31 100.46,199.57 104.31,199.84 108.15,200.12 112.00,200.40 115.85,200.69 119.69,200.99 123.54,201.30 127.38,201.62 131.23,201.95 135.08,203.23 138.92,204.72 142.77,206.27 146.62,207.88 150.46,209.54 154.31,211.27 158.15,213.07 162.00,214.95 165.85,216.92 169.69,218.98 173.54,221.15 177.38,223.45 181.23,225.90 185.08,228.53 188.92,231.36 192.77,234.46 196.62,237.91 200.46,241.85 204.31,246.54 208.15,252.65 212.00,265.03 212.00,268.0" fill="var(--l0)" opacity=".34"/>
+<polyline points="62.00,172.52 65.85,172.99 69.69,173.48 73.54,173.97 77.38,174.48 81.23,174.99 85.08,175.52 88.92,176.06 92.77,176.62 96.62,177.19 100.46,177.77 104.31,178.37 108.15,178.99 112.00,179.62 115.85,180.27 119.69,180.94 123.54,181.62 127.38,182.33 131.23,183.06 135.08,183.81 138.92,184.59 142.77,185.39 146.62,186.22 150.46,187.09 154.31,187.98 158.15,188.92 162.00,189.89 165.85,190.91 169.69,191.98 173.54,193.11 177.38,194.30 181.23,195.57 185.08,196.93 188.92,198.40 192.77,200.01 196.62,201.80 200.46,209.88 204.31,220.30 208.15,233.88 212.00,261.40" fill="none" stroke="var(--l1)" stroke-width="1.4"/>
+<polyline points="62.00,197.21 65.85,197.42 69.69,197.64 73.54,197.86 77.38,198.09 81.23,198.32 85.08,198.56 88.92,198.80 92.77,199.05 96.62,199.31 100.46,199.57 104.31,199.84 108.15,200.12 112.00,200.40 115.85,200.69 119.69,200.99 123.54,201.30 127.38,201.62 131.23,201.95 135.08,203.23 138.92,204.72 142.77,206.27 146.62,207.88 150.46,209.54 154.31,211.27 158.15,213.07 162.00,214.95 165.85,216.92 169.69,218.98 173.54,221.15 177.38,223.45 181.23,225.90 185.08,228.53 188.92,231.36 192.77,234.46 196.62,237.91 200.46,241.85 204.31,246.54 208.15,252.65 212.00,265.03" fill="none" stroke="var(--l0)" stroke-width="1.4"/>
+<polygon points="564.00,268.0 564.00,219.92 673.76,218.46 692.94,217.01 696.70,215.55 700.45,214.09 704.21,212.64 707.97,211.18 711.73,209.72 715.49,208.26 719.25,206.81 723.01,205.35 726.76,203.89 730.52,202.44 734.28,201.76 738.04,201.42 741.80,201.08 745.56,200.74 749.31,200.40 753.07,200.06 756.83,199.72 760.59,199.38 764.35,199.04 768.11,198.70 771.87,198.36 775.62,198.02 779.38,197.68 783.14,197.34 786.90,197.00 790.66,196.66 794.42,196.32 798.17,195.98 801.93,195.64 805.69,195.30 809.45,194.96 813.21,194.62 816.97,194.28 820.72,193.94 824.48,193.60 828.24,193.26 832.00,192.92 832.00,268.0" fill="var(--l1)" opacity=".22"/>
+<polygon points="564.00,268.0 564.00,246.36 673.76,245.71 692.94,245.05 696.70,244.40 700.45,243.74 704.21,243.09 707.97,242.43 711.73,241.77 715.49,241.12 719.25,240.46 723.01,239.81 726.76,239.15 730.52,238.50 734.28,237.84 738.04,237.19 741.80,236.53 745.56,235.87 749.31,235.22 753.07,234.56 756.83,233.91 760.59,233.25 764.35,232.60 768.11,231.94 771.87,231.28 775.62,230.63 779.38,229.97 783.14,229.32 786.90,228.66 790.66,228.01 794.42,227.35 798.17,226.70 801.93,226.04 805.69,225.38 809.45,224.73 813.21,224.07 816.97,223.42 820.72,222.76 824.48,222.11 828.24,221.45 832.00,220.79 832.00,268.0" fill="var(--l0)" opacity=".34"/>
+<polyline points="564.00,219.92 673.76,218.46 692.94,217.01 696.70,215.55 700.45,214.09 704.21,212.64 707.97,211.18 711.73,209.72 715.49,208.26 719.25,206.81 723.01,205.35 726.76,203.89 730.52,202.44 734.28,201.76 738.04,201.42 741.80,201.08 745.56,200.74 749.31,200.40 753.07,200.06 756.83,199.72 760.59,199.38 764.35,199.04 768.11,198.70 771.87,198.36 775.62,198.02 779.38,197.68 783.14,197.34 786.90,197.00 790.66,196.66 794.42,196.32 798.17,195.98 801.93,195.64 805.69,195.30 809.45,194.96 813.21,194.62 816.97,194.28 820.72,193.94 824.48,193.60 828.24,193.26 832.00,192.92" fill="none" stroke="var(--l1)" stroke-width="1.4"/>
+<polyline points="564.00,246.36 673.76,245.71 692.94,245.05 696.70,244.40 700.45,243.74 704.21,243.09 707.97,242.43 711.73,241.77 715.49,241.12 719.25,240.46 723.01,239.81 726.76,239.15 730.52,238.50 734.28,237.84 738.04,237.19 741.80,236.53 745.56,235.87 749.31,235.22 753.07,234.56 756.83,233.91 760.59,233.25 764.35,232.60 768.11,231.94 771.87,231.28 775.62,230.63 779.38,229.97 783.14,229.32 786.90,228.66 790.66,228.01 794.42,227.35 798.17,226.70 801.93,226.04 805.69,225.38 809.45,224.73 813.21,224.07 816.97,223.42 820.72,222.76 824.48,222.11 828.24,221.45 832.00,220.79" fill="none" stroke="var(--l0)" stroke-width="1.4"/>
+<path d="M211.78,268.00 L211.81,266.38 L211.85,265.27 L211.88,264.31 L211.91,263.42 L211.95,262.59 L211.98,261.81 L212.32,261.05 L213.01,260.33 L213.69,259.62 L214.38,258.94 L215.06,258.28 L215.75,257.63 L216.43,257.00 L217.12,256.38 L217.81,255.77 L218.49,255.18 L219.18,254.59 L219.86,254.01 L220.55,253.45 L221.24,252.89 L221.92,252.34 L222.61,251.79 L223.29,251.26 L223.98,250.73 L224.66,250.21 L225.35,249.69 L226.04,249.18 L226.72,248.68 L227.41,248.18 L228.09,247.68 L228.78,247.20 L229.47,246.71 L230.15,246.23 L230.84,245.76 L231.52,245.29 L232.21,244.83 L232.89,244.36 L233.58,243.91 L234.27,243.46 L234.95,243.01 L235.64,242.56 L236.32,242.12 L237.01,241.68 L237.70,241.25 L238.38,240.82 L239.07,240.39 L239.75,239.97 L240.44,239.55 L241.12,239.13 L241.81,238.71 L242.50,238.30 L243.18,237.89 L243.87,237.49 L244.55,237.09 L245.24,236.69 L245.93,236.29 L246.61,235.90 L247.30,235.51 L247.98,235.12 L248.67,234.73 L249.35,234.35 L250.04,233.97 L250.73,233.59 L251.41,233.21 L252.10,232.84 L252.78,232.47 L253.47,232.10 L254.16,231.74 L254.84,231.37 L255.53,231.01 L256.21,230.65 L256.90,230.30 L257.58,229.94 L258.27,229.59 L258.96,229.24 L259.64,228.90 L260.33,228.55 L261.01,228.21 L261.70,227.87 L262.39,227.53 L263.07,227.19 L263.76,226.86 L264.44,226.52 L265.13,226.19 L265.81,225.87 L266.50,225.54 L267.19,225.22 L267.87,224.89 L268.56,224.57 L269.24,224.25 L269.93,223.94 L270.62,223.62 L271.30,223.31 L271.99,223.00 L272.67,222.69 L273.36,222.39 L274.04,222.08 L274.73,221.78 L275.42,221.48 L276.10,221.18 L276.79,220.89 L277.47,220.59 L278.16,220.30 L278.85,220.01 L279.53,219.72 L280.22,219.43 L280.90,219.14 L281.59,218.86 L282.27,218.58 L282.96,218.30 L283.65,218.02 L284.33,217.75 L285.02,217.47 L285.70,217.20 L286.39,216.93 L287.08,216.66 L287.76,216.39 L288.45,216.13 L289.13,215.87 L289.82,215.60 L290.50,215.35 L291.19,215.09 L291.88,214.83 L292.56,214.58 L293.25,214.33 L293.93,214.08 L294.62,213.83 L295.31,213.58 L295.99,213.34 L296.68,213.10 L297.36,212.85 L298.05,212.62 L298.73,212.38 L299.42,212.14 L300.11,211.91 L300.79,211.68 L301.48,211.45 L302.16,211.22 L302.85,211.00 L303.54,210.77 L304.22,210.55 L304.91,210.33 L305.59,210.12 L306.28,209.90 L306.96,209.69 L307.65,209.48 L308.34,209.27 L309.02,209.06 L309.71,208.85 L310.39,208.65 L311.08,208.45 L311.77,208.25 L312.45,208.05 L313.14,207.86 L313.82,207.66 L314.51,207.47 L315.19,207.29 L315.88,207.10 L316.57,206.92 L317.25,206.73 L317.94,206.55 L318.62,206.38 L319.31,206.20 L320.00,206.03 L320.68,205.86 L321.37,205.69 L322.05,205.53 L322.74,205.36 L323.42,205.20 L324.11,205.05 L324.80,204.89 L325.48,204.74 L326.17,204.59 L326.85,204.44 L327.54,204.30 L328.23,204.16 L328.91,204.02 L329.60,203.89 L330.28,203.75 L330.97,203.62 L331.65,203.50 L332.34,203.38 L333.03,203.26 L333.71,203.14 L334.40,203.03 L335.08,202.92 L335.77,202.82 L336.46,202.72 L337.14,202.62 L337.83,202.53 L338.51,202.45 L339.20,202.37 L339.88,202.29 L340.57,202.22 L341.26,202.16 L341.94,202.10 L342.63,202.06 L343.31,202.02 L344.00,202.00 L344.00,202.00 L530.00,202.00 L530.00,202.00 L564.00,219.92 L564.00,268.0 L211.78,268.0 Z" fill="url(#hatch)" stroke="var(--copper)" stroke-width="2.2" stroke-linejoin="round"/>
+<line x1="62.0" y1="44.0" x2="62.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="212.0" y1="44.0" x2="212.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="344.0" y1="44.0" x2="344.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="530.0" y1="44.0" x2="530.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="564.0" y1="44.0" x2="564.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="622.0" y1="44.0" x2="622.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="690.0" y1="44.0" x2="690.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="832.0" y1="44.0" x2="832.0" y2="268.0" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3"/>
+<text class="dlab" x="137.0" y="36.0" text-anchor="middle">up</text>
+<text class="dlab" x="278.0" y="36.0" text-anchor="middle">nose</text>
+<text class="dlab" x="437.0" y="36.0" text-anchor="middle">cyl</text>
+<text class="dlab" x="547.0" y="36.0" text-anchor="middle">tail</text>
+<text class="dlab" x="593.0" y="36.0" text-anchor="middle">wake1</text>
+<text class="dlab" x="656.0" y="36.0" text-anchor="middle">wake2</text>
+<text class="dlab" x="761.0" y="36.0" text-anchor="middle">wake3</text>
+<line x1="57.0" y1="268.0" x2="62.0" y2="268.0" stroke="var(--muted)"/>
+<text class="dlab" x="53.0" y="271.5" text-anchor="end">0</text>
+<line x1="57.0" y1="202.0" x2="62.0" y2="202.0" stroke="var(--muted)"/>
+<text class="dlab" x="53.0" y="205.5" text-anchor="end">wall</text>
+<line x1="57.0" y1="146.0" x2="62.0" y2="146.0" stroke="var(--muted)"/>
+<text class="dlab" x="53.0" y="149.5" text-anchor="end">0.35</text>
+<line x1="57.0" y1="92.0" x2="62.0" y2="92.0" stroke="var(--muted)"/>
+<text class="dlab" x="53.0" y="95.5" text-anchor="end">2.0</text>
+<line x1="57.0" y1="44.0" x2="62.0" y2="44.0" stroke="var(--muted)"/>
+<text class="dlab" x="53.0" y="47.5" text-anchor="end">11.775</text>
+<text class="dlab" x="53.0" y="32.0" text-anchor="end">r [m]</text>
+<text class="dlab" x="62.0" y="284.0" text-anchor="middle">−17.73</text>
+<text class="dlab" x="211.8" y="284.0" text-anchor="middle">0</text>
+<text class="dlab" x="564.0" y="284.0" text-anchor="middle">2.955</text>
+<text class="dlab" x="832.0" y="284.0" text-anchor="middle">41.37</text>
+<text class="dlab" x="447.0" y="300.0" text-anchor="middle">x [m] — both axes are piecewise-linear so every block is visible; the picture is not to scale</text>
+</svg>
+    <figcaption>Meridional map. The body (hatched, copper) sits on the axis from x = 0 to
+    2.955. Butterfly core and ring exist only upstream of the cap and downstream of the base —
+    the two places where the axis is fluid. The three shells span the whole domain.</figcaption>
+  </figure>
+  <figure class="narrow">
+    <svg viewBox="0 0 330 340" role="img" aria-label="Cross-plane butterfly tiling of the quarter domain">
+<polygon points="176.0,290.0 176.0,287.6 175.9,285.1 175.8,282.7 175.7,280.2 175.5,277.8 175.3,275.4 175.0,273.0 174.7,270.5 174.4,268.1 174.0,265.7 173.5,263.3 173.1,260.9 172.6,258.5 172.0,256.2 171.4,253.8 170.8,251.4 170.1,249.1 169.4,246.7 168.7,244.4 167.9,242.1 167.1,239.8 166.2,237.5 165.3,235.3 164.4,233.0 163.4,230.8 162.4,228.5 161.4,226.3 160.3,224.2 159.2,222.0 158.0,219.8 156.8,217.7 155.6,215.6 154.4,213.5 153.1,211.4 151.7,209.4 150.4,207.4 149.0,205.4 147.5,203.4 146.1,201.4 144.6,199.5 143.1,197.6 141.5,195.7 139.9,193.9 138.3,192.1 136.6,190.3 134.9,188.5 133.2,186.8 95.1,224.9 96.1,226.0 97.2,227.2 98.2,228.3 99.3,229.4 100.3,230.6 101.2,231.8 102.2,233.0 103.1,234.2 104.1,235.4 105.0,236.7 105.8,237.9 106.7,239.2 107.5,240.5 108.4,241.8 109.2,243.1 109.9,244.4 110.7,245.8 111.4,247.1 112.1,248.5 112.8,249.9 113.5,251.3 114.1,252.7 114.7,254.1 115.3,255.5 115.9,256.9 116.4,258.4 116.9,259.8 117.4,261.3 117.9,262.7 118.3,264.2 118.7,265.7 119.1,267.2 119.5,268.7 119.8,270.2 120.2,271.7 120.5,273.2 120.7,274.7 121.0,276.2 121.2,277.7 121.4,279.3 121.5,280.8 121.7,282.3 121.8,283.9 121.9,285.4 121.9,286.9 122.0,288.5 122.0,290.0" fill="var(--l2)" opacity=".18" stroke="var(--l2)" stroke-width="1.2"/>
+<polygon points="133.2,186.8 131.5,185.1 129.7,183.4 127.9,181.7 126.1,180.1 124.3,178.5 122.4,176.9 120.5,175.4 118.6,173.9 116.6,172.5 114.6,171.0 112.6,169.6 110.6,168.3 108.6,166.9 106.5,165.6 104.4,164.4 102.3,163.2 100.2,162.0 98.0,160.8 95.8,159.7 93.7,158.6 91.5,157.6 89.2,156.6 87.0,155.6 84.7,154.7 82.5,153.8 80.2,152.9 77.9,152.1 75.6,151.3 73.3,150.6 70.9,149.9 68.6,149.2 66.2,148.6 63.8,148.0 61.5,147.4 59.1,146.9 56.7,146.5 54.3,146.0 51.9,145.6 49.5,145.3 47.0,145.0 44.6,144.7 42.2,144.5 39.8,144.3 37.3,144.2 34.9,144.1 32.4,144.0 30.0,144.0 30.0,198.0 31.5,198.0 33.1,198.1 34.6,198.1 36.1,198.2 37.7,198.3 39.2,198.5 40.7,198.6 42.3,198.8 43.8,199.0 45.3,199.3 46.8,199.5 48.3,199.8 49.8,200.2 51.3,200.5 52.8,200.9 54.3,201.3 55.8,201.7 57.3,202.1 58.7,202.6 60.2,203.1 61.6,203.6 63.1,204.1 64.5,204.7 65.9,205.3 67.3,205.9 68.7,206.5 70.1,207.2 71.5,207.9 72.9,208.6 74.2,209.3 75.6,210.1 76.9,210.8 78.2,211.6 79.5,212.5 80.8,213.3 82.1,214.2 83.3,215.0 84.6,215.9 85.8,216.9 87.0,217.8 88.2,218.8 89.4,219.7 90.6,220.7 91.7,221.8 92.8,222.8 94.0,223.9 95.1,224.9" fill="var(--l2)" opacity=".18" stroke="var(--l2)" stroke-width="1.2"/>
+<polygon points="226.0,290.0 226.0,286.7 225.9,283.5 225.8,280.2 225.6,276.9 225.3,273.6 225.0,270.4 224.7,267.1 224.3,263.9 223.8,260.6 223.3,257.4 222.7,254.2 222.1,251.0 221.4,247.8 220.7,244.6 219.9,241.4 219.0,238.2 218.1,235.1 217.2,231.9 216.2,228.8 215.2,225.7 214.1,222.6 212.9,219.6 211.7,216.5 210.4,213.5 209.1,210.5 207.8,207.5 206.4,204.5 204.9,201.6 203.4,198.7 201.9,195.8 200.3,192.9 198.6,190.1 196.9,187.3 195.2,184.5 193.4,181.8 191.6,179.1 189.7,176.4 187.8,173.7 185.8,171.1 183.8,168.5 181.8,166.0 179.7,163.5 177.5,161.0 175.4,158.5 173.1,156.1 170.9,153.7 168.6,151.4 133.2,186.8 134.9,188.5 136.6,190.3 138.3,192.1 139.9,193.9 141.5,195.7 143.1,197.6 144.6,199.5 146.1,201.4 147.5,203.4 149.0,205.4 150.4,207.4 151.7,209.4 153.1,211.4 154.4,213.5 155.6,215.6 156.8,217.7 158.0,219.8 159.2,222.0 160.3,224.2 161.4,226.3 162.4,228.5 163.4,230.8 164.4,233.0 165.3,235.3 166.2,237.5 167.1,239.8 167.9,242.1 168.7,244.4 169.4,246.7 170.1,249.1 170.8,251.4 171.4,253.8 172.0,256.2 172.6,258.5 173.1,260.9 173.5,263.3 174.0,265.7 174.4,268.1 174.7,270.5 175.0,273.0 175.3,275.4 175.5,277.8 175.7,280.2 175.8,282.7 175.9,285.1 176.0,287.6 176.0,290.0" fill="var(--l3)" opacity=".18" stroke="var(--l3)" stroke-width="1.2"/>
+<polygon points="168.6,151.4 166.3,149.1 163.9,146.9 161.5,144.6 159.0,142.5 156.5,140.3 154.0,138.2 151.5,136.2 148.9,134.2 146.3,132.2 143.6,130.3 140.9,128.4 138.2,126.6 135.5,124.8 132.7,123.1 129.9,121.4 127.1,119.7 124.2,118.1 121.3,116.6 118.4,115.1 115.5,113.6 112.5,112.2 109.5,110.9 106.5,109.6 103.5,108.3 100.4,107.1 97.4,105.9 94.3,104.8 91.2,103.8 88.1,102.8 84.9,101.9 81.8,101.0 78.6,100.1 75.4,99.3 72.2,98.6 69.0,97.9 65.8,97.3 62.6,96.7 59.4,96.2 56.1,95.7 52.9,95.3 49.6,95.0 46.4,94.7 43.1,94.4 39.8,94.2 36.5,94.1 33.3,94.0 30.0,94.0 30.0,144.0 32.4,144.0 34.9,144.1 37.3,144.2 39.8,144.3 42.2,144.5 44.6,144.7 47.0,145.0 49.5,145.3 51.9,145.6 54.3,146.0 56.7,146.5 59.1,146.9 61.5,147.4 63.8,148.0 66.2,148.6 68.6,149.2 70.9,149.9 73.3,150.6 75.6,151.3 77.9,152.1 80.2,152.9 82.5,153.8 84.7,154.7 87.0,155.6 89.2,156.6 91.5,157.6 93.7,158.6 95.8,159.7 98.0,160.8 100.2,162.0 102.3,163.2 104.4,164.4 106.5,165.6 108.6,166.9 110.6,168.3 112.6,169.6 114.6,171.0 116.6,172.5 118.6,173.9 120.5,175.4 122.4,176.9 124.3,178.5 126.1,180.1 127.9,181.7 129.7,183.4 131.5,185.1 133.2,186.8" fill="var(--l3)" opacity=".18" stroke="var(--l3)" stroke-width="1.2"/>
+<polygon points="276.0,290.0 276.0,285.9 275.9,281.8 275.7,277.7 275.5,273.6 275.1,269.5 274.8,265.4 274.3,261.3 273.8,257.2 273.2,253.1 272.6,249.1 271.9,245.0 271.1,241.0 270.2,237.0 269.3,233.0 268.3,229.0 267.3,225.0 266.1,221.1 265.0,217.1 263.7,213.2 262.4,209.3 261.0,205.4 259.6,201.6 258.1,197.8 256.5,194.0 254.8,190.2 253.1,186.5 251.4,182.7 249.6,179.1 247.7,175.4 245.7,171.8 243.7,168.2 241.7,164.6 239.5,161.1 237.4,157.6 235.1,154.2 232.8,150.8 230.5,147.4 228.0,144.1 225.6,140.8 223.1,137.5 220.5,134.3 217.9,131.2 215.2,128.1 212.4,125.0 209.7,122.0 206.8,119.0 203.9,116.1 168.6,151.4 170.9,153.7 173.1,156.1 175.4,158.5 177.5,161.0 179.7,163.5 181.8,166.0 183.8,168.5 185.8,171.1 187.8,173.7 189.7,176.4 191.6,179.1 193.4,181.8 195.2,184.5 196.9,187.3 198.6,190.1 200.3,192.9 201.9,195.8 203.4,198.7 204.9,201.6 206.4,204.5 207.8,207.5 209.1,210.5 210.4,213.5 211.7,216.5 212.9,219.6 214.1,222.6 215.2,225.7 216.2,228.8 217.2,231.9 218.1,235.1 219.0,238.2 219.9,241.4 220.7,244.6 221.4,247.8 222.1,251.0 222.7,254.2 223.3,257.4 223.8,260.6 224.3,263.9 224.7,267.1 225.0,270.4 225.3,273.6 225.6,276.9 225.8,280.2 225.9,283.5 226.0,286.7 226.0,290.0" fill="var(--l4)" opacity=".18" stroke="var(--l4)" stroke-width="1.2"/>
+<polygon points="203.9,116.1 201.0,113.2 198.0,110.3 195.0,107.6 191.9,104.8 188.8,102.1 185.7,99.5 182.5,96.9 179.2,94.4 175.9,92.0 172.6,89.5 169.2,87.2 165.8,84.9 162.4,82.6 158.9,80.5 155.4,78.3 151.8,76.3 148.2,74.3 144.6,72.3 140.9,70.4 137.3,68.6 133.5,66.9 129.8,65.2 126.0,63.5 122.2,61.9 118.4,60.4 114.6,59.0 110.7,57.6 106.8,56.3 102.9,55.0 98.9,53.9 95.0,52.7 91.0,51.7 87.0,50.7 83.0,49.8 79.0,48.9 75.0,48.1 70.9,47.4 66.9,46.8 62.8,46.2 58.7,45.7 54.6,45.2 50.5,44.9 46.4,44.5 42.3,44.3 38.2,44.1 34.1,44.0 30.0,44.0 30.0,94.0 33.3,94.0 36.5,94.1 39.8,94.2 43.1,94.4 46.4,94.7 49.6,95.0 52.9,95.3 56.1,95.7 59.4,96.2 62.6,96.7 65.8,97.3 69.0,97.9 72.2,98.6 75.4,99.3 78.6,100.1 81.8,101.0 84.9,101.9 88.1,102.8 91.2,103.8 94.3,104.8 97.4,105.9 100.4,107.1 103.5,108.3 106.5,109.6 109.5,110.9 112.5,112.2 115.5,113.6 118.4,115.1 121.3,116.6 124.2,118.1 127.1,119.7 129.9,121.4 132.7,123.1 135.5,124.8 138.2,126.6 140.9,128.4 143.6,130.3 146.3,132.2 148.9,134.2 151.5,136.2 154.0,138.2 156.5,140.3 159.0,142.5 161.5,144.6 163.9,146.9 166.3,149.1 168.6,151.4" fill="var(--l4)" opacity=".18" stroke="var(--l4)" stroke-width="1.2"/>
+<polygon points="71.4,290.0 71.4,248.6 95.1,224.9 96.7,226.6 98.3,228.3 99.8,230.1 101.3,231.9 102.8,233.7 104.2,235.5 105.5,237.4 106.8,239.4 108.1,241.3 109.3,243.3 110.4,245.4 111.5,247.4 112.6,249.5 113.6,251.6 114.5,253.7 115.4,255.9 116.3,258.0 117.1,260.2 117.8,262.5 118.5,264.7 119.1,266.9 119.6,269.2 120.1,271.5 120.6,273.8 120.9,276.1 121.3,278.4 121.5,280.7 121.7,283.0 121.9,285.3 122.0,287.7 122.0,290.0" fill="var(--l1)" opacity=".26" stroke="var(--l1)" stroke-width="1.2"/>
+<polygon points="71.4,248.6 30.0,248.6 30.0,198.0 32.3,198.0 34.7,198.1 37.0,198.3 39.3,198.5 41.6,198.7 43.9,199.1 46.2,199.4 48.5,199.9 50.8,200.4 53.1,200.9 55.3,201.5 57.5,202.2 59.8,202.9 62.0,203.7 64.1,204.6 66.3,205.5 68.4,206.4 70.5,207.4 72.6,208.5 74.6,209.6 76.7,210.7 78.7,211.9 80.6,213.2 82.6,214.5 84.5,215.8 86.3,217.2 88.1,218.7 89.9,220.2 91.7,221.7 93.4,223.3 95.1,224.9" fill="var(--l1)" opacity=".26" stroke="var(--l1)" stroke-width="1.2"/>
+<rect x="30.0" y="248.6" width="41.4" height="41.4" fill="var(--l0)" opacity=".36" stroke="var(--l0)" stroke-width="1.2"/>
+<line x1="121.9" y1="286.0" x2="275.8" y2="279.3" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="121.6" y1="282.0" x2="275.1" y2="268.6" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="121.2" y1="278.0" x2="273.9" y2="257.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="120.6" y1="274.0" x2="272.3" y2="247.3" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="119.8" y1="270.1" x2="270.2" y2="236.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="118.9" y1="266.2" x2="267.6" y2="226.3" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="117.7" y1="262.3" x2="264.6" y2="216.0" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="116.5" y1="258.5" x2="261.2" y2="205.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="115.0" y1="254.8" x2="257.3" y2="195.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="113.4" y1="251.1" x2="253.0" y2="186.0" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="111.6" y1="247.5" x2="248.2" y2="176.4" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="109.7" y1="244.0" x2="243.0" y2="167.0" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="107.6" y1="240.6" x2="237.5" y2="157.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="105.4" y1="237.2" x2="231.5" y2="148.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="103.0" y1="234.0" x2="225.2" y2="140.2" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="100.5" y1="230.9" x2="218.4" y2="131.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="97.8" y1="227.8" x2="211.4" y2="123.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="92.2" y1="222.2" x2="196.2" y2="108.6" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="89.1" y1="219.5" x2="188.1" y2="101.6" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="86.0" y1="217.0" x2="179.8" y2="94.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="82.8" y1="214.6" x2="171.1" y2="88.5" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="79.4" y1="212.4" x2="162.2" y2="82.5" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="76.0" y1="210.3" x2="153.0" y2="77.0" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="72.5" y1="208.4" x2="143.6" y2="71.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="68.9" y1="206.6" x2="134.0" y2="67.0" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="65.2" y1="205.0" x2="124.1" y2="62.7" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="61.5" y1="203.5" x2="114.1" y2="58.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="57.7" y1="202.3" x2="104.0" y2="55.4" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="53.8" y1="201.1" x2="93.7" y2="52.4" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="49.9" y1="200.2" x2="83.2" y2="49.8" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="46.0" y1="199.4" x2="72.7" y2="47.7" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="42.0" y1="198.8" x2="62.1" y2="46.1" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="38.0" y1="198.4" x2="51.4" y2="44.9" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="34.0" y1="198.1" x2="40.7" y2="44.2" stroke="var(--ink)" stroke-width=".4" opacity=".16"/>
+<line x1="95.1" y1="224.9" x2="203.9" y2="116.1" stroke="var(--ink)" stroke-width="1" opacity=".45" stroke-dasharray="4 3"/>
+<circle cx="122.0" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<text class="dkey" x="130.0" y="304.0">(1,0)</text>
+<circle cx="95.1" cy="224.9" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<text class="dkey" x="101.1" y="218.9">(1,1)</text>
+<circle cx="30.0" cy="198.0" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<text class="dkey" x="40.0" y="194.0">(1,2)</text>
+<circle cx="176.0" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<circle cx="226.0" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<circle cx="276.0" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.1"/>
+<circle cx="71.4" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--l0)" stroke-width="1.1"/>
+<circle cx="71.4" cy="248.6" r="2.6" fill="var(--panel)" stroke="var(--l0)" stroke-width="1.1"/>
+<circle cx="30.0" cy="248.6" r="2.6" fill="var(--panel)" stroke="var(--l0)" stroke-width="1.1"/>
+<circle cx="30.0" cy="290.0" r="2.6" fill="var(--panel)" stroke="var(--l0)" stroke-width="1.1"/>
+<text class="dkey" x="50.7" y="271.4" text-anchor="middle">L0</text>
+<text class="dkey" x="96.7" y="263.1" text-anchor="middle">L1</text>
+<text class="dkey" x="150.0" y="196.0" text-anchor="middle">L2</text>
+<text class="dkey" x="90.4" y="140.6" text-anchor="middle">L3</text>
+<text class="dkey" x="110.1" y="91.7" text-anchor="middle">L4</text>
+<line x1="22.0" y1="290.0" x2="292.0" y2="290.0" stroke="var(--muted)"/>
+<line x1="30.0" y1="298.0" x2="30.0" y2="28.0" stroke="var(--muted)"/>
+<text class="dlab" x="292.0" y="327.0" text-anchor="end">y  →  symm plane z = 0</text>
+<text class="dlab" x="35.0" y="32.0">−z ↑ symm plane y = 0</text>
+</svg>
+    <figcaption>Cross-plane tiling of the quarter, at the base station. Faint lines are the
+    real azimuthal divisions (N_AZ = 18 per 45°). The dashed 45° ray is the block split that
+    the butterfly forces — and the reason the current mesh has the defect in §08.</figcaption>
+  </figure>
+
+  <h3>Levels — the radial index</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Level</th><th class="l">Name</th><th class="l">Extent</th><th>Cells</th>
+      <th class="l">Present where</th><th class="l">Set by</th></tr></thead>
+    <tbody>
+      <tr><td><span class="lv lv0">L0</span></td><td class="l">core</td>
+        <td class="l">butterfly square, half-width 0.45·R<sub>i</sub></td><td>18 × 18</td>
+        <td class="l">axis fluid only</td><td class="l">N_AZ, CORE_FRAC</td></tr>
+      <tr><td><span class="lv lv1">L1</span></td><td class="l">ring</td>
+        <td class="l">square → inner circle R<sub>i</sub>(x)</td><td>10 radial</td>
+        <td class="l">axis fluid only</td><td class="l">N_RING</td></tr>
+      <tr><td><span class="lv lv2">L2</span></td><td class="l">shell 1</td>
+        <td class="l">wall → r = 0.35 m</td><td>57 radial</td>
+        <td class="l">everywhere</td><td class="l">SHELLS[0]</td></tr>
+      <tr><td><span class="lv lv3">L3</span></td><td class="l">shell 2</td>
+        <td class="l">0.35 → 2.00 m</td><td>21 radial</td>
+        <td class="l">everywhere</td><td class="l">SHELLS[1]</td></tr>
+      <tr><td><span class="lv lv4">L4</span></td><td class="l">shell 3</td>
+        <td class="l">2.00 → 11.775 m</td><td>14 radial</td>
+        <td class="l">everywhere</td><td class="l">SHELLS[2]</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each shell is split at 45° into two azimuthal blocks, because the butterfly ring must be
+  two blocks and everything outward has to match it. <strong>L2 is where the boundary layer
+  lives</strong>, which is why it carries 57 of the 92 radial cells and 57% of the mesh.</p>
+
+  <h3>Segments — the streamwise index</h3>
+  <p><code>nose</code> is built as 14 sub-blocks and <code>up</code> as 6, for the reason in
+  §08. They behave as one segment: you set the cell size at each end and the subdivision
+  reproduces that law exactly.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="l">Segment</th><th>x₀</th><th>x₁</th><th>Axial cells</th>
+      <th class="l">Core?</th><th class="l">Wall patch</th><th class="l">Inner boundary</th></tr></thead>
+    <tbody>
+      <tr><td class="l">up <span class="dim">(×6)</span></td><td>−17.730</td><td>0.026</td><td>81</td>
+        <td class="l">yes</td><td class="l dim">—</td><td class="l">tangent blend</td></tr>
+      <tr><td class="l">nose <span class="dim">(×14)</span></td><td>0.026</td><td>0.800</td><td>152</td>
+        <td class="l">no</td><td class="l">cone</td><td class="l">wall</td></tr>
+      <tr><td class="l">cyl</td><td>0.800</td><td>2.830</td><td>169</td>
+        <td class="l">no</td><td class="l">walls</td><td class="l">wall</td></tr>
+      <tr><td class="l">tail</td><td>2.830</td><td>2.955</td><td>16</td>
+        <td class="l">no</td><td class="l">tail</td><td class="l">wall</td></tr>
+      <tr><td class="l">wake1</td><td>2.955</td><td>3.255</td><td>94</td>
+        <td class="l">yes</td><td class="l dim">—</td><td class="l">wake cone</td></tr>
+      <tr><td class="l">wake2</td><td>3.255</td><td>4.155</td><td>41</td>
+        <td class="l">yes</td><td class="l dim">—</td><td class="l">wake cone</td></tr>
+      <tr><td class="l">wake3</td><td>4.155</td><td>41.370</td><td>73</td>
+        <td class="l">yes</td><td class="l dim">—</td><td class="l">wake cone</td></tr>
+      <tr class="tot"><td class="l">total</td><td></td><td></td><td>626</td><td class="l"></td>
+        <td class="l"></td><td class="l"></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note"><span class="tag">Cell count, exactly</span>
+  <p>A segment with core contributes <code>n_x · (2·N_AZ·n_rad + N_AZ² + 2·N_AZ·N_RING)</code>
+  cells; without core, just the first term. Nothing is estimated — you can compute the mesh
+  before you build it, and <code>python3 meshParams.py</code> prints it.</p></div>
+</section>
+
+<section id="budget">
+  <h2><span class="h2n">02</span>Where the cells actually are</h2>
+  <p>Refinement is a budget problem, so start from where the budget already goes. Two facts
+  dominate everything below: <strong>shell 1 holds 57% of the mesh</strong>, and
+  <strong>the wake holds 36%</strong> — more than the nose and cylinder that you probably
+  care about most.</p>
+
+  <div class="bud" role="img" aria-label="Cell budget by segment, split by level">
+    <div class="budrow"><span>up</span><span class="budbar" style="width:57.8%"><i style="background:var(--l0);opacity:0.30;flex:26244"></i><i style="background:var(--l1);opacity:0.44;flex:29160"></i><i style="background:var(--l2);opacity:0.58;flex:166212"></i><i style="background:var(--l3);opacity:0.72;flex:61236"></i><i style="background:var(--l4);opacity:0.86;flex:40824"></i></span><span class="budval">323,676 · 14.3%</span></div>
+    <div class="budrow"><span>nose</span><span class="budbar" style="width:89.9%"><i style="background:var(--l2);opacity:0.58;flex:311904"></i><i style="background:var(--l3);opacity:0.72;flex:114912"></i><i style="background:var(--l4);opacity:0.86;flex:76608"></i></span><span class="budval">503,424 · 22.2%</span></div>
+    <div class="budrow"><span>cyl</span><span class="budbar" style="width:100.0%"><i style="background:var(--l2);opacity:0.58;flex:346788"></i><i style="background:var(--l3);opacity:0.72;flex:127764"></i><i style="background:var(--l4);opacity:0.86;flex:85176"></i></span><span class="budval">559,728 · 24.6%</span></div>
+    <div class="budrow"><span>tail</span><span class="budbar" style="width:9.5%"><i style="background:var(--l2);opacity:0.58;flex:32832"></i><i style="background:var(--l3);opacity:0.72;flex:12096"></i><i style="background:var(--l4);opacity:0.86;flex:8064"></i></span><span class="budval">52,992 · 2.3%</span></div>
+    <div class="budrow"><span>wake1</span><span class="budbar" style="width:67.1%"><i style="background:var(--l0);opacity:0.30;flex:30456"></i><i style="background:var(--l1);opacity:0.44;flex:33840"></i><i style="background:var(--l2);opacity:0.58;flex:192888"></i><i style="background:var(--l3);opacity:0.72;flex:71064"></i><i style="background:var(--l4);opacity:0.86;flex:47376"></i></span><span class="budval">375,624 · 16.5%</span></div>
+    <div class="budrow"><span>wake2</span><span class="budbar" style="width:29.3%"><i style="background:var(--l0);opacity:0.30;flex:13284"></i><i style="background:var(--l1);opacity:0.44;flex:14760"></i><i style="background:var(--l2);opacity:0.58;flex:84132"></i><i style="background:var(--l3);opacity:0.72;flex:30996"></i><i style="background:var(--l4);opacity:0.86;flex:20664"></i></span><span class="budval">163,836 · 7.2%</span></div>
+    <div class="budrow"><span>wake3</span><span class="budbar" style="width:52.1%"><i style="background:var(--l0);opacity:0.30;flex:23652"></i><i style="background:var(--l1);opacity:0.44;flex:26280"></i><i style="background:var(--l2);opacity:0.58;flex:149796"></i><i style="background:var(--l3);opacity:0.72;flex:55188"></i><i style="background:var(--l4);opacity:0.86;flex:36792"></i></span><span class="budval">291,708 · 12.8%</span></div>
+    <div class="legend">
+      <span class="lv lv0">L0 core</span><span class="lv lv1">L1 ring</span>
+      <span class="lv lv2">L2 shell 1</span><span class="lv lv3">L3 shell 2</span>
+      <span class="lv lv4">L4 shell 3</span>
+    </div>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th class="l">Segment</th><th>L0 core</th><th>L1 ring</th><th>L2 shell 1</th>
+      <th>L3 shell 2</th><th>L4 shell 3</th><th>Total</th><th>Share</th></tr></thead>
+    <tbody>
+      <tr><td class="l">up</td><td>26,244</td><td>29,160</td><td>166,212</td><td>61,236</td><td>40,824</td><td>323,676</td><td>14.3%</td></tr>
+      <tr><td class="l">nose</td><td class="dim">—</td><td class="dim">—</td><td>311,904</td><td>114,912</td><td>76,608</td><td>503,424</td><td>22.2%</td></tr>
+      <tr><td class="l">cyl</td><td class="dim">—</td><td class="dim">—</td><td>346,788</td><td>127,764</td><td>85,176</td><td>559,728</td><td>24.6%</td></tr>
+      <tr><td class="l">tail</td><td class="dim">—</td><td class="dim">—</td><td>32,832</td><td>12,096</td><td>8,064</td><td>52,992</td><td>2.3%</td></tr>
+      <tr><td class="l">wake1</td><td>30,456</td><td>33,840</td><td>192,888</td><td>71,064</td><td>47,376</td><td>375,624</td><td>16.5%</td></tr>
+      <tr><td class="l">wake2</td><td>13,284</td><td>14,760</td><td>84,132</td><td>30,996</td><td>20,664</td><td>163,836</td><td>7.2%</td></tr>
+      <tr><td class="l">wake3</td><td>23,652</td><td>26,280</td><td>149,796</td><td>55,188</td><td>36,792</td><td>291,708</td><td>12.8%</td></tr>
+      <tr class="tot"><td class="l">total</td><td>93,636</td><td>104,040</td><td>1,284,552</td><td>473,256</td><td>315,504</td><td>2,270,988</td><td>100%</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Marginal cost of one more cell</h3>
+  <div class="tw"><table>
+    <thead><tr><th class="l">Add one</th><th>Cells added</th><th>% of mesh</th><th class="l">Because</th></tr></thead>
+    <tbody>
+      <tr><td class="l">azimuthal cell (N_AZ +1)</td><td>+126,166</td><td>+5.6%</td><td class="l">multiplies every block</td></tr>
+      <tr><td class="l">shell 1 radial cell</td><td>+22,536</td><td>+1.0%</td><td class="l">all 626 axial × 2 azimuthal blocks</td></tr>
+      <tr><td class="l">shell 2 radial cell</td><td>+22,536</td><td>+1.0%</td><td class="l">same</td></tr>
+      <tr><td class="l">ring radial cell (N_RING +1)</td><td>+10,404</td><td>+0.5%</td><td class="l">only the 289 axial cells with core</td></tr>
+      <tr><td class="l">axial cell on <code>cyl</code></td><td>+3,312</td><td>+0.15%</td><td class="l">92 radial × 36 azimuthal</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>N_AZ is by far the most expensive knob</strong>, because it is the only one that
+  multiplies the whole mesh. It is also the one you are most likely to reach for, since it
+  sets the surface cell size. Reach for a radial or axial change first.</p>
+</section>
+
+<section id="handles">
+  <h2><span class="h2n">03</span>Every refinement handle</h2>
+  <p>Under the hood there are exactly four families of transfinite curve, and every cell in
+  the mesh is sized by one of them. Everything in <code>meshParams.py</code> resolves into
+  this table.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th class="l">Family</th><th class="l">Label in code</th><th>Instances</th>
+      <th class="l txt">Controls</th><th class="l txt">Set by</th></tr></thead>
+    <tbody>
+      <tr><td class="l">Azimuthal</td><td class="l"><code>azim</code></td><td>1</td>
+        <td class="l txt">cells per 45° arc, and the core square edge</td><td class="l txt">N_AZ</td></tr>
+      <tr><td class="l">Butterfly ring</td><td class="l"><code>ring</code></td><td>1</td>
+        <td class="l txt">square → inner circle</td><td class="l txt">N_RING</td></tr>
+      <tr><td class="l">Radial</td><td class="l"><code>shell{k}@{station}</code></td><td>78</td>
+        <td class="l txt">one per shell per station — count shared, <em>bias per station</em></td>
+        <td class="l txt">SHELLS, SHELL1_BIAS</td></tr>
+      <tr><td class="l">Streamwise</td><td class="l"><code>ax_{segment}</code></td><td>25</td>
+        <td class="l txt">one per streamwise block</td><td class="l txt">SEGMENTS, H_UP_INLET, H_WAKE_BASE</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note ok"><span class="tag">Why per-station bias matters</span>
+  <p>Shell 1's <em>count</em> is the same at every station — it has to be, or the blocks would
+  not conform. Its <em>bias</em> is not. At a wall station it clusters at the wall (coefficient
+  1.0777, first cell 303 µm). At the inlet plane it is uniform, because there is no wall there
+  to cluster on and a 0.3 mm cell next to a 1.5 m cell is an aspect ratio, not a resolution.
+  Opposite edges of a transfinite face must share a count, never a progression.</p></div>
+
+  <h3>The parameters, in the order they matter</h3>
+  <dl class="kv">
+    <dt>N_AZ = 18</dt><dd>Cells per 45°. Full circumference is <code>8 · N_AZ</code> = 144;
+      surface cell 3.29 mm on the cylinder. Also the core square edge, so the two can never
+      drift apart. <strong>The most expensive knob in the file.</strong></dd>
+    <dt>N_RING = 10</dt><dd>Cells across the butterfly ring. Cheap; only affects the 289
+      axial cells that have a core.</dd>
+    <dt>SHELLS[k]</dt><dd><code>r_out</code>, <code>h_in</code>, <code>h_out</code> in metres.
+      <code>h_in = None</code> on shell 1 means "use y₁ from the y⁺ target". Counts are
+      <em>derived</em> from the sizes.</dd>
+    <dt>YPLUS_TARGET = 32</dt><dd>y⁺ at the first cell <em>centre</em>; y₁ is twice that
+      distance. 30–60 pairs with <code>nutUSpaldingWallFunction</code>. Below ~5 you are
+      wall-resolving and want a gentler shell-1 <code>h_out</code> to keep the growth ratio sane.</dd>
+    <dt>SEGMENTS</dt><dd><code>h_start</code>/<code>h_end</code> per streamwise segment.
+      <code>None</code> means "continue from the neighbour", so you cannot accidentally open
+      a jump at a block interface.</dd>
+    <dt>H_UP_INLET = 1.5<br>H_WAKE_BASE = 5e-4</dt><dd>The two ends that have no neighbour to
+      inherit from: the inlet plane and the flat base. H_WAKE_BASE is a wall cell — the base is
+      a wall.</dd>
+    <dt>CAP_R_FRAC = 0.10</dt><dd>Butterfly cap rim ÷ R_BODY. Sets where the O-grid hands over
+      to the Cartesian core: rim 7.55 mm at x = 26.3 mm, wall slope 12.1° there. Larger cap =
+      more of the nose meshed Cartesian; smaller = a more oblique handover.</dd>
+    <dt>CORE_FRAC = 0.45</dt><dd>Core square half-width ÷ local inner radius. Must keep
+      <code>a·√2 &lt; R_i</code> or the square pokes through its own ring — asserted, not hoped.</dd>
+    <dt>R_INLET = 0.22<br>R_WAKE_OUT = 0.12</dt><dd>Where the internal blend surface sits at
+      the two ends. Not physical; they only shape the butterfly tube. Both must stay below
+      shell 1's <code>r_out</code>.</dd>
+    <dt>N_NOSE_BLOCKS = 14<br>N_UP_BLOCKS = 6</dt><dd>Streamwise subdivision of the two curved
+      segments. Not resolution — accuracy. See §08.</dd>
+    <dt>UPSTREAM_L = 6<br>DOWNSTREAM_L = 13<br>R_FAR = 11.775</dt><dd>Domain, in body lengths
+      and metres. Inherited from the snappyHexMesh box for a fair comparison; 118 D upstream
+      and 256 D downstream is generous by any standard.</dd>
+  </dl>
+</section>
+
+<section id="law">
+  <h2><span class="h2n">04</span>The sizing law</h2>
+  <p>This is the whole reason the file reads differently from a <code>snappyHexMeshDict</code>.
+  You do not specify refinement <em>levels</em> and discover the cell size afterwards. You
+  specify the <strong>cell size at each end of a stretch</strong>, and the count falls out of
+  two closed-form equations.</p>
+
+  <div class="eq">
+    <b>h</b><sub>N</sub> = <b>h</b><sub>1</sub> · c<sup>(n−1)</sup> &nbsp;&nbsp;&nbsp;
+    <i>and</i> &nbsp;&nbsp;&nbsp; L = <b>h</b><sub>1</sub> (c<sup>n</sup> − 1)/(c − 1)<br>
+    ⟹ &nbsp; c = (L − <b>h</b><sub>1</sub>) / (L − <b>h</b><sub>N</sub>)
+    &nbsp;&nbsp;&nbsp; n = 1 + ln(<b>h</b><sub>N</sub>/<b>h</b><sub>1</sub>) / ln c
+  </div>
+
+  <p>Both are exact. "0.303 mm at the wall growing to 20 mm at r = 0.35 m" is a statement about
+  the mesh, not a wish about it — no iteration, no relaxation, no quality-driven retreat.</p>
+
+  <p>One consequence is worth internalising, because it is what makes subdivision safe: in a
+  geometric stack the cell size is <strong>exactly linear in distance along</strong>,
+  <code>h(s) = h₁ + (c − 1)·s</code>. So splitting a segment and re-solving each piece
+  reproduces the parent distribution rather than approximating it. That is how
+  <code>nose</code> becomes 14 blocks without you having to think about it.</p>
+
+  <div class="note warn"><span class="tag">Two errors it will now give you</span>
+  <p><code>cell size (1.5, 1.25) is not smaller than the segment it has to fill (1.48 m)</code> —
+  you shrank the domain but left <code>H_UP_INLET</code> at 1.5 m. Shrink it too.</p>
+  <p>An <code>OverflowError</code> from inside the solver used to be possible when a fine y⁺
+  with a gentle expansion drove <code>n</code> into the hundreds. That path is now
+  overflow-safe and returns <code>inf</code>, so the bisection converges instead of dying.</p></div>
+</section>
+
+<section id="current">
+  <h2><span class="h2n">05</span>What the current settings produce</h2>
+  <p>Before changing anything, this is what you have. Both tables are computed from the
+  parameters, not measured after the fact — you can regenerate them for any candidate
+  settings with <code>python3 meshParams.py</code>.</p>
+
+  <h3>Wall cells along the body</h3>
+  <div class="tw"><table>
+    <thead><tr><th>x [m]</th><th>r [m]</th><th>Δx [mm]</th><th>arc r·Δθ [mm]</th><th>y₁ [mm]</th>
+      <th>Δx / arc</th><th>arc / y₁</th></tr></thead>
+    <tbody>
+      <tr><td>0.030</td><td>0.00834</td><td>1.55</td><td>0.364</td><td>0.3776</td><td>4.3</td><td>1.0</td></tr>
+      <tr><td>0.100</td><td>0.02028</td><td>2.52</td><td>0.885</td><td>0.3644</td><td>2.8</td><td>2.4</td></tr>
+      <tr><td>0.200</td><td>0.03338</td><td>3.89</td><td>1.457</td><td>0.3500</td><td>2.7</td><td>4.2</td></tr>
+      <tr><td>0.400</td><td>0.05339</td><td>6.65</td><td>2.329</td><td>0.3278</td><td>2.9</td><td>7.1</td></tr>
+      <tr><td>0.800</td><td>0.07550</td><td>12.01</td><td>3.294</td><td>0.3034</td><td>3.6</td><td>10.9</td></tr>
+      <tr><td>2.000</td><td>0.07550</td><td>12.01</td><td>3.294</td><td>0.3034</td><td>3.6</td><td>10.9</td></tr>
+      <tr><td>2.830</td><td>0.07550</td><td>12.01</td><td>3.294</td><td>0.3034</td><td>3.6</td><td>10.9</td></tr>
+      <tr><td>2.955</td><td>0.05500</td><td>7.81</td><td>2.400</td><td>0.3261</td><td>3.3</td><td>7.4</td></tr>
+    </tbody>
+  </table></div>
+  <p>Note what the polar topology does for free: <strong>the azimuthal cell shrinks with
+  radius</strong>, so the nose is circumferentially finer than the cylinder without you asking.
+  At x = 0.03 the surface cell is 0.36 mm against 3.29 mm on the barrel. That is refinement you
+  are already paying for — check it is refinement you want before adding more.</p>
+
+  <h3>The radial stack on the cylinder</h3>
+  <p>Shell 1: 57 cells, ratio 1.0777, wall to r = 0.35 m.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Cell #</th><th>Height [mm]</th><th>Distance from wall [mm]</th><th class="l"></th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>0.3034</td><td>0.303</td><td class="l">y⁺ = 32</td></tr>
+      <tr><td>5</td><td>0.4093</td><td>1.772</td><td class="l"></td></tr>
+      <tr><td>10</td><td>0.5952</td><td>4.348</td><td class="l"></td></tr>
+      <tr><td>20</td><td>1.2583</td><td>13.542</td><td class="l"></td></tr>
+      <tr><td>31</td><td>2.8671</td><td>35.845</td><td class="l">δ = 38.0 mm</td></tr>
+      <tr><td>40</td><td>5.6243</td><td>74.069</td><td class="l"></td></tr>
+      <tr><td>57</td><td>20.0818</td><td>274.500</td><td class="l">hands over to shell 2</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="recipes">
+  <h2><span class="h2n">06</span>Refinement recipes</h2>
+  <p>Each row is a real edit with its real cost, computed by re-running the solver — not an
+  estimate. <code>× base</code> is against 2,270,988 cells.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th class="l txt">Change</th><th>Cells</th><th>× base</th><th class="nocaps">y₁ [µm]</th>
+      <th>Cells in δ</th><th>Radial</th><th>Axial</th></tr></thead>
+    <tbody>
+      <tr class="tot"><td class="l txt">base, as shipped</td><td>2,270,988</td><td>1.00</td><td>303.4</td><td>31</td><td>92</td><td>626</td></tr>
+      <tr><td class="l txt">finer near field: shell 1 <code>h_out</code> 20 → 10 mm</td><td>3,285,108</td><td>1.45</td><td>303.4</td><td>47</td><td>137</td><td>626</td></tr>
+      <tr><td class="l txt">wall-resolved: <code>YPLUS_TARGET</code> 32 → 1</td><td>3,285,108</td><td>1.45</td><td>9.5</td><td>75</td><td>137</td><td>626</td></tr>
+      <tr><td class="l txt">wall-resolved <em>and</em> shell 1 <code>h_out</code> → 8 mm</td><td>6,282,396</td><td>2.77</td><td>9.5</td><td>162</td><td>270</td><td>626</td></tr>
+      <tr><td class="l txt">circumferential: N_AZ 18 → 24 (192 cells)</td><td>3,069,600</td><td>1.35</td><td>303.4</td><td>31</td><td>92</td><td>626</td></tr>
+      <tr><td class="l txt">coarser: N_AZ 18 → 12 (96 cells)</td><td>1,493,184</td><td>0.66</td><td>303.4</td><td>31</td><td>92</td><td>626</td></tr>
+      <tr><td class="l txt">streamwise: cylinder Δx 12 → 8 mm</td><td>2,704,860</td><td>1.19</td><td>303.4</td><td>31</td><td>92</td><td>757</td></tr>
+      <tr><td class="l txt">wake: 40 → 20 mm and 2.0 → 1.0 m</td><td>2,654,604</td><td>1.17</td><td>303.4</td><td>31</td><td>92</td><td>722</td></tr>
+      <tr><td class="l txt">tighter domain: 3/6 L, R_FAR 6 m, H_UP_INLET 0.6</td><td>2,094,192</td><td>0.92</td><td>303.4</td><td>31</td><td>86</td><td>615</td></tr>
+      <tr><td class="l txt">N_AZ 20, for the §08 azimuthal fix</td><td>2,534,880</td><td>1.12</td><td>303.4</td><td>31</td><td>92</td><td>626</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Reading that table</h3>
+  <p><strong>Going wall-resolved is nearly free in this topology.</strong> y⁺ 32 → 1 costs the
+  same 1.45× as merely halving the near-field cell, because y₁ only sets where the geometric
+  stack <em>starts</em> — the count grows logarithmically, not linearly. There is no layer
+  algorithm to collapse, so the change is exactly the change you asked for.</p>
+  <p><strong>The cheapest real refinement is streamwise.</strong> Cylinder Δx 12 → 8 mm buys a
+  third more axial resolution for 19%, and it lands where the boundary layer is developing.</p>
+  <p><strong>The domain is the free lunch.</strong> Cutting 118 D upstream to 59 D and the
+  farfield to 6 m gives back 8% of the mesh with, at this Reynolds number, no defensible effect
+  on the forces — and it removes the highest-aspect-ratio freestream cells at the same time.</p>
+
+  <div class="note warn"><span class="tag">If you shrink the domain, shrink H_UP_INLET</span>
+  <p>The upstream segment is subdivided into 6 equal pieces. <code>H_UP_INLET = 1.5 m</code> has
+  to fit inside the first of them. At 3 body lengths upstream that piece is 1.48 m and the
+  solver refuses — clearly, naming both numbers. Use 0.6 m.</p></div>
+</section>
+
+<section id="invariants">
+  <h2><span class="h2n">07</span>Invariants you must not break</h2>
+  <p>Most of these are asserted in code and will stop you. The ones that are not are marked,
+  and those are the ones to hold in your head.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th class="l">Invariant</th><th class="l txt">Why it exists</th><th class="l txt">If broken</th></tr></thead>
+    <tbody>
+      <tr><td class="l txt"><code>a·√2 &lt; R_i</code> at every station</td>
+        <td class="l txt">core square must fit inside its own ring</td>
+        <td class="l txt"><span style="color:var(--ok)">asserted</span> at build</td></tr>
+      <tr><td class="l txt"><code>r_nose</code> monotone</td>
+        <td class="l txt">the cap map <code>x = x_nose_of_r(√(u²+v²))</code> must be a bijection</td>
+        <td class="l txt"><span style="color:var(--ok)">asserted</span> by <code>validate()</code></tr>
+      <tr><td class="l txt">nose closes on <code>R_BODY</code></td>
+        <td class="l txt">the two pieces of <code>r_body</code> must meet</td>
+        <td class="l txt"><span style="color:var(--ok)">asserted</span>; also now derived, so unbreakable</td></tr>
+      <tr><td class="l txt"><code>R_INLET</code>, <code>R_WAKE_OUT</code> &lt; shell 1 <code>r_out</code></td>
+        <td class="l txt">the blend tube lives inside shell 1</td>
+        <td class="l txt"><span style="color:var(--crit)">not asserted</span> — blocks invert</td></tr>
+      <tr><td class="l txt">every <code>h</code> &lt; the length it fills</td>
+        <td class="l txt">a stack cannot start bigger than its own span</td>
+        <td class="l txt"><span style="color:var(--ok)">clear error</span> naming both numbers</td></tr>
+      <tr><td class="l txt">opposite edges share a <em>count</em></td>
+        <td class="l txt">transfinite conformity</td>
+        <td class="l txt"><span style="color:var(--ok)">structural</span> — one count per family</td></tr>
+      <tr><td class="l txt">every boundary face in a physical group</td>
+        <td class="l txt">or gmshToFoam invents <code>defaultFaces</code></td>
+        <td class="l txt"><span style="color:var(--ok)">checked</span>: 175,396 = exact face count</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note"><span class="tag">Counts are shared, biases are not</span>
+  <p>If you find yourself wanting a different <em>number</em> of radial cells at one station
+  than another, the block structure is telling you it needs another radial split, not a
+  different count. Add a shell. That is what shells are for.</p></div>
+</section>
+
+<section id="traps">
+  <h2><span class="h2n">08</span>Traps, and the one open defect</h2>
+
+  <div class="note crit"><span class="tag">Open — fix this before quoting any number</span>
+  <p>Non-orthogonality: mean 13.13°, max 85.82°, <strong>63,209 faces above 70°</strong>. It
+  sits <em>entirely</em> in the azimuthal faces — axial faces are 0.69° mean with none above 70.</p>
+  <p><strong>Cause.</strong> The annular sector face blends radius <em>linearly in index</em>
+  while the radial distribution is <em>geometric</em> (0.303 mm → 20 mm), multiplied by the 45°
+  arc-to-chord sagitta of 0.0761. In a pure polar grid azimuthal faces are at exactly 0° —
+  confirmed by the validation below.</p>
+  <p><strong>Fix, designed and costed.</strong> Split the azimuthal direction into more blocks.
+  A ring block (square edge → 45° arc) splits cleanly into N pieces; the core stays one block;
+  conformity holds. Sagitta: 45° → 0.0761, 22.5° → 0.0192, <strong>11.25° → 0.00482</strong>,
+  a 16× reduction. Set <code>N_AZ = 20</code> (divisible by 4) — 2,534,880 cells, 1.12× base.
+  Changes needed: the <code>cross_quads()</code> tiling and intermediate azimuthal columns in
+  <code>Station.uv()</code>.</p></div>
+
+  <div class="note ok"><span class="tag">The measuring instrument is validated</span>
+  <p><code>meshQuality.py</code> computes OpenFOAM's definitions, not gmsh's SICN — different
+  numbers, and a mesh can pass one and fail the other. Checked against meshes with known
+  answers: uniform cube 0.000e+00, graded cube 0.000e+00, <strong>polar annulus 0.000°</strong>,
+  45° shear → exactly 45.000°. So the numbers above are real, not an artefact.</p></div>
+
+  <h3>Already fixed — do not reintroduce</h3>
+  <div class="tw"><table>
+    <thead><tr><th class="l">Trap</th><th class="l txt">Symptom</th><th class="l txt">Fix in place</th></tr></thead>
+    <tbody>
+      <tr><td class="l txt">gmsh spaces transfinite points on a spline by <strong>arc length, not
+        parameter</strong></td>
+        <td class="l txt">graded wall meridian came out uniform opposite a graded straight edge;
+        blocks sheared to <strong>89.5°</strong></td>
+        <td class="l txt">sample densely for curve accuracy, hand gmsh the real progression</td></tr>
+      <tr><td class="l txt">power blend <code>ξ^q</code>, 1 &lt; q &lt; 2, has <strong>unbounded
+        curvature</strong> at ξ = 0</td>
+        <td class="l txt">curvature-singular exactly at the cap rim; 77° cells</td>
+        <td class="l txt">tangent-matched blend <code>Rᵢ² = r_cap² + 2 r_cap s_cap t + λt²</code></td></tr>
+      <tr><td class="l txt">Coons drift on a curved meridian</td>
+        <td class="l txt">wall off by ~1 mm = 3 first-cell heights; snapping the wall alone just
+        distorts the first cell instead</td>
+        <td class="l txt">14 nose blocks, stations equidistributing |r″|<sup>½</sup>; error falls
+        as 1/n² to 6.9 µm</td></tr>
+      <tr><td class="l txt">spline control points become stray mesh nodes</td>
+        <td class="l txt">checkMesh point-usage error</td>
+        <td class="l txt"><code>drop_control_nodes()</code> — 5,293 cleared</td></tr>
+      <tr><td class="l txt">gmshToFoam makes <strong>every patch <code>type patch</code></strong></td>
+        <td class="l txt"><code>symm</code> fails loudly; <strong>walls fail silently</strong> —
+        wall functions, yPlus and forceCoeffs all quietly wrong</td>
+        <td class="l txt"><code>fixPatchTypes.py</code>, run as part of <code>Allmesh</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note warn"><span class="tag">Not a mesh problem, but it was wrong</span>
+  <p><code>controlDict</code> used <code>A = πR²</code> with <strong>R = 0.2355 m, the fin
+  semi-span</strong> — not the body radius, and not a real cross-section either. Corrected to
+  the Barrowman reference: <code>Aref = 0.0044770 m²</code>, <code>lRef = 0.1510 m</code>. The
+  old value was <strong>9.73× too large</strong>, so every Cd computed with it was low by that
+  factor, on the snappy mesh too.</p></div>
+</section>
+
+<section id="files">
+  <h2><span class="h2n">09</span>Files and commands</h2>
+  <dl class="kv">
+    <dt>aconcaguaGeom.py</dt><dd><strong>The geometry of record</strong>, replacing the STL.
+      Five defining numbers, everything else derived. Self-verifying: reproduces all 2016 body
+      vertices to 2.7e-7 m, which is the STL's own float32 write precision. Also carries the
+      parametric fin sections.</dd>
+    <dt>meshParams.py</dt><dd>The only file you normally edit. Run it alone to print the plan
+      before building anything.</dd>
+    <dt>blockTools.py</dt><dd>Memoising structured-block layer over gmsh's built-in kernel.
+      Every entity is keyed on its defining data, so neighbouring blocks share edges
+      automatically — which is what makes a 177-block decomposition tractable by hand.</dd>
+    <dt>buildHexBody.py</dt><dd>The topology: levels, segments, stations, patches.</dd>
+    <dt>meshQuality.py</dt><dd>OpenFOAM's quality measures, validated against known meshes.</dd>
+    <dt>meshFinish.py</dt><dd>build → snap → audit → export.</dd>
+    <dt>fixPatchTypes.py</dt><dd>Run immediately after gmshToFoam. Not optional.</dd>
+  </dl>
+
+<pre><i># plan the mesh before building it</i>
+python3 meshParams.py
+
+<i># build, snap, audit, write the .msh   (~50 s, 334 MB ASCII — generate locally)</i>
+python3 meshFinish.py
+<b>AG_COARSE=4</b> python3 meshFinish.py    <i># quarter resolution smoke test, ~2 s</i>
+
+<i># convert and check   (gmsh needs libglu1-mesa: import fails with OSError libGLU.so.1)</i>
+./Allmesh</pre>
+
+  <p>Physical group names match the existing OpenFOAM case exactly — <code>inlet</code>,
+  <code>outlet</code>, <code>symm</code>, <code>box</code>, <code>cone</code>,
+  <code>walls</code>, <code>tail</code> — so <code>0/</code> and <code>system/</code> transfer
+  unchanged. <code>box</code> is now a cylinder of radius 11.775 m rather than a box; the name
+  is kept for parity.</p>
+</section>
+
+</main>
+<footer>
+  Aconcagua Mesh Atlas · gmsh 4.15.2 · OpenFOAM ESI v2412 · quarter symmetry, y ≥ 0, z ≤ 0<br>
+  All numbers on this page are computed from meshParams.py or measured from the built mesh.
+  None are estimates.
+</footer>
+</div>

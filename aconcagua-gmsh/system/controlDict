@@ -1,0 +1,121 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - quarter-symmetry external aero
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// CORRECTIONS
+//  [FATAL] `application foamRun; solver incompressibleVoF;` is OpenFOAM
+//          FOUNDATION v11 syntax AND a two-phase free-surface solver. There is
+//          no alpha.water in 0/, no constant/g, no phaseProperties - the case
+//          could not run. ESI v2412 uses `application <solverName>`.
+//  [CHOICE] simpleFoam: steady incompressible RANS. At M = U/a = 100/346 = 0.29
+//          the density variation is ~4%, so incompressible is defensible for
+//          force and moment coefficients. If you need the T / alphat /
+//          thermophysicalProperties machinery back, switch to rhoSimpleFoam
+//          and restore constant/thermophysicalProperties.
+//  [NOTE]  endTime is now an ITERATION count, not a physical time.
+
+application     simpleFoam;
+
+startFrom       startTime;
+startTime       0;
+
+stopAt          endTime;
+endTime         3000;           // iterations; residualControl will exit earlier
+
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   500;
+
+purgeWrite      3;              // keep the last 3 only - a 5e6-cell field set
+                                // is ~500 MB per write in binary
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+
+timeFormat      general;
+timePrecision   6;
+
+runTimeModifiable true;
+
+
+functions
+{
+    // -- Force coefficients -------------------------------------------------
+    //  QUARTER-MODEL SCALING: the function object integrates only over the
+    //  quarter of the body present in the mesh, so Aref must be the QUARTER
+    //  frontal area for Cd to come out at its true value.
+    //
+    //  [CORRECTED] The previous values used R = 0.2355 m, which is the FIN
+    //  SEMI-SPAN, not the body radius. It is also not a real cross-section:
+    //  the fins are 6 mm plates, not a disc. The rocketry convention (and
+    //  Barrowman, and OpenRocket) references the BODY cross-section:
+    //      D       = 2 * 0.0755        = 0.1510 m
+    //      full  A = pi D^2 / 4        = 0.0179079 m2
+    //      Aref    = A / 4             = 0.0044770 m2
+    //      lRef    = D                 = 0.1510 m
+    //  The old Aref was 9.73x too large, so every Cd reported before
+    //  this line was written was low by the same factor.
+    //
+    //  The fins are in the mesh now (introduced by deforming the azimuthal
+    //  coordinate, not by adding blocks), so `fins` is back in the patch list.
+    //  forceCoeffs aborts on a patch name it cannot find, so this list and the
+    //  mesh have to agree.
+    forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   50;
+        log             yes;
+
+        patches         (walls cone tail fins);
+
+        rho             rhoInf;
+        rhoInf          1.225;
+
+        liftDir         (0 1 0);
+        dragDir         (1 0 0);
+        CofR            (0 0 0);
+        pitchAxis       (0 0 1);
+
+        magUInf         100;
+        lRef            0.1510;
+        Aref            0.0044770;
+    }
+
+    // -- y+ on the walls: THE check that the layer stack did its job ---------
+    //  Target the bulk of the distribution in 20 < y+ < 100.
+    //  nutUSpaldingWallFunction tolerates the tails.
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    // -- Residuals, for convergence plotting --------------------------------
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        fields          (U p k omega);
+        writeResidualFields no;
+    }
+}
+
+// ************************************************************************* //
