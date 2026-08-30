@@ -11,3 +11,7 @@ Malla del cohete Aconcagua creada utilizando scripts de Python y la herramienta 
 
 - CFD lateral del Aconcagua
 - Calculadora de fin flutter
+- Calentamiento de nosecone
+- Modelo de vuelo (sub + supersonico)
+
+- 
