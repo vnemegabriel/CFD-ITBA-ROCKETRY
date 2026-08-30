@@ -3,7 +3,7 @@ Repositorio del equipo ITBA ROCKETRY del Instituto Tecnológico de Buenos Aires
 
 ## Que hay acá 
 
-### aconcagua-gmsh
+### mesh
 
 Malla del cohete Aconcagua creada utilizando scripts de Python y la herramienta de mallado GMSH.
 
