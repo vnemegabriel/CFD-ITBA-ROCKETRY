@@ -1,0 +1,76 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - quarter-symmetry external aero
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// CORRECTIONS
+//  [FATAL] The old file was VoF-flavoured throughout - div(rhoPhi,U),
+//          div(phi,alpha) Gauss MPLIC, p_rgh - with NO div(phi,U),
+//          div(phi,k) or div(phi,omega) entries. A single-phase RAS run
+//          cannot start from it.
+//  [FATAL] `gradSchemes default Gauss linear limited 0.7` is not a valid
+//          gradient specification. `limited` belongs to snGrad/laplacian
+//          correction, not to grad.
+//  [FIX]   div(phi,U) was `Gauss upwind` - first order, which smears exactly
+//          the boundary layer and wake you are paying millions of cells to
+//          resolve. linearUpwind is second order with a limited gradient.
+//  [FIX]   `limited corrected 0.33` on laplacian/snGrad is the conservative
+//          choice for maxNonOrtho 65. Raise toward 1 (fully corrected) only
+//          once checkMesh reports low non-orthogonality.
+
+ddtSchemes
+{
+    default         steadyState;
+}
+
+gradSchemes
+{
+    default         cellLimited Gauss linear 1;
+    grad(U)         cellLimited Gauss linear 1;
+    limitedGrad     cellLimited Gauss linear 1;
+}
+
+divSchemes
+{
+    default         none;
+
+    div(phi,U)      bounded Gauss linearUpwind grad(U);
+    div(phi,k)      bounded Gauss limitedLinear 1;
+    div(phi,omega)  bounded Gauss limitedLinear 1;
+
+    div((nuEff*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear limited corrected 0.33;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         limited corrected 0.33;
+}
+
+wallDist
+{
+    method          meshWave;
+}
+
+// ************************************************************************* //

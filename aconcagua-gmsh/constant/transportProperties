@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - quarter-symmetry external aero
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// CORRECTION: the case carried constant/physicalProperties, which is the
+// OpenFOAM FOUNDATION (v11+) file name. ESI v2412 reads
+// constant/transportProperties for incompressible solvers.
+// constant/physicalProperties and constant/momentumTransport are inert here
+// and should be deleted to avoid confusion.
+
+transportModel  Newtonian;
+
+nu              [0 2 -1 0 0 0 0] 1.5e-05;
+
+// ************************************************************************* //

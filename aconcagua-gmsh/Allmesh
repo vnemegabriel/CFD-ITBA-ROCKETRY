@@ -1,0 +1,24 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+. "${WM_PROJECT_DIR:?}/bin/tools/RunFunctions"
+
+rm log.gmshToFoam log.checkMesh log.renumberMesh 2>/dev/null
+
+MSH=${1:-aconcagua_body.msh}
+[ -f "$MSH" ] || { echo "no $MSH here -- copy it in, or pass the path"; exit 1; }
+
+echo "== gmshToFoam ($MSH) =="
+runApplication gmshToFoam "$MSH"
+
+echo "== patch types (gmshToFoam makes them ALL 'patch') =="
+python3 fixPatchTypes.py || { echo "patch fix FAILED -- stop, do not run"; exit 1; }
+
+echo "== checkMesh =="
+runApplication checkMesh -allGeometry -allTopology
+
+echo "== renumberMesh =="
+runApplication renumberMesh -overwrite
+
+echo
+echo "done. Read log.checkMesh before running anything:"
+grep -E "cells:|hexahedra|polyhedra|non-orthogonality|skewness|aspect|Failed|Mesh OK" log.checkMesh
