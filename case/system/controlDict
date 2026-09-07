@@ -1,0 +1,126 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua external aero               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+#include "${FOAM_CASE}/constant/meshInfo"      // written by mesh/build.py
+
+application     simpleFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         3000;           // iterations; residualControl exits earlier
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   500;
+purgeWrite      2;              // a 3.5 M-cell field set is ~400 MB in binary
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    // -- Force coefficients ------------------------------------------------
+    //  Everything mesh-dependent comes from constant/meshInfo:
+    //    wallPatches   the wall patches the mesh actually has (fins or not)
+    //    Aref          BODY cross-section x fraction of 360 deg in the mesh,
+    //                  so Cd is the true value whatever the sector
+    //    lRef          body diameter
+    //  and everything flow-dependent from system/flowConditions:
+    //    dragDir       along the free stream
+    //    liftDir       normal to it, in the pitch (x-y) plane
+    //  Moments are about the NOSE TIP (CofR = origin), pitch axis z:
+    //  the centre of pressure is x_cp = -Cm * lRef / CN measured from the
+    //  tip, the same convention as Barrowman / OpenRocket.
+    forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   10;
+        log             yes;
+        patches         $wallPatches;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        dragDir         ($dx $dy $dz);
+        liftDir         ($lx $ly $lz);
+        CofR            (0 0 0);
+        pitchAxis       (0 0 1);
+        magUInf         $Uinf;
+        lRef            $lRef;
+        Aref            $Aref;
+    }
+
+    // -- Forces per patch, dimensional (N) -- what you compare with a
+    //    balance or with OpenRocket after scaling by the sector
+    forces1
+    {
+        type            forces;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   10;
+        log             no;
+        patches         $wallPatches;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        CofR            (0 0 0);
+    }
+
+    // -- y+ on the walls: THE check that the wall spacing did its job -------
+    //  Target the bulk of the distribution in 20 < y+ < 100;
+    //  nutUSpaldingWallFunction tolerates the tails.
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    // -- Residuals, for convergence plotting --------------------------------
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        fields          (U p k omega);
+        writeResidualFields no;
+    }
+
+    // -- Wall shear stress and pressure coefficient, written with the fields
+    wallShearStress
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        patches         $wallPatches;
+    }
+    Cp
+    {
+        type            pressure;
+        libs            (fieldFunctionObjects);
+        mode            staticCoeff;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        pInf            0;
+        UInf            ($Ux $Uy $Uz);
+        writeControl    writeTime;
+    }
+}
+
+// ************************************************************************* //

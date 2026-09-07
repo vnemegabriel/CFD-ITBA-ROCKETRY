@@ -1,0 +1,36 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua external aero               |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowDerived;
+}
+// Derived from system/flowConditions -- nothing to edit here.  The fields,
+// transportProperties and controlDict #include this file.
+#include "${FOAM_CASE}/system/flowConditions"
+
+Ux              #eval{ $Uinf*cos(degToRad($alpha))*cos(degToRad($beta)) };
+Uy              #eval{ $Uinf*sin(degToRad($alpha))*cos(degToRad($beta)) };
+Uz              #eval{ $Uinf*sin(degToRad($beta)) };
+
+// unit vectors for the force coefficients: drag along the free stream, lift
+// perpendicular to it in the pitch plane (orthogonal to dragDir for any beta)
+dx              #eval{ cos(degToRad($alpha))*cos(degToRad($beta)) };
+dy              #eval{ sin(degToRad($alpha))*cos(degToRad($beta)) };
+dz              #eval{ sin(degToRad($beta)) };
+lx              #eval{ -sin(degToRad($alpha)) };
+ly              #eval{ cos(degToRad($alpha)) };
+lz              0;
+
+kInlet          #eval{ 1.5*sqr($Uinf*$Ti) };
+nutInlet        #eval{ $nuRatio*$nu };
+omegaInlet      #eval{ $kInlet/$nutInlet };
+
+// ************************************************************************* //

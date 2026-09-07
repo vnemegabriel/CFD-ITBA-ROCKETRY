@@ -57,8 +57,11 @@ D_BODY   = 2.0 * R_BODY
 
 # --- fins: 4 planar clipped deltas at theta = 0, 90, 180, 270 -----------------
 # Anchored to the BASE rather than to absolute x, so they travel with the tail
-# when the body length changes.
-N_FINS       = 8
+# when the body length changes.  N_FINS is fixed by the mesh topology: the fins
+# lie in the planes of the structured quadrant, so there are four of them at
+# 90 deg.  It is recorded here for the documentation and the sanity checks, not
+# as something to change.
+N_FINS       = 4
 FIN_T        = 0.012    # m  full thickness
 FIN_ROOT_R   = 0.07500  # m  radial station of the root chord
 FIN_TIP_R    = 0.23550  # m  semi-span
@@ -261,8 +264,13 @@ def fin_half_thickness(x, r, section='wedge', tip_smear=0.004):
     # and the STL models it that way (full-thickness vertices sit at r = 0.07494)
     inside = (xib >= 0.0) & (xib <= 1.0) & (rb <= hi + 1e-12)
     if np.any(inside):
-        out[inside] = np.array([fin_halfthickness(float(a), float(b), section)
-                                for a, b in zip(xib[inside], cb[inside])])
+        # fin_halfthickness is written in numpy throughout, so it takes the
+        # whole selection at once.  It used to be called once per point from a
+        # Python list comprehension: fine on the ~100 k nodes the deformation
+        # touches, hopeless on the 4 M-point grid wetted_area_analytic()
+        # integrates over, where it cost 112 s against 0.9 s vectorised.
+        # Verified identical to the last bit for all five sections.
+        out[inside] = fin_halfthickness(xib[inside], cb[inside], section)
         if tip_smear > 0.0:      # taper the tip instead of ending on a cliff
             out *= np.clip((hi - rb) / tip_smear, 0.0, 1.0)
     return out if out.size > 1 else float(out.reshape(-1)[0])
@@ -295,16 +303,25 @@ def validate():
         errs.append('fin root radius is outside the body surface it mounts on')
     if FIN_LE_BEVEL + FIN_TE_BEVEL >= (FIN_TIP_TE - FIN_TIP_LE):
         errs.append('fin bevels overlap at the tip chord')
+    if N_FINS != 4:
+        errs.append('N_FINS must be 4: the fins lie in the planes of the structured '
+                    'quadrant (see docs/MESH_DESIGN.md)')
     if errs:
         raise AssertionError('geometry is inconsistent:\n  - ' + '\n  - '.join(errs))
     return True
 
 
 # --------------------------------------------------------- reference values --
-def reference_values(quarter=True):
-    """Aref / lRef for force coefficients.  Quarter symmetry divides Aref by 4."""
+def reference_values(fraction=0.25):
+    """Aref / lRef for force coefficients (rocketry convention: BODY cross-section).
+
+    `fraction` is the part of the full 360 deg present in the mesh (0.25 for a
+    quadrant, 0.5 for a half, 1 for a full model): the force function object
+    integrates only over the patches it has, so Aref must shrink with it for
+    the coefficients to come out at their true value.
+    """
     A = np.pi * D_BODY ** 2 / 4.0
-    return dict(Aref=A / (4.0 if quarter else 1.0), lRef=D_BODY, Sref_full=A)
+    return dict(Aref=A * fraction, lRef=D_BODY, Sref_full=A)
 
 
 # ------------------------------------------------------------ verification ---

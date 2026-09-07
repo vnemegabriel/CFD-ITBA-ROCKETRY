@@ -1,0 +1,55 @@
+#!/bin/sh
+# Allrun -- run the case on the mesh brought in by ./Allmesh.
+#
+#     ./Allrun            parallel, numberOfSubdomains from decomposeParDict
+#     ./Allrun 16         parallel on 16 cores (updates decomposeParDict)
+#     ./Allrun 1          serial
+#
+# Refuses to start if system/flowConditions asks for an angle the mesh's
+# sector cannot represent (see constant/meshInfo).
+cd "${0%/*}" || exit 1
+. "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
+
+[ -d constant/polyMesh ] || { echo "no mesh: run ./Allmesh <file.msh> first"; exit 1; }
+
+# ---- consistency: angles vs sector -----------------------------------------
+SECTOR=$(foamDictionary -entry sector -value constant/meshInfo)
+ALPHA=$(foamDictionary -entry alpha -value system/flowConditions)
+BETA=$(foamDictionary -entry beta -value system/flowConditions)
+echo "sector $SECTOR   alpha $ALPHA deg   beta $BETA deg"
+case "$SECTOR" in
+    quarter)
+        if [ "$(echo "$ALPHA $BETA" | awk '{print ($1 != 0 || $2 != 0)}')" = 1 ]; then
+            echo "!! quarter mesh: two symmetry planes, alpha and beta must be 0."
+            echo "   Build with  python3 build.py --sector half  (alpha) or  --sector full  (alpha, beta)."
+            exit 1
+        fi ;;
+    half)
+        if [ "$(echo "$BETA" | awk '{print ($1 != 0)}')" = 1 ]; then
+            echo "!! half mesh: symmetry plane z = 0, beta must be 0.  Build with --sector full."
+            exit 1
+        fi ;;
+esac
+
+# ---- processors --------------------------------------------------------------
+if [ -n "$1" ]; then
+    foamDictionary -entry numberOfSubdomains -set "$1" system/decomposeParDict > /dev/null
+fi
+NP=$(getNumberOfProcessors)
+
+restore0Dir
+
+if [ "$NP" -gt 1 ]; then
+    runApplication decomposePar -force
+    runParallel -np "$NP" potentialFoam -initialiseUBCs
+    runParallel -np "$NP" $(getApplication)
+    runApplication reconstructPar -latestTime
+else
+    runApplication potentialFoam -initialiseUBCs
+    runApplication $(getApplication)
+fi
+
+echo
+echo "coefficients: postProcessing/forceCoeffs1/0/coefficient.dat"
+tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null
+echo "y+ per patch: grep -A6 'yPlus' log.simpleFoam | tail -12"

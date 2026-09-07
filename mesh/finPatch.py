@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-finPatch.py -- introduce the fins into an existing structured mesh.
+finPatch.py -- introduce the fins into the structured quadrant mesh.
 
 Two steps, neither of which touches the block topology.
 
-1. DEFORM the azimuthal coordinate:
+1. DEFORM the azimuthal coordinate of every node:
 
        theta -> theta_f(x,r) + theta * (90 - 2 theta_f) / 90
 
@@ -16,16 +16,17 @@ Two steps, neither of which touches the block topology.
    relaxes to nothing there.  The tip is the one genuine discontinuity and is
    smeared over FIN_TIP_SMEAR.
 
-   Both symmetry planes get it, because the quarter model contains two half
-   fins -- one lying in each plane.
+   Both symmetry planes get it, because the quadrant contains two half fins --
+   one lying in each plane.  The full-thickness fin appears when two quadrants
+   are stitched together (sectorAssembly.py): the two half-fins on either side
+   of the interface plane are its two faces.
 
-2. RETAG the faces that are now fin rather than symmetry.  A gmsh physical
-   group is per-surface, and one block side face carries both, so the split has
-   to happen at element level, in the .msh.
+2. CLASSIFY the symmetry-plane faces.  A face whose nodes were all left in the
+   plane is still symmetry; a face with any displaced node lies on the fin and
+   becomes a wall.  The same rule decides, at assembly, which interface faces
+   are stitched (merged into the interior) and which stay as fin walls -- the
+   two decisions cannot disagree because they are the same test.
 """
-
-import sys
-import time
 
 import numpy as np
 
@@ -33,107 +34,101 @@ import aconcaguaGeom as G
 import meshParams as MP
 
 
-def deform_nodes(gmsh, section=None, smear=None):
-    """Apply the fin deformation to every node in the model."""
+def fin_node_mask(nodes, section=None, smear=None):
+    """True for nodes the deformation will move: on the fin planform.
+
+    Evaluated on UNDEFORMED coordinates.  Independent of which plane the node
+    is on, so pass a plane mask and AND it in if you need one plane only.
+    """
     section = section or MP.FIN_SECTION
     smear = MP.FIN_TIP_SMEAR if smear is None else smear
-    moved = 0
-    dmax = 0.0
-    for dim, tag in gmsh.model.getEntities():
-        t, c, par = gmsh.model.mesh.getNodes(dim, tag)
-        if len(t) == 0:
-            continue
-        p = c.reshape(-1, 3).copy()
-        x, y, z = p[:, 0], p[:, 1], p[:, 2]
-        r = np.hypot(y, z)
-        live = (r > 1e-9) & (x >= G.FIN_ROOT_LE - 1e-6) & (x <= G.FIN_TIP_TE + 1e-6)
-        if not np.any(live):
-            continue
-        th = np.arctan2(-z[live], y[live])
-        tf = G.fin_half_angle(x[live], r[live], section, smear)
-        if not np.any(tf > 0):
-            continue
-        half = np.pi / 2.0
-        thn = tf + th * (half - 2.0 * tf) / half
-        rr = r[live]
-        ny, nz = rr * np.cos(thn), -rr * np.sin(thn)
-        d = np.hypot(ny - y[live], nz - z[live])
-        dmax = max(dmax, float(d.max()))
-        y[live], z[live] = ny, nz
-        # gmsh 4.15 exposes only the singular setNode, so touch just the nodes
-        # that actually moved -- ~1 % of the mesh, since the fin is local.
-        idx = np.flatnonzero(live)[d > 1e-12]
-        for k in idx:
-            gmsh.model.mesh.setNode(int(t[k]), p[k].tolist(), [])
-        moved += len(idx)
-    return moved, dmax
+    x, y, z = nodes[:, 0], nodes[:, 1], nodes[:, 2]
+    r = np.hypot(y, z)
+    out = np.zeros(len(nodes), bool)
+    live = (r > 1e-9) & (x >= G.FIN_ROOT_LE - 1e-6) & (x <= G.FIN_TIP_TE + 1e-6)
+    if np.any(live):
+        t = G.fin_half_thickness(x[live], r[live], section, smear)
+        out[live] = np.atleast_1d(t) > 1e-9
+    return out
 
 
-# ------------------------------------------------------------ patch split ---
-def split_symm(path, section=None, verbose=True):
-    """Retag the symmetry-plane faces that are covered by the fin."""
+def deform(nodes, section=None, smear=None):
+    """Apply the fin deformation.  Returns (new_nodes, n_moved, max_displacement)."""
     section = section or MP.FIN_SECTION
-    t0 = time.time()
-    src = open(path).read().split('\n')
-
-    def block(name):
-        i = src.index(f'${name}')
-        j = src.index(f'$End{name}')
-        return i, j
-
-    # --- physical names ----------------------------------------------------
-    i, j = block('PhysicalNames')
-    names = src[i + 2:j]
-    symm_tag = None
-    used = set()
-    for ln in names:
-        f = ln.split(' ', 2)
-        used.add(int(f[1]))
-        if f[2].strip('"') == MP.PATCHES['symmetry']:
-            symm_tag = int(f[1])
-    if symm_tag is None:
-        raise KeyError('no symmetry physical group in the mesh')
-    fin_tag = max(used) + 1
-    src[i + 1] = str(int(src[i + 1]) + 1)
-    src[j:j] = [f'2 {fin_tag} "fins"']
-
-    # --- nodes -------------------------------------------------------------
-    i, j = block('Nodes')
-    n = int(src[i + 1])
-    arr = np.fromstring(' '.join(src[i + 2:j]), sep=' ').reshape(n, 4)
-    lut = np.zeros(int(arr[:, 0].max()) + 1, np.int64)
-    lut[arr[:, 0].astype(np.int64)] = np.arange(n)
-    xyz = arr[:, 1:]
-
-    # --- elements ----------------------------------------------------------
-    i, j = block('Elements')
-    out = []
-    hit = 0
-    pre = f' 3 2 {symm_tag} '
-    for k in range(i + 2, j):
-        ln = src[k]
-        p = ln.find(pre)
-        if p < 0:
-            out.append(ln)
-            continue
-        f = ln.split()
-        nodes = lut[np.array(f[5:9], dtype=np.int64)]
-        c = xyz[nodes].mean(axis=0)
-        r = float(np.hypot(c[1], c[2]))
-        if G.fin_half_thickness(float(c[0]), r, section, tip_smear=0.0) > 1e-9:
-            f[3] = str(fin_tag)
-            hit += 1
-            out.append(' '.join(f))
-        else:
-            out.append(ln)
-    src[i + 2:j] = out
-
-    open(path, 'w').write('\n'.join(src))
-    if verbose:
-        print(f'  fins patch: {hit:,d} faces retagged from '
-              f'{MP.PATCHES["symmetry"]} in {time.time()-t0:.1f}s')
-    return hit
+    smear = MP.FIN_TIP_SMEAR if smear is None else smear
+    p = nodes.copy()
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    r = np.hypot(y, z)
+    live = (r > 1e-9) & (x >= G.FIN_ROOT_LE - 1e-6) & (x <= G.FIN_TIP_TE + 1e-6)
+    if not np.any(live):
+        return p, 0, 0.0
+    th = np.arctan2(-z[live], y[live])
+    tf = np.atleast_1d(G.fin_half_angle(x[live], r[live], section, smear))
+    half = np.pi / 2.0
+    thn = tf + th * (half - 2.0 * tf) / half
+    rr = r[live]
+    ny, nz = rr * np.cos(thn), -rr * np.sin(thn)
+    d = np.hypot(ny - y[live], nz - z[live])
+    y[live], z[live] = ny, nz
+    return p, int((d > 1e-12).sum()), float(d.max())
 
 
-if __name__ == '__main__':
-    split_symm(sys.argv[1] if len(sys.argv) > 1 else 'aconcagua_body.msh')
+def split_symm(quads_symm, fin_nodes):
+    """Split the symmetry-plane quads into (still symmetry, now fin)."""
+    on_fin = fin_nodes[quads_symm].any(axis=1)
+    return quads_symm[~on_fin], quads_symm[on_fin]
+
+
+def wetted_area(nodes, quads):
+    """Area of a quad patch, for checking the fin against its analytic value."""
+    p = nodes[quads]
+    d1 = p[:, 2] - p[:, 0]
+    d2 = p[:, 3] - p[:, 1]
+    return float(0.5 * np.linalg.norm(np.cross(d1, d2), axis=1).sum())
+
+
+def analytic_half_fin_area():
+    """Nominal planform area of ONE side of one fin, root chord to FIN_TIP_R.
+
+    This is the number a drawing gives, and it is NOT what the mesh should
+    reproduce: it leaves out the tip smear band and treats the bevels as flat.
+    Use wetted_area_analytic() to judge the mesh.
+    """
+    span = G.FIN_TIP_R - G.FIN_ROOT_R
+    c_root = G.FIN_ROOT_TE - G.FIN_ROOT_LE
+    c_tip = G.FIN_TIP_TE - G.FIN_TIP_LE
+    return 0.5 * (c_root + c_tip) * span
+
+
+def wetted_area_analytic(section=None, smear=None, n=2001):
+    """True wetted area of ONE side of one fin: the area of the surface the
+    deformation actually creates, z = -t_half(x, r).
+
+    The reference the mesh converges to, and the one to compare against.  It
+    exceeds the nominal planform for two reasons that are geometry, not
+    discretisation:
+
+      * the tip taper extends the fin FIN_TIP_SMEAR past FIN_TIP_R
+      * the bevels and the tip taper are inclined, so the surface is larger
+        than its projection by sqrt(1 + (dt/dx)^2 + (dt/dr)^2)
+
+    For the as-drawn wedge fin that is 376.0 cm2 against a 361.5 cm2 nominal
+    planform, a 4 % difference -- the same order as the discretisation error
+    it was being blamed for.
+    """
+    section = section or MP.FIN_SECTION
+    smear = MP.FIN_TIP_SMEAR if smear is None else smear
+    hi = G.FIN_TIP_R + max(smear, 0.0)
+    x = np.linspace(G.FIN_ROOT_LE, G.FIN_TIP_TE, n)
+    r = np.linspace(G.FIN_ROOT_R, hi, n)
+    X, R = np.meshgrid(x, r, indexing='ij')
+
+    def t(xx, rr):
+        return np.atleast_1d(G.fin_half_thickness(xx, rr, section, smear)).reshape(xx.shape)
+
+    h = 1e-6
+    tt = t(X, R)
+    tx = (t(X + h, R) - t(X - h, R)) / (2.0 * h)
+    tr = (t(X, R + h) - t(X, R - h)) / (2.0 * h)
+    dA = (x[1] - x[0]) * (r[1] - r[0])
+    return float((np.sqrt(1.0 + tx ** 2 + tr ** 2) * (tt > 1e-12)).sum() * dA)

@@ -220,12 +220,12 @@ class BodyMesh:
     # ============================================================== counts ===
     def _counts(self):
         coefs = MP.az_coefs()
-        nc = MP.n_az_cells()
         c = {'ring': (MP.n_ring(), 1.0)}
         for k, co in enumerate(coefs):
-            c[f'azv{k}'] = (nc, co)                    # arcs, and core v-edges
-        for i in range(self.M):
-            c[f'azu{i}'] = (nc, 1.0 / coefs[self.N - 1 - i])   # core u-edges
+            c[f'azv{k}'] = (MP.n_az_cells_block(k), co)        # arcs, and core v-edges
+        for i in range(self.M):                                # core u-edges face block N-1-i
+            c[f'azu{i}'] = (MP.n_az_cells_block(self.N - 1 - i),
+                            1.0 / coefs[self.N - 1 - i])
         for seg in self.segs:
             c[f"ax_{seg['name']}"] = (seg['n'], seg['c'])
         for k, sh in enumerate(self.d['shells'], start=1):

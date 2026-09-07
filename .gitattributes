@@ -1,0 +1,5 @@
+# Scripts and dictionaries are consumed under Linux/WSL: keep LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.msh -text
+*.stl -text

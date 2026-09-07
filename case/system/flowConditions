@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua external aero               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowConditions;
+}
+// ============================================================================
+//  THE ONE FILE YOU EDIT TO SET A RUN.
+//
+//  Plain numbers only.  system/flowDerived turns them into the velocity
+//  vector, the force directions and the inlet turbulence, and every field in
+//  0.orig/, transportProperties and controlDict #include THAT file -- so a
+//  flight condition is stated once, here.  Set it from the shell:
+//
+//      foamDictionary system/flowConditions -entry alpha -set 5
+//
+//  (Keep the #eval expressions out of this file: foamDictionary -set rewrites
+//  the file it edits with every #eval already evaluated, which would freeze
+//  the derived values at the old angle.)
+//
+//  Angles are in DEGREES.  The body axis is +x, nose at x = 0.
+//
+//      alpha   angle of attack: the free stream is rotated from +x towards +y.
+//              Needs a mesh with sector half or full (the quarter mesh has a
+//              symmetry plane at y = 0 which alpha would violate).
+//      beta    sideslip: rotated towards +z.  Needs sector full.
+//
+//  Fins lie along +y, -z, -y, +z.  alpha != 0 with beta = 0 is therefore a
+//  "plus" configuration (one fin pair in the pitch plane); alpha = beta gives
+//  a 45 deg roll, the "cross" configuration.
+//
+//  ./Allrun refuses to start when these are inconsistent with the sector
+//  recorded in constant/meshInfo.
+// ============================================================================
+
+Uinf            100;        // m/s   free-stream speed
+alpha           0;          // deg   angle of attack   (needs half or full)
+beta            0;          // deg   sideslip          (needs full)
+
+nu              1.5e-05;    // m2/s  kinematic viscosity (air, ~15 C, sea level)
+rhoInf          1.225;      // kg/m3 only used to scale the force coefficients
+
+Ti              0.005;      // -     free-stream turbulence intensity (0.5 %)
+nuRatio         5;          // -     nut / nu in the free stream
+
+// ************************************************************************* //

@@ -1,22 +1,20 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  2412                                  |
-|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua external aero               |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
-    format      binary;
-    arch        "LSB;label=32;scalar=64";
+    format      ascii;
     class       volScalarField;
-    location    "0";
     object      p;
 }
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+#include "${FOAM_CASE}/system/flowDerived"
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [0 2 -2 0 0 0 0];      // kinematic pressure, p/rho
 
 internalField   uniform 0;
 
@@ -26,36 +24,25 @@ boundaryField
     {
         type            zeroGradient;
     }
+    outlet
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    box
+    {
+        type            freestreamPressure;
+        freestreamValue $internalField;
+        value           $internalField;
+    }
     symm
     {
         type            symmetry;
     }
-    box
+    "(cone|walls|tail|fins)"
     {
         type            zeroGradient;
-    }
-    cone
-    {
-        type            zeroGradient;
-    }
-    fins
-    {
-        type            zeroGradient;
-    }
-    walls
-    {
-        type            zeroGradient;
-    }
-    tail
-    {
-        type            zeroGradient;
-    }
-    outlet
-    {
-        type            fixedValue;
-        value           uniform 0;
     }
 }
-
 
 // ************************************************************************* //

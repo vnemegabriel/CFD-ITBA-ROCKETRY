@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua external aero               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      nut;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [0 2 -1 0 0 0 0];
+
+internalField   uniform $nutInlet;
+
+boundaryField
+{
+    inlet
+    {
+        type            calculated;
+        value           $internalField;
+    }
+    outlet
+    {
+        type            calculated;
+        value           $internalField;
+    }
+    box
+    {
+        type            calculated;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    // Spalding's law is continuous in y+, so the first cell may sit anywhere
+    // from the viscous sublayer to the log layer without a jump in tau_w
+    "(cone|walls|tail|fins)"
+    {
+        type            nutUSpaldingWallFunction;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

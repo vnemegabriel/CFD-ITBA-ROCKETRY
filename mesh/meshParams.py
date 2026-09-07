@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-meshParams.py -- the ONLY file you normally edit.
+meshParams.py -- the DEFAULT mesh parameters.  The only file you normally edit.
+
+Every value here can also be overridden without editing, from the command
+line of build.py (``--scale``, ``--sector``, ``--set KEY=VALUE``) or from a
+preset in presets/.  build.py records the final parameter set next to every
+.msh it writes, so a mesh is always reproducible from its own sidecar file.
 
 The interface here is deliberately different from a snappyHexMeshDict.  You do
 not specify refinement LEVELS and discover the cell size afterwards; you
@@ -31,17 +36,41 @@ import aconcaguaGeom as G
 #   H_SCALE = 2.0   about 1/8 the cells, for a quick look
 #   H_SCALE = 0.7   about 3x the cells, for a convergence study
 #
-# H_SCALE_WALL = False holds y1 (and therefore y+) fixed while everything else
-# scales -- what you want for a grid-convergence study with wall functions.
+# H_SCALE_WALL = False holds the FIRST CELL OFF EVERY WALL fixed while
+# everything else scales: y1 (and therefore y+) on the lateral walls, the
+# streamwise cell at the nose tip (SEGMENTS up.h_end / nose.h_start) and the
+# streamwise cell off the flat base (H_WAKE_BASE).  What you want for a
+# grid-convergence study with wall functions.  The tip one matters for
+# quality, not just y+: the cap surface is nearly vertical at the apex and
+# the core cells there are ~0.1 mm across, so a 4.5 mm streamwise cell on
+# them (H_SCALE 3) pushes the boundary-face skewness past 4.
 H_SCALE      = 1.0
 H_SCALE_WALL = True
 
-H_SCALE = float(os.environ.get('AG_COARSE', H_SCALE))    # env override for smoke tests
+# H_SCALE_FIN = False does the same for the FIN: FIN_H_X (chordwise), AZ_FIN_H
+# and the cell count of the two azimuthal blocks touching the fin (normal to
+# it), and FIN_H_R (spanwise) keep their values while everything else scales.
+# A fin is 12 mm thick with 33 / 21 mm bevels: at H_SCALE 3 with everything
+# scaled it is one cell thick and its edges land two cells apart, which is
+# not a fin, it is a bump.  The coarse and medium presets set this False.
+H_SCALE_FIN  = True
+
+H_SCALE = float(os.environ.get('AG_COARSE', H_SCALE))    # legacy env override
 
 
 def _h(v):
     """Scale a cell size."""
     return None if v is None else v * H_SCALE
+
+
+def _hf(v):
+    """Scale a FIN cell size -- unless the fin is exempt from H_SCALE."""
+    return _h(v) if H_SCALE_FIN else v
+
+
+def _hw(v):
+    """Scale a WALL first-cell size -- unless the wall is exempt from H_SCALE."""
+    return _h(v) if H_SCALE_WALL else v
 
 
 def _n(v, lo=1):
@@ -77,6 +106,25 @@ def n_az_cells():
     return _n(N_AZ_CELLS, 1)
 
 
+def n_az_cells_block(k):
+    """Cells in azimuthal block k (0 .. N_AZ_BLOCKS-1).
+
+    All blocks carry n_az_cells(), except that with H_SCALE_FIN = False the
+    two blocks touching the symmetry planes -- the ones the fins lie in --
+    keep the unscaled N_AZ_CELLS, so the fin-normal resolution survives a
+    global coarsening.  Symmetric in k <-> N-1-k, which the sector assembly
+    relies on.
+    """
+    if not H_SCALE_FIN and k in (0, N_AZ_BLOCKS - 1):
+        return max(1, int(N_AZ_CELLS))
+    return n_az_cells()
+
+
+def n_az_quadrant():
+    """Azimuthal cells per quadrant."""
+    return sum(n_az_cells_block(k) for k in range(N_AZ_BLOCKS))
+
+
 def n_ring():
     return _n(N_RING, 2)
 
@@ -103,6 +151,15 @@ FIN_TIP_SMEAR = 0.004        # m, radial band over which the tip taper closes
 #              setting WAKE_ZONE_K to whichever zone should open into the wake.
 FIN_H_X      = 0.005         # m   None = leave `cyl` and `tail` unrefined
 FIN_X_LEAD   = 0.060         # m   of cylinder ahead of the root LE to include
+# Spanwise: radial cell size AT THE FIN TIP.  None = no dedicated zone, the tip
+# gets whatever the ZONE stack gives there (12 mm at H_SCALE 1, 40 mm at 3).
+# A value inserts a zone boundary at the outer edge of the tip smear,
+# FIN_TIP_R + FIN_TIP_SMEAR, so the fin closes exactly on a node line; the
+# radial stack grows from y1 to FIN_H_R over the span and continues outward
+# from there.  The zone is inserted into the ZONE_R/ZONE_H list at the right
+# radius -- WAKE_ZONE_K still indexes YOUR list.  Exempt from H_SCALE when
+# H_SCALE_FIN = False.
+FIN_H_R      = None          # m   e.g. 0.012
 
 # ======================= REFINEMENT ZONES -- EDIT HERE =======================
 # Concentric zones outward from the wall.  ZONE_R[k] is where zone k ENDS, so
@@ -130,9 +187,42 @@ F_INLET     = 0.63           # of ZONE_R[0]          -> 0.221 m
 F_WAKE_OUT  = 0.50           # of the zone-0 radius at the outlet -> 0.350 m
 
 # --- derived: do NOT edit ----------------------------------------------------
-R_FAR  = ZONE_R[-1]
-SHELLS = [dict(r_out=r, h_in=(None if k == 0 else ZONE_H[k - 1]), h_out=ZONE_H[k])
-          for k, r in enumerate(ZONE_R)]
+def r_far():
+    """Farfield radius: stated once, as the end of the last zone."""
+    return ZONE_R[-1]
+
+
+def fin_zone_r():
+    """Outer radius of the fin zone (None when FIN_H_R is off)."""
+    if FIN_H_R is None or not FINS_ON:
+        return None
+    return G.FIN_TIP_R + max(FIN_TIP_SMEAR, 0.0)
+
+
+def shell_spec():
+    """Radial shells derived from ZONE_R / ZONE_H, at call time so overrides
+    of the lists are honoured.  Sizes here are UNSCALED (metres as written);
+    derived() applies H_SCALE.
+
+    Each entry: r_out, h_out, h_in (None = continue from the shell inside),
+    scale ('global' or 'fin'), wake (this zone opens into the wake), name.
+    The fin zone, when FIN_H_R is set, is inserted at its radius; the zones
+    from ZONE_R keep their identity, so WAKE_ZONE_K indexes ZONE_R as written.
+    """
+    zones = [dict(r_out=r, h_out=ZONE_H[k], scale='global', wake=(k == WAKE_ZONE_K),
+                  name=f'zone {k}') for k, r in enumerate(ZONE_R)]
+    rf = fin_zone_r()
+    if rf is not None:
+        zones.append(dict(r_out=rf, h_out=FIN_H_R, scale='fin', wake=False, name='fin zone'))
+        zones.sort(key=lambda z: z['r_out'])
+    for k, z in enumerate(zones):
+        z['h_in'] = None if k == 0 else zones[k - 1]['h_out']
+        z['h_in_scale'] = None if k == 0 else zones[k - 1]['scale']
+    return zones
+
+
+def _hz(v, scale):
+    return _hf(v) if scale == 'fin' else _h(v)
 
 # ------------------------------------------------------------- streamwise ---
 # h_start / h_end in metres; None means "continue from the neighbouring
@@ -170,9 +260,35 @@ UPSTREAM_L, DOWNSTREAM_L = 6.0, 13.0        # body lengths; matches the snappy b
 X_WAKE_1     = 0.30                          # m behind the base
 X_WAKE_2     = 4.00          # near wake now runs to 27 body diameters
 
-QUARTER = True
+# ------------------------------------------------------------------ sector --
+# The block structure is always built for ONE QUADRANT (theta = 0..90 deg,
+# the two fins lying in its two symmetry planes).  Larger sectors are made by
+# rotating copies of that quadrant and stitching them together at the
+# interface planes, node for node -- see sectorAssembly.py.
+#
+#   'quarter'  90 deg, two symmetry planes.  Axial flow only (alpha = beta = 0).
+#   'half'     180 deg, one symmetry plane (z = 0) holding two opposite fins.
+#              Angle of attack in the x-y plane (alpha != 0, beta = 0).
+#   'full'     360 deg, no symmetry.  Any alpha, beta, or roll; unsteady wake.
+#
+# Cell count scales x1, x2, x4.  Everything else -- parameters, quality,
+# patch names -- is identical.
+SECTOR = 'quarter'
+SECTORS = {'quarter': 1, 'half': 2, 'full': 4}      # name -> number of copies
+
 PATCHES = dict(inlet='inlet', outlet='outlet', farfield='box', symmetry='symm',
-               nose='cone', body='walls', tail='tail')
+               nose='cone', body='walls', tail='tail', fins='fins')
+
+
+def n_copies():
+    if SECTOR not in SECTORS:
+        raise ValueError(f"SECTOR must be one of {list(SECTORS)}, got {SECTOR!r}")
+    return SECTORS[SECTOR]
+
+
+def symmetry_fraction():
+    """Fraction of the full 360 deg present in the mesh: 0.25, 0.5 or 1."""
+    return n_copies() / 4.0
 
 
 # ------------------------------------------------------------------ solver --
@@ -244,11 +360,12 @@ def derived():
 
     # radial shells, resolved at the CYLINDER station where the wall is
     shells, h_prev, r_prev = [], y1, G.R_BODY
-    for s in SHELLS:
-        h_in = _h(s['h_in']) if s['h_in'] is not None else h_prev
-        h_out = _h(s['h_out'])
+    for s in shell_spec():
+        h_in = _hz(s['h_in'], s['h_in_scale']) if s['h_in'] is not None else h_prev
+        h_out = _hz(s['h_out'], s['scale'])
         n, c = geometric(s['r_out'] - r_prev, h_in, h_out)
-        shells.append(dict(r_out=s['r_out'], n=n, c=c, h_in=h_in, h_out=h_out))
+        shells.append(dict(r_out=s['r_out'], n=n, c=c, h_in=h_in, h_out=h_out,
+                           wake=s['wake'], name=s['name']))
         h_prev, r_prev = h_out, s['r_out']
 
     # cells inside the boundary layer
@@ -264,8 +381,8 @@ def derived():
                 cap_angle=float(np.degrees(np.arctan(G.drdx_body(x_cap)))),
                 shells=shells, n_rad=sum(s['n'] for s in shells),
                 n_delta=n_delta,
-                ds=2.0 * np.pi * G.R_BODY / (4.0 * N_AZ_BLOCKS * n_az_cells()),
-                n_circ=4 * N_AZ_BLOCKS * n_az_cells())
+                ds=2.0 * np.pi * G.R_BODY / (4.0 * n_az_quadrant()),
+                n_circ=4 * n_az_quadrant())
 
 
 def fin_x_start():
@@ -303,13 +420,19 @@ def h_up_inlet(d):
 def segment_sizes():
     """Cell sizes per streamwise segment, with the fin overrides folded in."""
     spec = dict(SEGMENTS)
-    spec['wake1'] = dict(spec['wake1'], h_start=H_WAKE_BASE)
+    out = {k: dict(h_start=_h(v['h_start']), h_end=_h(v['h_end']))
+           for k, v in spec.items()}
+    # first cells off the walls: the nose tip (end of `up`, start of `nose`)
+    # and the flat base (start of `wake1`) follow H_SCALE_WALL, like y1
+    out['up']['h_end'] = _hw(spec['up']['h_end'])
+    out['nose']['h_start'] = _hw(spec['nose']['h_start'])
+    out['wake1']['h_start'] = _hw(H_WAKE_BASE)
     if FIN_H_X is not None:
-        spec['cyl'] = dict(spec['cyl'], h_end=FIN_H_X)
-        spec['cylfin'] = dict(h_start=FIN_H_X, h_end=FIN_H_X)
-        spec['tail'] = dict(h_start=FIN_H_X, h_end=FIN_H_X)
-    return {k: dict(h_start=_h(v['h_start']), h_end=_h(v['h_end']))
-            for k, v in spec.items()}
+        hx = _hf(FIN_H_X)
+        out['cyl']['h_end'] = hx
+        out['cylfin'] = dict(h_start=hx, h_end=hx)
+        out['tail'] = dict(h_start=hx, h_end=hx)
+    return out
 
 
 def axial_plan(d):
@@ -328,23 +451,37 @@ def zone_r_out(k, x):
     """Outer radius of zone k at station x.
 
     Zone WAKE_ZONE_K opens out downstream of the base so the fine radial band
-    tracks the spreading wake; the others are cylinders.
+    tracks the spreading wake, and any zone inside it opens in proportion;
+    the zones outside are cylinders.
     """
-    if k != WAKE_ZONE_K or x <= G.X_BASE:
-        return ZONE_R[k]
+    zs = shell_spec()
+    kw = wake_shell_index()
+    if k > kw or x <= G.X_BASE:
+        return zs[k]['r_out']
     x_out = G.X_BASE + DOWNSTREAM_L * G.L_TOTAL
     xi = min(max((x - G.X_BASE) / (x_out - G.X_BASE), 0.0), 1.0)
-    return ZONE_R[k] + (ZONE0_R_WAKE - ZONE_R[k]) * xi ** WAKE_SPREAD_P
+    rw = zs[kw]['r_out']
+    grow = 1.0 + (ZONE0_R_WAKE / rw - 1.0) * xi ** WAKE_SPREAD_P
+    # every zone INSIDE the wake zone (a fin zone, say) opens with it, in
+    # proportion, so the layering is preserved as the band widens and no
+    # inner zone gets squeezed against the blend tube at the outlet
+    return zs[k]['r_out'] * grow
+
+
+def wake_shell_index():
+    """Index, in the derived shell list, of the zone that opens into the wake."""
+    return next(k for k, z in enumerate(shell_spec()) if z['wake'])
 
 
 def r_inlet():
-    """Blend-tube radius at the inlet plane.  A fraction of zone 0, so it
-    cannot outgrow the zone it lives inside."""
-    return F_INLET * ZONE_R[0]
+    """Blend-tube radius at the inlet plane.  A fraction of the innermost
+    zone, so it cannot outgrow the zone it lives inside."""
+    return F_INLET * shell_spec()[0]['r_out']
 
 
 def r_wake_out():
-    """Blend-tube radius at the outlet plane, likewise a fraction."""
+    """Blend-tube radius at the outlet plane: a fraction of the INNERMOST
+    zone's radius there, so it cannot outgrow the zone it lives inside."""
     return F_WAKE_OUT * zone_r_out(0, G.X_BASE + DOWNSTREAM_L * G.L_TOTAL)
 
 
@@ -372,11 +509,11 @@ def az_coefs():
     plane are graded; the rest are uniform."""
     th = az_angles()
     c = [1.0] * N_AZ_BLOCKS
-    nc = n_az_cells()
+    nc = n_az_cells_block(0)
     if AZ_FIN_H is not None:
         arc0 = G.R_BODY * (th[1] - th[0])
-        if _h(AZ_FIN_H) < arc0 / nc:
-            k = refit(arc0, nc, _h(AZ_FIN_H))
+        if _hf(AZ_FIN_H) < arc0 / nc:
+            k = refit(arc0, nc, _hf(AZ_FIN_H))
             c[0] = k                       # cluster at theta = 0
             c[-1] = 1.0 / k                # cluster at theta = 90
     return c
@@ -396,16 +533,29 @@ def validate_params():
         e.append(f'ZONE_R must increase: {ZONE_R}')
     if ZONE_R and ZONE_R[0] <= G.R_BODY:
         e.append(f'ZONE_R[0] = {ZONE_R[0]} is inside the body (R_BODY = {G.R_BODY})')
+    if FIN_H_R is not None and FIN_H_R <= 0:
+        e.append(f'FIN_H_R must be > 0 or None, got {FIN_H_R}')
+    rf = fin_zone_r()
+    if rf is not None:
+        near = [r for r in ZONE_R if abs(r - rf) < 2.0 * FIN_H_R]
+        if near:
+            e.append(f'FIN_H_R puts a zone boundary at r = {rf:.4f} m, within two '
+                     f'cells of ZONE_R entry {near[0]}: drop one of them')
+        if rf >= ZONE_R[-1]:
+            e.append(f'fin zone radius {rf:.4f} m is outside the farfield {ZONE_R[-1]}')
     k = WAKE_ZONE_K
     if not 0 <= k < len(ZONE_R):
         e.append(f'WAKE_ZONE_K = {k} is not a zone index')
-    else:
-        if ZONE0_R_WAKE < ZONE_R[k]:
+    elif not e:
+        zs = shell_spec()
+        kw = wake_shell_index()
+        if ZONE0_R_WAKE < zs[kw]['r_out']:
             e.append(f'ZONE0_R_WAKE {ZONE0_R_WAKE} < ZONE_R[{k}] {ZONE_R[k]}: '
                      f'zone {k} would close up downstream instead of opening out')
-        if k + 1 < len(ZONE_R) and ZONE0_R_WAKE >= ZONE_R[k + 1]:
-            e.append(f'ZONE0_R_WAKE {ZONE0_R_WAKE} >= ZONE_R[{k+1}] {ZONE_R[k+1]}: '
-                     f'zone {k} would swallow zone {k+1} at the outlet. Either lower '
+        if kw + 1 < len(zs) and ZONE0_R_WAKE >= zs[kw + 1]['r_out']:
+            nxt = zs[kw + 1]
+            e.append(f'ZONE0_R_WAKE {ZONE0_R_WAKE} >= {nxt["r_out"]} ({nxt["name"]}): '
+                     f'zone {k} would swallow it at the outlet. Either lower '
                      f'ZONE0_R_WAKE or set WAKE_ZONE_K to the outermost fine zone.')
     if FIN_H_X is not None and not G.X_BODY_1 < fin_x_start() < G.FIN_ROOT_LE:
         e.append(f'FIN_X_LEAD = {FIN_X_LEAD} puts the fin block start at '
@@ -413,6 +563,10 @@ def validate_params():
                  f'({G.X_BODY_1} .. {G.FIN_ROOT_LE})')
     if H_SCALE <= 0:
         e.append(f'H_SCALE must be > 0, got {H_SCALE}')
+    if SECTOR not in SECTORS:
+        e.append(f'SECTOR must be one of {list(SECTORS)}, got {SECTOR!r}')
+    if FIN_SECTION not in ('wedge', 'diamond', 'biconvex', 'naca', 'naca_te'):
+        e.append(f'unknown FIN_SECTION {FIN_SECTION!r}')
     if not 0.0 < F_INLET < 1.0:
         e.append(f'F_INLET must be in (0,1), got {F_INLET}')
     if not 0.0 < F_WAKE_OUT < 1.0:
@@ -424,11 +578,15 @@ def validate_params():
                  f'pokes through its own ring; got {CORE_FRAC}')
     if N_AZ_BLOCKS % 2 or N_AZ_BLOCKS < 2:
         e.append(f'N_AZ_BLOCKS must be even and >= 2, got {N_AZ_BLOCKS}')
-    for k, b in enumerate(ZONE_H):
-        span = ZONE_R[k] - (G.R_BODY if k == 0 else ZONE_R[k - 1])
-        if _h(b) >= span:
-            e.append(f'ZONE_H[{k}] = {b} m (x H_SCALE = {_h(b):.4g}) is not smaller '
-                     f'than zone {k}, which is {span:.4f} m wide')
+    if not e:
+        r_prev = G.R_BODY
+        for z in shell_spec():
+            span = z['r_out'] - r_prev
+            h = _hz(z['h_out'], z['scale'])
+            if h >= span:
+                e.append(f'{z["name"]}: cell size {z["h_out"]} m (scaled {h:.4g}) is not '
+                         f'smaller than the zone, which is {span:.4f} m wide')
+            r_prev = z['r_out']
     if e:
         raise ValueError('refinement zones are inconsistent:\n  - '
                          + '\n  - '.join(e))
@@ -454,7 +612,8 @@ def report():
     print('-' * 74)
     print(f"  {'radial shell':<22}{'r_out':>9}{'cells':>7}{'ratio':>9}{'h_in':>11}{'h_out':>11}")
     for i, s in enumerate(d['shells']):
-        print(f"  {'shell ' + str(i+1):<22}{s['r_out']:>9.3f}{s['n']:>7d}"
+        tag = s['name'] + (' (wake)' if s['wake'] else '')
+        print(f"  {'shell ' + str(i+1) + '  ' + tag:<22}{s['r_out']:>9.3f}{s['n']:>7d}"
               f"{s['c']:>9.4f}{s['h_in']*1e3:>9.3f}mm{s['h_out']*1e3:>9.1f}mm")
     print(f"  {'total radial cells':<22}{'':>9}{d['n_rad']:>7d}")
     print('-' * 74)
@@ -467,20 +626,70 @@ def report():
               f"{a['h0']*1e3:>9.2f}mm{a['h1']*1e3:>9.1f}mm")
     print(f"  {'total axial':<10}{'':>18}{nx:>7d}")
     print('-' * 74)
-    core_ax = ax['up']['n'] + ax['wake1']['n'] + ax['wake2']['n'] + ax['wake3']['n']
-    n_ann  = nx * d['n_rad'] * 2 * N_AZ
-    n_ring = core_ax * N_RING * 2 * N_AZ
-    n_core = core_ax * N_AZ * N_AZ
-    print(f"  {'predicted cells: annuli':<34}{n_ann:>12,d}")
-    print(f"  {'                 butterfly ring':<34}{n_ring:>12,d}")
-    print(f"  {'                 butterfly core':<34}{n_core:>12,d}")
-    print(f"  {'                 TOTAL (all hex)':<34}{n_ann+n_ring+n_core:>12,d}")
+    est = predicted_cells(d, ax)
+    print(f"  {'predicted cells: annuli':<34}{est['annuli']:>12,d}")
+    print(f"  {'                 butterfly ring':<34}{est['ring']:>12,d}")
+    print(f"  {'                 butterfly core':<34}{est['core']:>12,d}")
+    print(f"  {'                 quadrant TOTAL':<34}{est['quadrant']:>12,d}")
+    print(f"  {'sector ' + SECTOR + ' (x' + str(n_copies()) + ')':<34}{est['total']:>12,d}")
     print('=' * 74)
     return d, ax
 
 
-if __name__ == '__main__':
-    report()
+def predicted_cells(d=None, ax=None):
+    """Closed-form cell count of the quadrant, before building anything.
+
+    Exact for the annuli and the ring; the core is an (N/2 x n_az)^2 grid per
+    axial cell.  The upstream / nose sub-blocking re-solves each piece from
+    the parent distribution so the axial totals are only approximate (a few
+    cells per segment)."""
+    if d is None:
+        d = derived()
+    if ax is None:
+        ax = axial_plan(d)
+    nx = sum(a['n'] for a in ax.values())
+    core_ax = sum(ax[k]['n'] for k in ('up', 'wake1', 'wake2', 'wake3'))
+    n_az_q = n_az_quadrant()                        # azimuthal cells per quadrant
+    n_core_side = n_az_q // 2                       # symmetric block counts
+    ann = nx * d['n_rad'] * n_az_q
+    ring = core_ax * n_ring() * n_az_q
+    core = core_ax * n_core_side ** 2
+    q = ann + ring + core
+    return dict(annuli=ann, ring=ring, core=core, quadrant=q, total=q * n_copies())
+
+
+# ---------------------------------------------------------------- overrides --
+# Names that build.py / presets are allowed to change.  Anything else is
+# either derived or a function, and overriding it would be a silent no-op.
+OVERRIDABLE = {
+    'H_SCALE', 'H_SCALE_WALL', 'H_SCALE_FIN', 'FIN_H_R', 'U', 'NU', 'RHO', 'YPLUS_TARGET',
+    'N_AZ_BLOCKS', 'N_AZ_CELLS', 'AZ_BLOCK_GROWTH', 'AZ_FIN_H', 'N_RING',
+    'FINS_ON', 'FIN_SECTION', 'FIN_TIP_SMEAR', 'FIN_H_X', 'FIN_X_LEAD',
+    'ZONE_R', 'ZONE_H', 'WAKE_ZONE_K', 'ZONE0_R_WAKE', 'WAKE_SPREAD_P',
+    'F_INLET', 'F_WAKE_OUT', 'SEGMENTS', 'F_UP_INLET', 'F_UP_MAX',
+    'H_WAKE_BASE', 'CAP_R_FRAC', 'CORE_FRAC', 'UPSTREAM_L', 'DOWNSTREAM_L',
+    'X_WAKE_1', 'X_WAKE_2', 'SECTOR', 'N_NOSE_BLOCKS', 'N_UP_BLOCKS',
+}
+
+
+def apply_overrides(values, source='override'):
+    """Set parameters from a {NAME: value} mapping, refusing unknown names.
+
+    A typo in a preset used to be a silent no-op -- the build ran with the
+    defaults and nobody noticed.  Now it is an error that names the file."""
+    g = globals()
+    bad = [k for k in values if k not in OVERRIDABLE]
+    if bad:
+        raise KeyError(f'{source}: not a mesh parameter: {bad}. '
+                       f'Overridable names: {sorted(OVERRIDABLE)}')
+    for k, v in values.items():
+        g[k] = v
+
+
+def snapshot():
+    """The current parameter set, for the sidecar record written with each mesh."""
+    g = globals()
+    return {k: g[k] for k in sorted(OVERRIDABLE)}
 
 
 # ------------------------------------------------- streamwise subdivision ---
@@ -561,3 +770,7 @@ def subdivide(plan, xs):
         out.append(dict(x0=float(a), x1=float(b), n=n, c=c,
                         h0=local_h(plan, a), h1=local_h(plan, b)))
     return out
+
+
+if __name__ == '__main__':
+    report()

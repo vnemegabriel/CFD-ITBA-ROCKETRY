@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+|  Placeholder.  ./Allmesh replaces this file with the .meshInfo that         |
+|  mesh/build.py wrote next to the .msh, so the case always describes the    |
+|  mesh it holds.  The values below are those of the default quarter mesh.   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      meshInfo;
+}
+
+sector              quarter;
+symmetryFraction    0.25;
+fins                true;
+nCells              0;
+hScale              1;
+yPlusTarget         32;
+y1                  0.000303;
+Uref                100;
+nuRef               1.5e-05;
+Aref                0.0044769823;
+lRef                0.151;
+rBody               0.0755;
+lBody               2.955;
+
+// fin bounding geometry, read by system/topoSetDict (./Allrefine)
+finRootR            0.075;
+finTipR             0.2355;
+finTipSmear         0.004;
+finX0               2.52922;
+finX1               2.93;
+
+wallPatches         (cone walls tail fins);
+patchTypes
+{
+    inlet           patch;
+    outlet          patch;
+    box             patch;
+    symm            symmetry;
+    cone            wall;
+    walls           wall;
+    tail            wall;
+    fins            wall;
+}

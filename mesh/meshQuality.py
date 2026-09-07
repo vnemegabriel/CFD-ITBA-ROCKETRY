@@ -92,11 +92,39 @@ def analyse(nodes, hexes, progress=None):
     cosa = np.clip(np.einsum('ij,ij->i', Sf, d) / (magS * magd), -1.0, 1.0)
     nonortho = np.degrees(np.arccos(cosa))
 
-    # skewness: where o->n pierces the face plane, versus the face centre
-    nrm = Sf / magS[:, None]
-    t = np.einsum('ij,ij->i', Cf - cc[o], nrm) / np.einsum('ij,ij->i', d, nrm)
-    pierce = cc[o] + t[:, None] * d
-    skew = np.linalg.norm(pierce - Cf, axis=1) / np.sqrt(magS)
+    # skewness, OpenFOAM's definition (primitiveMeshTools::faceSkewness):
+    # the vector from the face centre to where the owner->neighbour line
+    # pierces the face plane, over the face's extent IN THAT DIRECTION (with a
+    # floor of 0.2 |d|).  An earlier version divided by sqrt(face area), which
+    # is not what checkMesh does and over-reports skew on stretched faces by
+    # 2-3x -- enough to mistake a fine mesh for a bad one.
+    Cpf = Cf - cc[o]
+    sv = Cpf - (np.einsum('ij,ij->i', Sf, Cpf)
+                / (np.einsum('ij,ij->i', Sf, d) + 1e-300))[:, None] * d
+    magsv = np.linalg.norm(sv, axis=1)
+    svhat = sv / (magsv + 1e-300)[:, None]
+    fd = 0.2 * magd
+    pts = nodes[faces[pair_i]]                       # (n, 4, 3)
+    for i in range(4):
+        fd = np.maximum(fd, np.abs(np.einsum('ij,ij->i', svhat, pts[:, i] - Cf)))
+    skew = magsv / (fd + 1e-300)
+
+    # boundary faces (primitiveMeshTools::boundaryFaceSkewness): the same
+    # thing with the owner centre's normal projection standing in for d and a
+    # floor of 0.4 |d|.  checkMesh's maximum usually comes from here.
+    bnd = np.flatnonzero(~used)
+    Sb = fa[bnd]; Cb = fc[bnd]; ob = owner[bnd]
+    nb = Sb / (np.linalg.norm(Sb, axis=1) + 1e-300)[:, None]
+    Cpb = Cb - cc[ob]
+    db = nb * np.einsum('ij,ij->i', nb, Cpb)[:, None]
+    svb = Cpb - db
+    magsvb = np.linalg.norm(svb, axis=1)
+    svbhat = svb / (magsvb + 1e-300)[:, None]
+    fdb = 0.4 * np.linalg.norm(db, axis=1)
+    ptb = nodes[faces[bnd]]
+    for i in range(4):
+        fdb = np.maximum(fdb, np.abs(np.einsum('ij,ij->i', svbhat, ptb[:, i] - Cb)))
+    skew_b = magsvb / (fdb + 1e-300)
 
     # aspect ratio: OpenFOAM's definition, 1/6 * sum|Sf| * cell size / volume
     sumS = np.zeros(M)
@@ -116,6 +144,9 @@ def analyse(nodes, hexes, progress=None):
                 nonortho_mean=float(nonortho.mean()),
                 nonortho_gt70=int((nonortho > 70).sum()),
                 nonortho_gt40=int((nonortho > 40).sum()),
-                skew_max=float(skew.max()), skew_mean=float(skew.mean()),
-                skew_gt4=int((skew > 4).sum()),
+                skew_max=float(max(skew.max(), skew_b.max())),
+                skew_max_internal=float(skew.max()), skew_max_boundary=float(skew_b.max()),
+                skew_mean=float(skew.mean()),
+                skew_gt4=int((skew > 4).sum() + (skew_b > 4).sum()),
+                skew_hot=np.column_stack([Cb[np.argsort(skew_b)[-10:]], np.sort(skew_b)[-10:]]),
                 ar_max=float(np.nanmax(ar)), ar_mean=float(np.nanmean(ar)))

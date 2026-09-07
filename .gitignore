@@ -1,4 +1,5 @@
-# --- Generated meshe
+# --- Generated meshes: regenerate from the .params.py sidecar, never commit
+mesh/output/
 *.msh
 *.msh2
 *.msh4
@@ -33,11 +34,12 @@ constant/triSurface/*.eMesh
 0/cellZone
 0/faceZone
 
-# --- Solver output: time directories, keep 0/ 
+# --- Solver output: time directories.  0/ is generated from 0.orig/ by Allrun
 [1-9]*/
 0.[0-9]*/
 -[0-9]*/
-!0/
+case/0/
+!0.orig/
 
 # --- Parallel decomposition ---
 processor*/

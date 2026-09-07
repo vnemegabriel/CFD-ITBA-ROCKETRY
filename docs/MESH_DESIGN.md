@@ -1,7 +1,14 @@
-# Aconcagua — gmsh structured mesh
+# Aconcagua — gmsh structured mesh: design notes
 
-3,538,188 cells, 100 % hexahedra, fins resolved, amplified wake.
-Non-orthogonality mean **1.49 deg**, max 75.9, 6,999 faces above 70.
+*Why the mesh is built the way it is.  For how to use it see
+[WORKFLOW.md](WORKFLOW.md) (Spanish); every parameter is listed in
+[PARAMETERS.md](PARAMETERS.md); half and full meshes in
+[SECTORS_AND_AOA.md](SECTORS_AND_AOA.md).*
+
+3,538,188 cells per quadrant, 100 % hexahedra, fins resolved, amplified wake.
+checkMesh: non-orthogonality max 86.7 deg, mean 5.35, 7,563 faces above 70 of
+10.7 million; skewness max 2.75.  Half (2 quadrants) and full (4) meshes are
+assembled from this quadrant with identical quality.
 
 ---
 
@@ -10,7 +17,7 @@ Non-orthogonality mean **1.49 deg**, max 75.9, 6,999 faces above 70.
 **Streamwise segments and radial levels.** Both axes are piecewise-linear so every
 block is visible — the picture is not to scale.
 
-![meridional zones](zones_meridional.png)
+![meridional zones](img/zones_meridional.png)
 
 The copper line is **shell 1**, the fine radial band. Downstream of the base it
 **opens out from 0.35 m to 0.70 m** so it tracks the spreading wake instead of the
@@ -22,7 +29,7 @@ graded toward both symmetry planes because that is where the fins are. The butte
 core is a 6 × 6 grid of sub-blocks: a single quad core can present only two edges to
 the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
 
-![cross-plane zones](zones_crossplane.png)
+![cross-plane zones](img/zones_crossplane.png)
 
 | Level | Zone | Extent | Cells | Present where |
 |---|---|---|---|---|
@@ -45,7 +52,7 @@ the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
 
 **Fins.** Planform and section:
 
-![fin planform and section](zones_fin.png)
+![fin planform and section](img/zones_fin.png)
 
 ---
 
@@ -53,6 +60,11 @@ the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
 
 You give **cell sizes**; counts are derived from `c = (L−h₁)/(L−h_N)` and
 `n = 1 + ln(h_N/h₁)/ln c`. Both closed form.
+
+`meshParams.py` holds the defaults; anything in it can be overridden from
+`build.py` (`--preset`, `--scale`, `--sector`, `--set KEY=VALUE`) without
+editing, and the parameter set actually used is written next to every mesh as
+`<name>.params.py`.  The tables below describe the defaults.
 
 ### Global coarsity — one number
 
@@ -62,7 +74,7 @@ H_SCALE_WALL = True    # False holds y1 (and y+) fixed while the rest scales
 ```
 
 Everything re-solves from the scaled sizes, so distributions stay correct rather
-than being thinned out. `AG_COARSE=<n>` overrides it from the shell for a quick look.
+than being thinned out. `build.py --scale <H>` sets it from the command line (the legacy `AG_COARSE=<n>` environment variable still works).
 
 | `H_SCALE` | cells | non-orth mean | max skew | build |
 |---|---|---|---|---|
@@ -137,38 +149,52 @@ Geometry constants live in `aconcaguaGeom.py`: five numbers define the body
 ## 3. Scripts
 
 ```
-python3 meshParams.py          # print the plan before building anything
-python3 meshFinish.py          # build -> snap -> fins -> audit -> write .msh   (~100 s)
-AG_COARSE=4 python3 meshFinish.py   # quarter resolution smoke test, ~3 s
-./Allmesh                      # gmshToFoam -> patch types -> checkMesh -> renumberMesh
+python build.py --plan                    # print the plan before building anything
+python build.py --preset fine             # build -> snap -> fins -> audit -> write   (~2 min)
+python build.py --preset smoke            # pipeline test, ~25 s
+python build.py --preset medium --sector full
+cd <run>; ./Allmesh <file.msh>            # gmshToFoam -> meshInfo -> patch types -> checkMesh -> renumberMesh
 ```
 
 | File | What it is |
 |---|---|
 | `aconcaguaGeom.py` | geometry of record, replaces the STL. Self-verifying. |
-| `meshParams.py` | the only file you normally edit |
+| `meshParams.py` | defaults, validation, the cell-count solver.  The only file you normally edit |
+| `presets/*.py` | named parameter sets layered on the defaults |
+| `build.py` | the command line: presets, overrides, sector, output, sidecars |
 | `blockTools.py` | memoising structured-block layer over gmsh |
 | `buildHexBody.py` | the block topology |
-| `finPatch.py` | fin deformation + patch split |
-| `meshQuality.py` | OpenFOAM's quality measures, validated |
-| `meshFinish.py` | driver |
-| `fixPatchTypes.py` | **run right after gmshToFoam, not optional** |
+| `meshIO.py` | gmsh model -> numpy arrays; .msh v2.2 writer; `.meshInfo` / `.params.py` sidecars |
+| `meshFinish.py` | the quadrant pipeline: build, mesh, extract, snap, deform, classify |
+| `finPatch.py` | fin deformation and symmetry/fin face classification, on arrays |
+| `sectorAssembly.py` | quadrant -> half / full by rotate-and-stitch |
+| `meshQuality.py` | OpenFOAM's quality measures, computed before OpenFOAM does |
+| `../case/fixPatchTypes.py` | **run right after gmshToFoam, not optional**; types from `meshInfo` |
+
+Everything after `gmsh.model.mesh.generate(3)` works on plain arrays: no
+per-node gmsh API calls, one vectorised pass each for the snap and the fin
+deformation, and a writer that emits exactly what gmshToFoam consumes.  Only
+nodes referenced by a hexahedron are written, so spline control points never
+reach the file.
 
 Setup:
 
 ```
-pip install gmsh --break-system-packages
-sudo apt install libglu1-mesa     # import gmsh fails with OSError: libGLU.so.1 without it
+pip install gmsh numpy scipy
+sudo apt install libglu1-mesa     # Linux/WSL: import gmsh fails with OSError: libGLU.so.1 without it
 ```
 
-The `.msh` is 460 MB ASCII — **generate it locally, do not copy it**.
+The quadrant `.msh` is 520 MB ASCII — **generate it locally, do not copy it**;
+the `.params.py` sidecar rebuilds it.
 
 `gmshToFoam` makes every patch `type patch`. `symm` fails loudly; **`cone`/`walls`/
 `tail`/`fins` fail silently** — wall functions, yPlus and forceCoeffs all quietly
-wrong. `fixPatchTypes.py` sets them and errors on anything unrecognised.
+wrong. `fixPatchTypes.py` sets them from the `patchTypes` entry of `meshInfo` and
+errors on anything unrecognised.
 
-Patches: `inlet` `outlet` `symm` `box` `cone` `walls` `tail` `fins` — 234,736 faces,
-exactly the boundary-face count, so nothing lands in `defaultFaces`.
+Patches: `inlet` `outlet` `symm` `box` `cone` `walls` `tail` `fins` — 266,244 faces
+in the quadrant, exactly the boundary-face count (build.py checks this and refuses
+to write otherwise), so nothing lands in `defaultFaces`.
 
 ---
 
@@ -189,6 +215,21 @@ It works only because the real fin is bevelled — thickness goes to zero contin
 at the leading and trailing edges, so the deformation relaxes to nothing there. Both
 symmetry planes get it: the quarter contains two half fins, one lying in each.
 `theta_f` is 2.28° at the root, 0.73° at the tip.
+
+**Which faces are fin.** A symmetry-plane face with *any* displaced node is off the
+plane, so it is tagged `fins`; only faces whose four nodes stayed put remain `symm`.
+The patch therefore carries a one-cell rim around the planform, which shrinks
+first-order with `FIN_H_X` and `FIN_H_R`: against the exact wetted area of the
+deformed surface, 376.0 cm² per half-fin, the mesh gives +3.8 % at 5/12 mm,
++2.0 % at 2.5/6 mm and +0.9 % at 1.25/3 mm.  The **normal** is right everywhere —
+the fin is a flat plate in the plane — so this is not the staircase that corrupts
+wall shear stress; it is a quantised outline.  Note that the exact reference is
+376.0 and not the 361.5 cm² nominal planform: the nominal figure omits the tip
+smear band and treats the bevels as flat, and comparing against it inflated the
+apparent discretisation error by about 4 %.  The same test decides, when two
+quadrants are stitched into a half or full mesh, which interface faces become
+interior and which stay as the two walls of the now full-thickness fin — one rule,
+so the quarter, half and full patches cannot disagree (see `sectorAssembly.py`).
 
 ### Refining around the fins
 
@@ -212,24 +253,48 @@ What those settings currently produce:
 | radial at the fin tip, r − R = 0.16 m | 11.89 mm |
 | fin faces | 5,218 |
 
-**Radial refinement at the tip** is the one that needs a zone rather than a knob. The
-tip sits at r = 0.2355 m, inside zone 0, where the radial stack has already grown to
-~12 mm. Add a zone boundary outside it and give it a small size:
+**Radial refinement at the tip** is the one that needs a zone rather than a stack
+parameter. The tip sits at r = 0.2355 m, inside zone 0, where the radial stack has
+already grown to ~12 mm. `FIN_H_R` inserts a zone boundary at the outer edge of the
+tip smear (`FIN_TIP_R + FIN_TIP_SMEAR` = 0.2395 m, so the fin closes on a node line)
+with that radial size:
 
 ```python
-ZONE_R = [0.28, 0.35, 2.00, 11.775]
-ZONE_H = [0.006, 0.020, 0.200, 1.600]
-WAKE_ZONE_K = 1          # zone 1 now carries the wake opening, not zone 0
+FIN_H_R = 0.006          # presets/fintip.py
 ```
 
-That gives 106 cells from the wall to 0.28 m at ratio 1.029, 6 mm at the tip instead
-of 12, and 147 radial cells in total against 92. `WAKE_ZONE_K` must move with it —
-`ZONE0_R_WAKE` opens whichever zone it indexes, and leaving it at 0 raises:
+That gives 85 cells from the wall to the tip at ratio 1.036, 6 mm at the tip instead
+of 12, and 129 radial cells in total against 92. The zone is inserted into the
+ZONE_R list at its radius, `WAKE_ZONE_K` keeps indexing the user's list, and every
+zone inside the wake zone opens with it in proportion downstream of the base — an
+inner zone that stayed cylindrical while the wake tube grew to 0.35 m at the outlet
+was squeezed to negative width, 816 inverted cells, which `build.py` refused to
+write. A transfinite block carries its radial count everywhere, so the fin zone's
+cells also run the length of the domain: that is the price of a fin zone, and why
+`fine` does not have one by default.
 
-```
-ZONE0_R_WAKE 0.7 >= ZONE_R[1] 0.35: zone 0 would swallow zone 1 at the outlet.
-Either lower ZONE0_R_WAKE or set WAKE_ZONE_K to the outermost fine zone.
-```
+**Coarsening and the fin.** `H_SCALE_FIN = False` (the coarse and medium presets)
+exempts the fin from `H_SCALE`: `FIN_H_X`, `AZ_FIN_H`, the cell count of the two
+azimuthal blocks touching the fin, and `FIN_H_R`. With everything scaled by 3 the
+12 mm fin was one cell thick with its edges two cells apart — a bump with a fin's
+planform — and the `fins` patch carried a 30 % rim. The per-block azimuthal count
+is consistent because a core u-edge shares its count with the ring block it faces
+(`azu{i}` ↔ block N−1−i) and symmetric in k ↔ N−1−k, which the sector stitching
+needs.
+
+That clustering reaches the nose apex through the butterfly core (the core's
+edges share the ring blocks' azimuthal distributions), so the cells on the axis at
+the tip are ~0.1 mm across.  With the streamwise cell at the cap scaled to 4.5 mm
+the cap's boundary faces there reached skewness 4.6 (checkMesh flags > 4).
+`H_SCALE_WALL = False` therefore also holds the streamwise first cell at the tip and
+off the base, not just `y1`: 2.5 in the coarse preset against 2.75 in `fine`.
+
+**Audit vs checkMesh.** `meshQuality.py` now uses OpenFOAM's own skewness
+definitions (internal faces normalised by the face extent in the skew direction,
+boundary faces against the owner's normal projection); an earlier version
+normalised by √area and over-reported stretched faces by 2–3×.  Non-orthogonality
+still differs (vertex-averaged vs volume-weighted cell centres): 75.9° here against
+86.7° in checkMesh on the same mesh.  checkMesh's numbers are the ones that count.
 
 ### Azimuthal quality
 
@@ -256,9 +321,15 @@ now 16.4° (sagitta 0.0103) against 45° (0.0761).
 
 ### Still open
 
-6,999 faces above 70°, out of 10.5 million. Aspect ratio reaches 63.2 in the fine
-azimuthal cells at the symmetry planes. Neither is blocking; `fvSchemes` carries
-`limited corrected 0.33` and `nNonOrthogonalCorrectors 1`.
+checkMesh counts 7,563 faces above 70° out of 10.7 million (the vertex-centred audit
+in `meshQuality.py` says 6,999 and a 75.9° maximum; checkMesh's volume-weighted
+centroids give 86.7°).  With `-allGeometry` it also flags 3,030 cells of aspect
+ratio up to 3,026: all in the farfield (r > 2 m) just behind the base, where the
+0.5 mm first streamwise cell off the base meets 1.6 m radial cells — a transfinite
+block carries one axial distribution across all radii.  Harmless there; removing it
+would need a radially varying axial distribution, i.e. a different topology.
+Neither is blocking; `fvSchemes` carries `limited corrected 0.33` and
+`nNonOrthogonalCorrectors 1`.
 
 ### Toolchain constraints the code depends on
 
@@ -276,13 +347,18 @@ code without honouring them produces a mesh that builds and is wrong.
 | `c ** n` overflows once n·ln c passes ~709 | `stack_sum` is log-guarded |
 | `gmshToFoam` types **every** patch `patch` | `fixPatchTypes.py` must list every patch and skip the `FoamFile` header |
 
-`Aref` in `controlDict` references **the body cross-section**, not the fin semi-span:
-`Aref = 0.0044770 m²`, `lRef = 0.1510 m`. `fins` is in the `forceCoeffs` patch list, and
-that list must match the mesh — `forceCoeffs` aborts on a patch name it cannot find.
+`Aref` references **the body cross-section**, not the fin semi-span, times the
+fraction of 360° in the mesh: `0.0044770 m²` for the quadrant, `lRef = 0.1510 m`.
+Both, and the wall patch list, are written by `build.py` into the `.meshInfo`
+sidecar that `controlDict` includes — `forceCoeffs` aborts on a patch name it
+cannot find, and a hand-maintained list drifted from the mesh more than once.
 
 ## Current quality
 
-| | snappyHexMesh | this mesh |
+checkMesh -allGeometry -allTopology on the fine quadrant (OpenFOAM v2412), against
+the snappyHexMesh mesh it replaced:
+
+| | snappyHexMesh | this mesh (quadrant) |
 |---|---|---|
 | cells | 2,475,822 | 3,538,188 |
 | hexahedra | 96.9 % | **100 %** |
@@ -292,8 +368,12 @@ that list must match the mesh — `forceCoeffs` aborts on a patch name it cannot
 | cells with volume ≤ 0 | — | **0** |
 | cells inside δ | 12–20 | **31** |
 | wall residual | — | **0.00 nm** |
-| max skewness | 2.51 | 3.16 |
-| max aspect ratio | 24.7 | 63.2 |
-| non-orth mean | 6.81° | **1.49°** |
-| non-orth > 70° | 496 | 6,999 |
+| max skewness | 2.51 | 2.75 |
+| max aspect ratio | 24.7 | 3,026 (3,030 farfield cells; 63 elsewhere) |
+| non-orth mean | 6.81° | **5.35°** |
+| non-orth max | — | 86.7° |
+| non-orth > 70° | 496 | 7,563 |
+| checkMesh | — | passes the default checks; fails 3 of `-allGeometry` (aspect ratio, determinant, interpolation weight) |
 | y⁺ on the fins | — | ~53 |
+
+The half and full meshes reproduce these numbers exactly, per copy.
