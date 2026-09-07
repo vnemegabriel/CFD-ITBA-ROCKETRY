@@ -79,3 +79,7 @@ directorios de corrida **fuera de OneDrive** y, en WSL, fuera de `/mnt/c`.
 ## Pendiente
 
 - Calculadora de fin flutter
+- Calentamiento de nosecone
+- Modelo de vuelo (sub + supersonico)
+
+- 
