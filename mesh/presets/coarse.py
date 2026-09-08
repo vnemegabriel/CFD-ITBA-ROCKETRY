@@ -1,4 +1,4 @@
-# coarse -- first look at a flow field.  ~530 k cells per quadrant, ~45 s.
+# coarse -- first look at a flow field.  ~473 k cells per quadrant, ~45 s.
 # Keeps y1 (y+ = 32) at the wall and the FIN at full resolution: 5 mm along
 # the chord, 0.5 mm normal to it, 12 mm spanwise at the tip.  Everything
 # else is 3x coarser than `fine`.  ZONE_H[0] is lowered so the step from the

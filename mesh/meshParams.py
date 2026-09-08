@@ -22,7 +22,6 @@ is iterated, relaxed, or subject to a quality-driven retreat.
 """
 
 import math
-import os
 
 import numpy as np
 import aconcaguaGeom as G
@@ -54,9 +53,6 @@ H_SCALE_WALL = True
 # scaled it is one cell thick and its edges land two cells apart, which is
 # not a fin, it is a bump.  The coarse and medium presets set this False.
 H_SCALE_FIN  = True
-
-H_SCALE = float(os.environ.get('AG_COARSE', H_SCALE))    # legacy env override
-
 
 def _h(v):
     """Scale a cell size."""
@@ -150,7 +146,32 @@ FIN_TIP_SMEAR = 0.004        # m, radial band over which the tip taper closes
 #              ZONE_H -- see the zone block above.  Adding a zone also means
 #              setting WAKE_ZONE_K to whichever zone should open into the wake.
 FIN_H_X      = 0.005         # m   None = leave `cyl` and `tail` unrefined
-FIN_X_LEAD   = 0.060         # m   of cylinder ahead of the root LE to include
+FIN_X_LEAD   = 0.500         # m   of cylinder ahead of the root LE to include
+# This one is COUPLED TO THE SWEEP, and it is the coupling that bites.  With
+# FIN_EDGE_FIT the approach block runs from a plane at fin_x_start() to a
+# surface that follows the leading edge, so its axial extent grows with radius
+# and its cell count does not:
+#
+#     stretch = 1 + (FIN_TIP_LE - FIN_ROOT_LE) / FIN_X_LEAD = 1 + 0.2508 / L
+#
+# At the 60 mm this used to be, that is 5.1: the block is 61 mm long at the
+# root and 311 mm at the tip, and its 12 uniform cells go from 5 mm to 26 mm.
+# The result is a wedge of coarse cells sitting between the 5 mm cylinder and
+# the 2.5 mm chord -- a 10:1 step, in the one place where the leading-edge
+# shock has to be resolved.  Raising it to 500 mm brings the stretch to 1.5 and
+# the cell at the tip leading edge from 25.9 mm to 7.7 mm.
+#
+# It is not paid for in cells, because the block is GRADED from the cylinder
+# size down to FIN_H_X rather than uniform: at H_SCALE 3 the whole mesh goes
+# from 530 k cells to 473 k.  What it does cost is skew, since the shear is
+# now released over 500 mm instead of 61: faces above 40 deg go from 89 k to
+# 116 k and the mean from 5.8 to 7.6 deg.  The MAXIMUM does not move (75.1 deg,
+# at the butterfly cap) and neither does the count above 70.
+#
+# validate_params() computes the stretch and refuses a value that leaves it
+# above FIN_LEAD_MAX_STRETCH.
+FIN_LEAD_MAX_STRETCH = 2.0   # of the approach block, at the fin tip
+
 # Spanwise: radial cell size AT THE FIN TIP.  None = no dedicated zone, the tip
 # gets whatever the ZONE stack gives there (12 mm at H_SCALE 1, 40 mm at 3).
 # A value inserts a zone boundary at the outer edge of the tip smear,
@@ -159,7 +180,38 @@ FIN_X_LEAD   = 0.060         # m   of cylinder ahead of the root LE to include
 # from there.  The zone is inserted into the ZONE_R/ZONE_H list at the right
 # radius -- WAKE_ZONE_K still indexes YOUR list.  Exempt from H_SCALE when
 # H_SCALE_FIN = False.
-FIN_H_R      = None          # m   e.g. 0.012
+FIN_H_R      = 0.001          # m   e.g. 0.012
+
+# --- fin edges ON the mesh, not across it -----------------------------------
+# The leading and trailing edges are swept: dx/dr = 1.56 at the LE, 0.62 at the
+# TE.  A grid whose axial stations are PLANES therefore crosses them in
+# diagonal, and split_symm(), which has to call a whole face wall or symmetry,
+# quantises the outline to the cell.  The patch comes out as the true planform
+# DILATED by one cell -- +10 % of planform area at H_SCALE 1, +21 % at 6 --
+# with a serrated, zero-thickness flange ahead of the real leading edge.
+#
+# FIN_EDGE_FIT bends the axial stations instead: x -> x + d(x, r), a shear in
+# the (x, r) plane that puts the station at FIN_LE_X_WALL exactly on x_LE(r)
+# and the one at X_BODY_2 exactly on x_TE(r).  Both edges become BLOCK
+# BOUNDARIES.  Nothing else changes: the mesh stays all-hexahedral and
+# transfinite, and split_symm() is not touched -- its input just stops lying,
+# because a node ON the leading edge has t = 0 exactly and is never moved.
+#
+# The price is skew, and it is not small: a face on the leading edge sits at
+# 57.4 deg to the axial direction, which IS the sweep.  It cannot be reduced
+# while the radial lines are circles; that would need a collar wrapped around
+# the planform edge, i.e. a different topology.  Away from the two edges
+# nothing goes past ~12 deg.
+FIN_EDGE_FIT = True
+# Radius at which the shear has died out.  None = ZONE_R[-2], the outside of
+# the mid field: far enough that the blend costs ~8 deg and no more.  Pulling
+# it in tightens the blend and the skew grows as 0.25 m / (r_blend - 0.2395).
+FIN_EDGE_R_BLEND = None
+# The trailing-edge station bulges 100 mm downstream at the tip while the base
+# plane stays put, which squeezes the `tail` block to 20 % of its length there.
+# This fraction of the TE shear is carried by the base station and released
+# over `wake1` instead.  0 = squeeze it all into `tail`.
+FIN_EDGE_TAIL_RELIEF = 0.5
 
 # ======================= REFINEMENT ZONES -- EDIT HERE =======================
 # Concentric zones outward from the wall.  ZONE_R[k] is where zone k ENDS, so
@@ -187,11 +239,6 @@ F_INLET     = 0.63           # of ZONE_R[0]          -> 0.221 m
 F_WAKE_OUT  = 0.50           # of the zone-0 radius at the outlet -> 0.350 m
 
 # --- derived: do NOT edit ----------------------------------------------------
-def r_far():
-    """Farfield radius: stated once, as the end of the last zone."""
-    return ZONE_R[-1]
-
-
 def fin_zone_r():
     """Outer radius of the fin zone (None when FIN_H_R is off)."""
     if FIN_H_R is None or not FINS_ON:
@@ -390,16 +437,72 @@ def fin_x_start():
     return G.FIN_ROOT_LE - FIN_X_LEAD
 
 
+def fin_lead_stretch():
+    """How much the approach block is stretched at the fin tip.
+
+    Its upstream face is a plane at fin_x_start() and its downstream face is
+    the swept leading edge, so the block is FIN_X_LEAD long at the root and
+    FIN_X_LEAD + sweep long at the tip -- with the same number of cells.
+    """
+    if not fin_edge_fit():
+        return 1.0
+    return 1.0 + (G.FIN_TIP_LE - G.FIN_ROOT_LE) / FIN_X_LEAD
+
+
+def fin_edge_fit():
+    """Whether the fin edges are being fitted as block boundaries."""
+    return bool(FIN_EDGE_FIT and FINS_ON)
+
+
+def fin_edge_r_blend():
+    """Radius at which the fin-edge shear has decayed to nothing."""
+    if FIN_EDGE_R_BLEND is not None:
+        return float(FIN_EDGE_R_BLEND)
+    return float(ZONE_R[-2] if len(ZONE_R) > 1 else ZONE_R[-1])
+
+
+def cyl_end():
+    """Where the cylinder blocks stop and `tail` starts.
+
+    X_BODY_2 normally.  With FIN_EDGE_FIT it is FIN_TE_X_WALL instead -- 2.5 um
+    further downstream -- because that station is the one the warp bends onto
+    the trailing edge, and it can only land ON the edge at every radius if it
+    starts on it at the wall.  Left at X_BODY_2 the station sits 2.5 um ahead
+    of its own trailing edge, every node on it keeps a half-thickness of 0.7 um
+    instead of zero, and `any` then hands the whole first column of `tail`
+    faces to the fin patch: 76 faces and +1.8 % of planform area, from two and
+    a half microns.  Everything else is unaffected -- r_body() is evaluated at
+    the actual station, so the wall stays exact, and the block either side of
+    it is 2.5 um longer or shorter than it was.
+    """
+    return G.FIN_TE_X_WALL if fin_edge_fit() else G.X_BODY_2
+
+
+def cyl_cuts():
+    """Extra block boundaries inside the cylinder, as (segment name, x).
+
+    Each one is a station the mesh will have, so each is a place the fin
+    machinery can anchor to.  `cylfin` is the streamwise refinement that starts
+    ahead of the root leading edge; `finchord` is the chord itself, and its
+    upstream face is the one FIN_EDGE_FIT bends onto the leading edge.
+    """
+    cuts = []
+    if FIN_H_X is not None:
+        cuts.append(('cylfin', fin_x_start()))
+    if fin_edge_fit():
+        cuts.append(('finchord', G.FIN_LE_X_WALL))
+    return sorted(cuts, key=lambda c: c[1])
+
+
 def segment_bounds(d):
     """Streamwise segment end stations, in order."""
     XB = G.X_BASE
     out = [('up', d['x_in'], d['x_cap']), ('nose', d['x_cap'], G.X_BODY_1)]
-    if FIN_H_X is not None:
-        out += [('cyl', G.X_BODY_1, fin_x_start()),
-                ('cylfin', fin_x_start(), G.X_BODY_2)]
-    else:
-        out += [('cyl', G.X_BODY_1, G.X_BODY_2)]
-    out += [('tail',  G.X_BODY_2, XB),
+    cuts = cyl_cuts()
+    names = ['cyl'] + [n for n, _ in cuts]
+    xs = [G.X_BODY_1] + [x for _, x in cuts] + [cyl_end()]
+    out += [(names[i], xs[i], xs[i + 1]) for i in range(len(names))]
+    out += [('tail',  cyl_end(), XB),
             ('wake1', XB,         XB + X_WAKE_1),
             ('wake2', XB + X_WAKE_1, XB + X_WAKE_2),
             ('wake3', XB + X_WAKE_2, d['x_out'])]
@@ -429,9 +532,25 @@ def segment_sizes():
     out['wake1']['h_start'] = _hw(H_WAKE_BASE)
     if FIN_H_X is not None:
         hx = _hf(FIN_H_X)
-        out['cyl']['h_end'] = hx
-        out['cylfin'] = dict(h_start=hx, h_end=hx)
         out['tail'] = dict(h_start=hx, h_end=hx)
+        if fin_edge_fit():
+            # GRADE the approach block from the cylinder size down to the fin
+            # size, and leave `cyl` alone.  Uniform-at-FIN_H_X only made sense
+            # while the block was a 60 mm strip: over the 500 mm the sweep now
+            # demands it would be 100 cells of 5 mm, most of them a long way
+            # from anything.  Graded it is 32, the step at either interface is
+            # under 1.05 at the root, and the cells sit where the leading edge
+            # is.
+            out['cylfin'] = dict(h_start=out['cyl']['h_end'], h_end=hx)
+        else:
+            out['cyl']['h_end'] = hx
+            out['cylfin'] = dict(h_start=hx, h_end=hx)
+    if fin_edge_fit():
+        # The chord block is the one the warp stretches and squeezes, and its
+        # cell count is what sets the chordwise resolution AT EVERY SPAN
+        # STATION: after the warp the axial index IS the chord fraction.
+        h = _hf(FIN_H_X) if FIN_H_X is not None else out['cyl']['h_end']
+        out['finchord'] = dict(h_start=h, h_end=h)
     return out
 
 
@@ -557,6 +676,37 @@ def validate_params():
             e.append(f'ZONE0_R_WAKE {ZONE0_R_WAKE} >= {nxt["r_out"]} ({nxt["name"]}): '
                      f'zone {k} would swallow it at the outlet. Either lower '
                      f'ZONE0_R_WAKE or set WAKE_ZONE_K to the outermost fine zone.')
+    if fin_edge_fit():
+        # The warp anchors the trailing edge on the cylinder / boattail station
+        # instead of giving it one of its own, which is only legitimate while
+        # the two really are the same place.  They are, to 2.5 um -- but that
+        # is a property of the drawing, so assert it rather than assume it.
+        gap = abs(G.FIN_TE_X_WALL - G.X_BODY_2)
+        if gap > 0.2 * (_hf(FIN_H_X) if FIN_H_X is not None else 0.012):
+            e.append(f'FIN_EDGE_FIT anchors the fin trailing edge on X_BODY_2 = '
+                     f'{G.X_BODY_2:.5f}, but the TE root is at {G.FIN_TE_X_WALL:.5f} '
+                     f'({gap*1e3:.1f} mm away): the fin no longer ends on the '
+                     f'boattail junction, so the TE needs a station of its own')
+        cuts = [x for _, x in cyl_cuts()]
+        if any(b - a < 1e-6 for a, b in zip(cuts[:-1], cuts[1:])):
+            e.append(f'cylinder block boundaries collide: {cuts}. '
+                     f'Lower FIN_X_LEAD or turn FIN_EDGE_FIT off')
+        if not 0.0 <= FIN_EDGE_TAIL_RELIEF < 1.0:
+            e.append(f'FIN_EDGE_TAIL_RELIEF must be in [0,1), got {FIN_EDGE_TAIL_RELIEF}')
+        st = fin_lead_stretch()
+        if st > FIN_LEAD_MAX_STRETCH:
+            need = (G.FIN_TIP_LE - G.FIN_ROOT_LE) / (FIN_LEAD_MAX_STRETCH - 1.0)
+            e.append(f'FIN_X_LEAD = {FIN_X_LEAD} stretches the approach block '
+                     f'{st:.2f}x at the fin tip, over FIN_LEAD_MAX_STRETCH = '
+                     f'{FIN_LEAD_MAX_STRETCH}: its cells there are {st:.1f} times '
+                     f'the {_hf(FIN_H_X) if FIN_H_X else 0:.4g} m they are at the '
+                     f'root, which puts a band of coarse cells right in front of '
+                     f'the leading edge.  Use FIN_X_LEAD >= {need:.3f}, or raise '
+                     f'FIN_LEAD_MAX_STRETCH to rebuild an older mesh as it was')
+        rb = fin_edge_r_blend()
+        if rb <= G.FIN_TIP_R + FIN_TIP_SMEAR:
+            e.append(f'FIN_EDGE_R_BLEND {rb} is inside the fin tip '
+                     f'{G.FIN_TIP_R + FIN_TIP_SMEAR:.4f}: nothing to blend over')
     if FIN_H_X is not None and not G.X_BODY_1 < fin_x_start() < G.FIN_ROOT_LE:
         e.append(f'FIN_X_LEAD = {FIN_X_LEAD} puts the fin block start at '
                  f'{fin_x_start():.4f}, outside the cylinder '
@@ -665,6 +815,8 @@ OVERRIDABLE = {
     'H_SCALE', 'H_SCALE_WALL', 'H_SCALE_FIN', 'FIN_H_R', 'U', 'NU', 'RHO', 'YPLUS_TARGET',
     'N_AZ_BLOCKS', 'N_AZ_CELLS', 'AZ_BLOCK_GROWTH', 'AZ_FIN_H', 'N_RING',
     'FINS_ON', 'FIN_SECTION', 'FIN_TIP_SMEAR', 'FIN_H_X', 'FIN_X_LEAD',
+    'FIN_EDGE_FIT', 'FIN_EDGE_R_BLEND', 'FIN_EDGE_TAIL_RELIEF',
+    'FIN_LEAD_MAX_STRETCH',
     'ZONE_R', 'ZONE_H', 'WAKE_ZONE_K', 'ZONE0_R_WAKE', 'WAKE_SPREAD_P',
     'F_INLET', 'F_WAKE_OUT', 'SEGMENTS', 'F_UP_INLET', 'F_UP_MAX',
     'H_WAKE_BASE', 'CAP_R_FRAC', 'CORE_FRAC', 'UPSTREAM_L', 'DOWNSTREAM_L',
@@ -732,22 +884,18 @@ def equidistribute(a, b, n, weight):
     return np.interp(np.linspace(0.0, c[-1], n + 1), c, x)
 
 
-def nose_stations(d, plan=None):
+def nose_stations(d, plan):
     h = 1e-6
     def w(x):
         xs = np.clip(x, h, G.L_NOSE - h)
         r2 = np.abs((G.r_body(xs + h) - 2 * G.r_body(xs) + G.r_body(xs - h)) / h ** 2)
         return np.sqrt(r2)
     f = lambda n: equidistribute(d['x_cap'], G.X_BODY_1, n, w)
-    if plan is None:
-        plan = axial_plan(d)['nose']
     return f(_blocks(N_NOSE_BLOCKS, plan, f))
 
 
-def up_stations(d, plan=None):
+def up_stations(d, plan):
     f = lambda n: np.linspace(d['x_in'], d['x_cap'], n + 1)
-    if plan is None:
-        plan = axial_plan(d)['up']
     return f(_blocks(N_UP_BLOCKS, plan, f))
 
 

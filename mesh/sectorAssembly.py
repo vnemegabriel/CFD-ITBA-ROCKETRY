@@ -83,7 +83,7 @@ def _match(key_b, key_a, tol=1e-7):
 
 
 def assemble(nodes, hexes, quads, plane_a, plane_b, fin_nodes, n_copies,
-             symm_name=None, fins_name=None, verbose=True):
+             verbose=True):
     """Rotate-and-stitch `n_copies` quadrants (1, 2 or 4).
 
     nodes, hexes, quads  the quadrant, as from meshIO.extract (quads includes
@@ -95,8 +95,8 @@ def assemble(nodes, hexes, quads, plane_a, plane_b, fin_nodes, n_copies,
     Returns (nodes, hexes, quads) for the assembled sector; the symmetry patch
     holds whatever external planes remain and the fin patch every fin face.
     """
-    symm_name = symm_name or MP.PATCHES['symmetry']
-    fins_name = fins_name or MP.PATCHES['fins']
+    symm_name = MP.PATCHES['symmetry']
+    fins_name = MP.PATCHES['fins']
     if n_copies not in (1, 2, 4):
         raise ValueError(f'n_copies must be 1, 2 or 4, got {n_copies}')
     n = len(nodes)

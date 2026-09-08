@@ -7,7 +7,7 @@ Qué significa cada error y qué hacer. Los mensajes están citados como salen.
 **`refinement zones are inconsistent:` seguido de una lista**
 `validate_params()` encontró parámetros incompatibles antes de construir.
 Cada línea dice qué regla se rompió y con qué valores; la tabla de reglas
-está en [PARAMETERS.md](PARAMETERS.md#validación). El caso típico es agregar
+está en [PARAMETERS.md](PARAMETROS.md#validación). El caso típico es agregar
 una zona a `ZONE_R` y olvidarse de `WAKE_ZONE_K`:
 `ZONE0_R_WAKE 0.7 >= ZONE_R[1] 0.35: zone 0 would swallow zone 1 at the outlet`.
 
@@ -61,7 +61,7 @@ de un cuarto con un `.msh` completo). `Allmesh` copia el sidecar que está
 
 **`Allrun`: `!! quarter mesh: two symmetry planes, alpha and beta must be 0`**
 Lo que dice. `--sector half` para `alpha`, `--sector full` para `beta`.
-Ver [SECTORS_AND_AOA.md](SECTORS_AND_AOA.md).
+Ver [SECTORS_AND_AOA.md](SECTORES_Y_AOA.md).
 
 **`forceCoeffs`: `Unknown patch name fins`** o `Cannot find patchField entry for symm`
 `constant/meshInfo` y la malla no coinciden (ver arriba), o alguien editó
@@ -154,7 +154,7 @@ quedaba con 15 mm sobre la cuerda, una celda de espesor y 40 mm radiales en
 la punta. Ahora `coarse` y `medium` llevan `H_SCALE_FIN = False` y
 `FIN_H_R = 0.012`, que mantienen la aleta a la resolución de `fine` mientras
 el resto se engrosa. Con `--scale` a mano, agregar `--set H_SCALE_FIN=False
---set FIN_H_R=0.012`. Ver [PARAMETERS.md](PARAMETERS.md#grosor-global).
+--set FIN_H_R=0.012`. Ver [PARAMETERS.md](PARAMETROS.md#grosor-global).
 
 **Celdas en "X" (moño) en un Clip con plano**
 Aparecen cuando el plano del `Clip` pasa exactamente por nodos de la malla,

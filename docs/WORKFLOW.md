@@ -83,7 +83,7 @@ con el número de celdas. Media malla ×2, completa ×4.
 | Flag | Efecto |
 |---|---|
 | `--scale H` | `H_SCALE`: multiplica todo tamaño de celda por H (celdas ≈ 1/H³). `--scale 2` es 1/8 de las celdas. |
-| `--sector quarter\|half\|full` | 90°, 180° o 360°. Ver [SECTORS_AND_AOA.md](SECTORS_AND_AOA.md). |
+| `--sector quarter\|half\|full` | 90°, 180° o 360°. Ver [SECTORS_AND_AOA.md](SECTORES_Y_AOA.md). |
 | `--fins` / `--no-fins` | con o sin aletas (cuerpo de revolución limpio) |
 | `--set KEY=VALUE` | cualquier parámetro; `VALUE` es un literal de Python: `--set ZONE_R=[0.28,0.35,2,11.775]` |
 | `--out FILE.msh` / `--name NOMBRE` | dónde y cómo se llama la salida. Default `output/aconcagua_<sector>_s<scale>[_nofins].msh` |
@@ -210,6 +210,7 @@ conviene saber **qué ya está refinado y qué no**:
 | Dirección | Cómo se refina | ¿Es local? |
 |---|---|---|
 | cuerda (axial) | `FIN_H_X`, que parte `cyl` en `cyl` + `cylfin` | **sí**, sólo sobre la aleta |
+| bordes de ataque y de fuga | `FIN_EDGE_FIT`, que corre las estaciones axiales para que caigan sobre `x_LE(r)` y `x_TE(r)` | **sí**, y no agrega ni una celda |
 | normal a la aleta (azimutal) | `AZ_FIN_H` y los bloques que tocan los planos | **sí**, sólo cerca de la aleta |
 | envergadura (radial) | `FIN_H_R`, una zona radial | **no**: es un cilindro que va del inlet al outlet |
 
@@ -432,7 +433,7 @@ python build.py --preset medium --set U=612     # M 1.8
 ```
 
 La tabla de `y1` contra velocidad está en
-[PARAMETERS.md](PARAMETERS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
+[PARAMETERS.md](PARAMETROS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
 `Allrun` avisa si la `Uinf` del caso no se corresponde con la malla.
 
 **Convergencia de malla.** `H_SCALE_WALL = False` mantiene `y1` (y por lo
@@ -453,7 +454,7 @@ done
 ```
 
 **Refinar las aletas.** Tres direcciones, tres parámetros (ver
-[PARAMETERS.md](PARAMETERS.md#aletas)): `AZ_FIN_H` (normal a la aleta),
+[PARAMETERS.md](PARAMETROS.md#aletas)): `AZ_FIN_H` (normal a la aleta),
 `FIN_H_X` (a lo largo de la cuerda), y `FIN_H_R` para la envergadura
 (`--preset fintip`). La radial es global en x y cuesta +36 %; si sólo querés
 la punta, `./Allrefine tip` hace lo mismo por +16 % (sección 3).
@@ -477,7 +478,7 @@ aparece `T` y `thermophysicalProperties`; la malla y `flowConditions` no.
 - `case/` no se corre. Si un cambio al caso vale para todas las corridas
   futuras, va a la plantilla y se commitea.
 - Cambios de geometría van a `aconcaguaGeom.py` y se verifican con
-  `python aconcaguaGeom.py` (ver [GEOMETRY.md](GEOMETRY.md)).
+  `python aconcaguaGeom.py` (ver [GEOMETRY.md](GEOMETRÍA.md)).
 
 ## Chuleta
 

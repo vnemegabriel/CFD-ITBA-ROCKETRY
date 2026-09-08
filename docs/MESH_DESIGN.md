@@ -2,8 +2,8 @@
 
 *Why the mesh is built the way it is.  For how to use it see
 [WORKFLOW.md](WORKFLOW.md) (Spanish); every parameter is listed in
-[PARAMETERS.md](PARAMETERS.md); half and full meshes in
-[SECTORS_AND_AOA.md](SECTORS_AND_AOA.md).*
+[PARAMETERS.md](PARAMETROS.md); half and full meshes in
+[SECTORS_AND_AOA.md](SECTORES_Y_AOA.md).*
 
 3,538,188 cells per quadrant, 100 % hexahedra, fins resolved, amplified wake.
 checkMesh: non-orthogonality max 86.7 deg, mean 5.35, 7,563 faces above 70 of
@@ -43,16 +43,176 @@ the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
 |---|---|---|---|---|
 | up (×6) | −17.730 | 0.026 | 79 | — |
 | nose (×14) | 0.026 | 0.800 | 153 | cone |
-| cyl | 0.800 | 2.469 | 209 | walls |
-| cylfin | 2.469 | 2.830 | 72 | walls |
-| tail | 2.830 | 2.955 | 25 | tail |
+| cyl | 0.800 | 2.029 | 102 | walls |
+| cylfin | 2.029 | 2.530 | 63 | walls |
+| finchord | 2.530001 | 2.830002 | 60 | walls |
+| tail | 2.830002 | 2.955 | 25 | tail |
 | wake1 | 2.955 | 3.255 | 110 | — |
 | wake2 | 3.255 | 6.955 | 222 | — |
 | wake3 | 6.955 | 41.370 | 91 | — |
 
+`finchord` is the fin chord itself: its two bounding stations are bent onto the
+leading and trailing edges, so its 60 axial cells span 300 mm at the root and
+150 mm at the tip — the axial index IS the chord fraction.  `cylfin` is the
+approach: its upstream face is a plane and its downstream face is the leading
+edge, so it is `FIN_X_LEAD` long at the root and `FIN_X_LEAD` + 250 mm at the
+tip.  See *Fin edges on the mesh* and *What the sweep costs the approach*
+below.
+
 **Fins.** Planform and section:
 
 ![fin planform and section](img/zones_fin.png)
+
+### Fin edges on the mesh, not across it
+
+The planform edges are swept: dx/dr = 1.5626 at the leading edge, 0.6249 at the
+trailing edge.  Axial stations that are PLANES therefore cross them in diagonal,
+and `finPatch.split_symm()` — which can only call a whole face wall or symmetry
+— quantises the outline to the cell.
+
+That rule cannot simply be made smarter.  At assembly a symmetry-plane face is
+merged into the interior only if all four of its nodes are still at z = 0, so
+"any node displaced -> wall" is forced by the topology, not chosen.  A centroid
+test would cut the area bias from +10.3 % to −0.2 % and break the stitch.  The
+input has to become exact instead:
+
+| | patch area vs planform | span rows | chord cells |
+|---|---|---|---|
+| H_SCALE 1 | +10.3 % | 50 | 81 |
+| H_SCALE 3 | +18.9 % | 16 | 27 |
+| H_SCALE 6 | +21.1 % | 8 | 14 |
+
+Always larger, never smaller, and because the wedge section has t → 0 at the
+leading edge the extra ring of faces carries almost no thickness: a serrated
+flange of near-zero thickness standing ahead of the real edge.
+
+`FIN_EDGE_FIT` shears the axial stations in the (x, r) plane instead —
+`x -> x + d(x, r)`, applied to the finished node array exactly the way
+`finPatch` applies the fin deformation, so no block is added and nothing is
+snapped:
+
+| anchor station | shift it carries |
+|---|---|
+| `fin_x_start()` = 2.4692 | 0, pinned |
+| `FIN_LE_X_WALL` = 2.5300 | `x_LE(r) − x_LE(R_BODY)` → lands on the leading edge |
+| `FIN_TE_X_WALL` = 2.830002 | `x_TE(r) − x_TE(R_BODY)` → lands on the trailing edge |
+| `X_BASE` = 2.9550 | `FIN_EDGE_TAIL_RELIEF ×` the above |
+| `X_BASE + X_WAKE_1` = 3.2550 | 0, pinned |
+
+The trailing edge needs no station of its own because it already has one: the
+fin root TE is at x = 2.830002 and the cylinder/boattail junction at 2.830000,
+2.5 µm apart, so `cyl_end()` moves the junction station those 2.5 µm rather
+than adding a second one.  That is not pedantry.  Left at 2.830000 the station
+sits 2.5 µm ahead of its own trailing edge, every node on it keeps a
+half-thickness of 0.7 µm instead of zero, `any` hands the entire first column
+of `tail` faces to the fin patch — 76 faces, +1.8 % of planform area — and the
+staircase is replaced by a strip.  The leading edge root lands on
+2.530001 = X_BASE − 0.425.  Neither number is luck (the fin was drawn to the
+body) but `validate()` asserts the trailing one rather than trusting it, since
+a change to `L_CYL` would silently break it.
+
+The wall does not move: every shift is measured from its own value at
+r = R_BODY and `G.fin_edge_x()` freezes below R_BODY, so d vanishes identically
+on the body surface.  `snap()` runs first and its nanometre result survives.
+
+*What it costs.*  A face lying on the leading edge is at 57.4 deg to the axial
+direction, because that IS the sweep, and no blend improves it while the radial
+lines are circles — the only way down is a collar wrapped around the planform
+edge, i.e. a different topology.  Measured at H_SCALE 3, quarter, with
+`FIN_H_R` = 12 mm:
+
+| | off | on |
+|---|---|---|
+| cells | 371,920 | 371,920 |
+| fin faces | 3,962 | 4,560 |
+| wetted area per half fin | +4.0 % | **−0.8 %** |
+| faces outside the true planform | ~1 cell all round | 0 |
+| non-orthogonality max | 74.92 deg | 74.92 deg |
+| faces above 70 deg | 658 | 658 |
+| faces above 40 deg | 3,999 | 65,947 |
+| skewness max | 4.578 | 4.578 |
+
+The −0.8 % is the reference, not the mesh: `wetted_area_analytic()` integrates
+from `FIN_ROOT_R` = 0.075, which is 0.5 mm inside the wall the mesh starts at
+(−0.40 %), and puts the surface on y = r rather than on the cylinder
+y = √(r² − t²) the deformation actually wraps it around (−0.24 %).  Not one
+face lies outside the planform, at either scale.
+
+The maximum is unchanged — it lives at the butterfly cap, not at the fin — and
+the shear adds no face above 70 deg.  What it does add is a large band between
+40 and 70, which is the shear itself and is the price of the edge.
+
+Gmsh's own `Curve In Surface` is not an alternative: embedded entities are
+supported only under the unstructured Delaunay and HXT algorithms, so an
+embedded curve and a transfinite block are mutually exclusive.  The edge has to
+be a block boundary, which is what this is.
+
+### What the sweep costs the approach
+
+Bending the downstream face of a block onto the leading edge stretches that
+block, because its upstream face is still a plane and its cell count is fixed
+along the radial index:
+
+    stretch = 1 + (FIN_TIP_LE − FIN_ROOT_LE) / FIN_X_LEAD = 1 + 0.2508 / L
+
+`FIN_X_LEAD` was 60 mm, chosen when the approach block was an ordinary
+constant-x band and 60 mm of lead was all it meant.  Against a 250 mm sweep it
+gives a stretch of 5.1: the block is 61 mm long at the root and 311 mm at the
+tip, and its 12 uniform cells go from 5 mm to 26 mm.  The axial sizes along the
+tip radius then run
+
+    5.0 mm  (cyl)  →  25.9 mm  (cylfin)  →  2.5 mm  (finchord)
+
+a 5:1 step up followed by a 10:1 step down, with the coarse island sitting
+exactly where the leading-edge shock is.  This is not something H_SCALE fixes:
+every size scales together, so the ratio is invariant.
+
+Two changes, and the parameter is now checked rather than left free:
+
+* `FIN_X_LEAD` is 500 mm, which puts the stretch at 1.50 and the cell at the
+  tip leading edge at 7.7 mm.
+* `cylfin` is GRADED from the cylinder size down to `FIN_H_X` instead of being
+  uniform at `FIN_H_X`, and `cyl` is no longer forced to end at `FIN_H_X`.
+  Uniform over 500 mm would be 100 cells; graded it is 32, and they sit against
+  the leading edge instead of being spread over half the cylinder.
+* `validate_params()` computes `fin_lead_stretch()` and refuses anything above
+  `FIN_LEAD_MAX_STRETCH` (2.0), naming the lead you need.
+
+Measured on `coarse`, quarter:
+
+| | lead 60 mm | lead 500 mm, graded |
+|---|---|---|
+| cells | 530,000 | **472,592** |
+| axial cell at the tip leading edge | 25.9 mm | **7.7 mm** |
+| non-orthogonality max | 75.09 deg | 75.09 deg |
+| faces above 70 deg | 1,165 | 1,165 |
+| faces above 40 deg | 89,089 | 115,649 |
+| non-orthogonality mean | 5.78 deg | 7.59 deg |
+| skewness max | 2.541 | 2.541 |
+
+Fewer cells and a 3.4x better leading-edge spacing, paid for in the band
+between 40 and 70 deg — the shear is now released over 500 mm of cylinder
+instead of 60 mm, so more of it is tilted.  The maximum does not move, because
+it lives at the butterfly cap and not at the fin.
+
+The side effect worth knowing: `cyl` now keeps the size `SEGMENTS` asks of it
+(12 mm at H_SCALE 1) instead of being silently graded down to `FIN_H_X` over
+its whole length.  The mid-cylinder is coarser than it was, which is where the
+57,000 cells went.  If you want it finer, that is `SEGMENTS['cyl']['h_end']`,
+which is what it is for.
+
+Going further would mean releasing the shear over the whole cylinder rather
+than over an approach block — 5.9 mm at the tip leading edge, but 144,725 faces
+above 40 deg and a mean of 9.1.  Not obviously worth it.
+
+### Volume refinement is a separate job
+
+None of this is the tool for making the CELLS around the fin smaller; it only
+makes them regular.  Local 2:1 refinement is `case-*/Allrefine`, which runs
+`topoSet` + `refineMesh` on a region `system/topoSetDict` reads out of
+`constant/meshInfo`.  Chordwise (`FIN_H_X`) and fin-normal (`AZ_FIN_H`)
+spacings are already local to the fin; the radial one is a cylinder that runs
+the length of the domain, and that is the one `Allrefine` exists to fix.
 
 ---
 
@@ -74,7 +234,7 @@ H_SCALE_WALL = True    # False holds y1 (and y+) fixed while the rest scales
 ```
 
 Everything re-solves from the scaled sizes, so distributions stay correct rather
-than being thinned out. `build.py --scale <H>` sets it from the command line (the legacy `AG_COARSE=<n>` environment variable still works).
+than being thinned out. `build.py --scale <H>` sets it from the command line.
 
 | `H_SCALE` | cells | non-orth mean | max skew | build |
 |---|---|---|---|---|
@@ -112,6 +272,7 @@ cannot outgrow the zone that contains them.
 | `ZONE_R[0] > R_BODY` | `ZONE_R[0] = ... is inside the body` |
 | `ZONE_R[k] ≤ ZONE0_R_WAKE < ZONE_R[k+1]`, k = `WAKE_ZONE_K` | that zone would close up, or swallow the next |
 | `FIN_X_LEAD` keeps the fin block start on the cylinder | names the resulting x and the valid range |
+| `FIN_X_LEAD` against the sweep | names the stretch, the cap, and the lead you need |
 | `H_SCALE > 0` | out of range |
 | `ZONE_H[k]` smaller than zone k | `ZONE_H[k] is not smaller than zone k, which is ... wide` |
 | `0 < F_INLET, F_WAKE_OUT < 1` | out of range |
@@ -135,7 +296,7 @@ cannot outgrow the zone that contains them.
 | `CORE_FRAC` | 0.45 | core half-width / R_i. Must stay < 0.707 (validated) |
 | `X_WAKE_1` / `X_WAKE_2` | 0.30 / 4.00 m | near wake runs to 27 body diameters |
 | `WAKE_ZONE_K` | 0 | which zone opens into the wake |
-| `FIN_H_X` / `FIN_X_LEAD` | 0.005 / 0.060 m | streamwise refinement over the fin chord |
+| `FIN_H_X` / `FIN_X_LEAD` | 0.005 / 0.500 m | streamwise cell over the fin chord, and the approach ahead of it |
 | `H_SCALE` / `H_SCALE_WALL` | 1.0 / `True` | global coarsity |
 | `UPSTREAM_L` / `DOWNSTREAM_L` | 6 / 13 | domain, in body lengths |
 | `FINS_ON` | `True` | |
@@ -165,7 +326,8 @@ cd <run>; ./Allmesh <file.msh>            # gmshToFoam -> meshInfo -> patch type
 | `blockTools.py` | memoising structured-block layer over gmsh |
 | `buildHexBody.py` | the block topology |
 | `meshIO.py` | gmsh model -> numpy arrays; .msh v2.2 writer; `.meshInfo` / `.params.py` sidecars |
-| `meshFinish.py` | the quadrant pipeline: build, mesh, extract, snap, deform, classify |
+| `meshFinish.py` | the quadrant pipeline: build, mesh, extract, snap, fit the fin edges, deform, classify |
+| `finEdge.py` | the shear that puts the fin leading and trailing edges on block boundaries |
 | `finPatch.py` | fin deformation and symmetry/fin face classification, on arrays |
 | `sectorAssembly.py` | quadrant -> half / full by rotate-and-stitch |
 | `meshQuality.py` | OpenFOAM's quality measures, computed before OpenFOAM does |
@@ -240,7 +402,8 @@ Three directions, three places to edit.
 | **azimuthal** | `AZ_FIN_H` | 5e-4 m | first cell off the fin surface → y⁺ ≈ 53 |
 | | `AZ_BLOCK_GROWTH` | 1.50 | how fast blocks widen away from the fin |
 | **streamwise** | `FIN_H_X` | 0.005 m | cell over the fin chord; splits `cyl` into `cyl` + `cylfin` and refines `tail`. `None` = off |
-| | `FIN_X_LEAD` | 0.060 m | cylinder included ahead of the root leading edge |
+| | `FIN_X_LEAD` | 0.500 m | approach block ahead of the root leading edge.  Coupled to the sweep: see *What the sweep costs the approach* |
+| | `FIN_LEAD_MAX_STRETCH` | 2.0 | cap on that block's stretch at the tip; `validate_params()` enforces it |
 | **radial** | `ZONE_R` / `ZONE_H` | see below | add a zone just outside the tip |
 
 What those settings currently produce:
@@ -342,7 +505,7 @@ code without honouring them produces a mesh that builds and is wrong.
 | gmsh spaces transfinite points on a spline by **arc length, not parameter** | control points cannot dictate node positions; sample densely for curve accuracy and pass the real progression |
 | a power blend `ξ^q` with 1 < q < 2 has **unbounded curvature** at ξ = 0 | the upstream blend is tangent-matched, `Rᵢ² = r_cap² + 2 r_cap s_cap t + λt²` |
 | a transfinite quad drifts off a **curved** meridian by (linear blend of end radii − true radius) × (arc − chord) | the nose is 14 blocks with stations equidistributing \|r″\|^½; error falls as 1/n² |
-| every gmsh model Point carries a mesh node | spline control points are un-meshed by `drop_control_nodes()` |
+| every gmsh model Point carries a mesh node | `meshIO.extract()` keeps only the nodes a hexahedron references, so spline control points never reach the file |
 | a gmsh physical group is **per-surface**, but one block face carries both fin and symm | the fin patch is split at element level in the `.msh` |
 | `c ** n` overflows once n·ln c passes ~709 | `stack_sum` is log-guarded |
 | `gmshToFoam` types **every** patch `patch` | `fixPatchTypes.py` must list every patch and skip the `FoamFile` header |

@@ -43,11 +43,15 @@ def parse_args(argv=None):
     g.add_argument('--no-fins', dest='fins', action='store_false')
     ap.add_argument('--set', action='append', default=[], metavar='KEY=VALUE',
                     help='override any parameter; VALUE is a Python literal')
-    ap.add_argument('--out', metavar='FILE.msh', help='output path (default output/<auto name>.msh)')
+    ap.add_argument('--out', metavar='FILE.msh',
+                    help='output path (default output/<auto name>.msh).  Worth pointing '
+                         'outside a synced folder: OneDrive uploading a 2 GB .msh as it '
+                         'is written can double the time')
     ap.add_argument('--name', metavar='NAME', help='basename for the output files (no extension)')
     ap.add_argument('--no-write', action='store_true', help='build and audit, write nothing')
     ap.add_argument('--no-audit', action='store_true',
-                    help='skip the quality audit of the ASSEMBLED mesh (the quadrant is always audited)')
+                    help='skip the quality audit of the ASSEMBLED mesh (the quadrant is always '
+                         'audited).  The audit of a 14 M-cell full mesh needs about 10 GB')
     ap.add_argument('--quiet', action='store_true')
     return ap.parse_args(argv)
 
@@ -169,8 +173,14 @@ def main(argv=None):
         print(f'  fin: {len(fin_q):,d} faces, wetted area per half-fin '
               f'{a_fin*1e4:.2f} cm2 vs {a_ref*1e4:.2f} exact '
               f'({100.0*(a_fin-a_ref)/a_ref:+.1f} %)')
-        print(f'       the excess is the one-cell rim where the patch outline is '
-              f'quantised; it halves with FIN_H_X and FIN_H_R')
+        if MP.fin_edge_fit():
+            print(f'       edges fitted: the outline IS the planform.  What is '
+                  f'left is the reference, which integrates from FIN_ROOT_R,')
+            print(f'       0.5 mm inside the wall the mesh starts at, and on '
+                  f'y = r rather than the cylinder the fin is wrapped on')
+        else:
+            print(f'       the excess is the one-cell rim where the patch outline '
+                  f'is quantised -- set FIN_EDGE_FIT to put the edges on the mesh')
 
     if n_copies == 1:
         nodes, hexes, quads = q['nodes'], q['hexes'], quads_q
@@ -187,7 +197,7 @@ def main(argv=None):
             qf = meshFinish.audit(nodes, hexes, quads, verbose,
                                   label=f'{MP.SECTOR} audit')
 
-    if qf.get('patches_consistent') is False:
+    if not qf['patches_consistent']:
         print('!! boundary faces and patch faces disagree -- refusing to write', file=sys.stderr)
         return 2
     if qf['n_negative'] or qf['triple_face']:

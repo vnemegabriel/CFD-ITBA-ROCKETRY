@@ -15,43 +15,6 @@ That single property is what makes a 30-block decomposition tractable by hand.
 import numpy as np
 import gmsh
 
-TOL = 1e-9
-
-
-def solve_progression(L, n, h1, lo=1e-6, hi=100.0):
-    """Geometric ratio c with n cells, first cell h1, summing to L.
-
-        h1 (c^n - 1) / (c - 1) = L
-
-    Returns 1.0 when h1 already equals L/n.  Bisection on a monotone function,
-    so it cannot land on the wrong branch the way a Newton solve can.
-    """
-    if h1 is None:
-        return 1.0
-    target = L / h1
-
-    def f(c):
-        return n if abs(c - 1.0) < 1e-12 else (c ** n - 1.0) / (c - 1.0)
-
-    if abs(f(1.0) - target) < 1e-9:
-        return 1.0
-    a, b = (1.0, hi) if target > n else (lo, 1.0)
-    for _ in range(200):
-        m = 0.5 * (a + b)
-        if (f(m) - target) * (f(a) - target) > 0:
-            a = m
-        else:
-            b = m
-    return 0.5 * (a + b)
-
-
-def cell_sizes(L, n, c):
-    """First and last cell size of a geometric distribution, for reporting."""
-    if abs(c - 1.0) < 1e-12:
-        return L / n, L / n
-    h1 = L * (c - 1.0) / (c ** n - 1.0)
-    return h1, h1 * c ** (n - 1)
-
 
 class Deck:
     """Memoising builder for a conforming structured multiblock model."""
@@ -64,7 +27,6 @@ class Deck:
         self.g = gmsh.model.geo
         self._pt, self._cv, self._sf, self._vl = {}, {}, {}, {}
         self._cv_ends = {}          # curve tag -> (start point, end point)
-        self._ctrl = set()          # points that exist only as spline controls
         self._cv_dir = {}           # curve tag -> direction class label
         self.surf_tags = {}         # physical name -> [surface tags]
 
@@ -117,7 +79,6 @@ class Deck:
         if key in self._cv:
             return self._cv[key]
         mids = [self.P(*sampler(float(t))) for t in np.linspace(0.0, 1.0, n_ctrl)[1:-1]]
-        self._ctrl.update(mids)
         tag = self.g.addSpline([p] + mids + [q])
         return self._register(key, tag, p, q, nc)
 
@@ -156,22 +117,6 @@ class Deck:
     def apply_transfinite(self):
         for tag, (n, c) in self._cv_dir.items():
             self.g.mesh.setTransfiniteCurve(tag, int(n) + 1, 'Progression', float(c))
-
-    def drop_control_nodes(self):
-        """Un-mesh the spline control points.
-
-        Every control point is a model Point, and a model Point carries a mesh
-        node whether or not anything uses it.  Left in place they land in the
-        .msh as unreferenced points, which checkMesh reports as a point-usage
-        error.  Endpoints of real curves are of course kept.
-        """
-        used = set()
-        for p, q in self._cv_ends.values():
-            used.add(p); used.add(q)
-        stray = sorted(self._ctrl - used)
-        if stray:
-            gmsh.model.mesh.clear([(0, t) for t in stray])
-        return len(stray)
 
     def stats(self):
         return dict(points=len(self._pt), curves=len(self._cv),

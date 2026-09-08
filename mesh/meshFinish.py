@@ -3,7 +3,8 @@
 meshFinish.py -- the mesh pipeline, from parameters to arrays.
 
     generate_quadrant()   build blocks -> gmsh mesh -> arrays -> snap wall
-                          -> fin deformation -> fin faces classified
+                          -> fin edge fit -> fin deformation -> fin faces
+                          classified
     audit()               OpenFOAM's quality measures on any (nodes, hexes)
 
 build.py is the command-line front end; this module is what it calls.  Use
@@ -26,6 +27,7 @@ import numpy as np
 import aconcaguaGeom as G
 import meshParams as MP
 import finPatch
+import finEdge
 import meshIO
 from meshQuality import analyse
 
@@ -98,6 +100,20 @@ def generate_quadrant(verbose=True):
     nodes = q['nodes']
     rep_snap = snap(nodes, q['lateral_idx'], q['cap_idx'], verbose)
 
+    # Bend the axial stations onto the fin leading and trailing edges, so the
+    # face classification below has an exact outline to work from instead of a
+    # one-cell staircase.  AFTER snap (which is what pins the wall the shear
+    # then leaves alone) and BEFORE the fin deformation, which reads (x, r).
+    edge = dict(on=False, moved=0, dmax=0.0)
+    if MP.FINS_ON and MP.fin_edge_fit():
+        rep_edge = finEdge.check()
+        nodes, edge['moved'], edge['dmax'] = finEdge.warp(nodes)
+        edge.update(on=True, min_stretch=rep_edge['min_stretch'])
+        if verbose:
+            print(f"\n  fin edges: {edge['moved']:,d} nodes sheared, max shift "
+                  f"{edge['dmax']*1e3:.1f} mm, worst block stretch "
+                  f"{rep_edge['min_stretch']:.2f}")
+
     # plane membership BEFORE the deformation moves fin nodes off the planes
     plane_a = np.abs(nodes[:, 2]) < PLANE_TOL
     plane_b = np.abs(nodes[:, 1]) < PLANE_TOL
@@ -116,30 +132,28 @@ def generate_quadrant(verbose=True):
               f"(dropped {q['n_dropped']:,d} spline control nodes)")
     return dict(nodes=nodes, hexes=q['hexes'], quads=q['quads'],
                 plane_a=plane_a, plane_b=plane_b, fin_nodes=fin_nodes,
-                stats=stats, snap=rep_snap, fins=fins, seconds=time.time() - t0)
+                stats=stats, snap=rep_snap, fins=fins, fin_edge=edge,
+                seconds=time.time() - t0)
 
 
-def audit(nodes, hexes, quads=None, verbose=True, label='mesh audit'):
+def audit(nodes, hexes, quads, verbose=True, label='mesh audit'):
     """Run OpenFOAM's checks here, before OpenFOAM does.
 
-    With `quads` given, also verifies that every boundary face of the cell set
-    is in exactly one patch -- the check that nothing lands in defaultFaces
-    and, after a sector assembly, that every stitched face really did become
-    interior.
+    Also verifies that every boundary face of the cell set is in exactly one
+    patch -- the check that nothing lands in defaultFaces and, after a sector
+    assembly, that every stitched face really did become interior.
     """
     q = analyse(nodes, hexes)
-    if quads is not None:
-        q['n_patch_faces'] = int(sum(len(v) for v in quads.values()))
-        q['patches_consistent'] = q['n_patch_faces'] == q['n_boundary']
+    q['n_patch_faces'] = int(sum(len(v) for v in quads.values()))
+    q['patches_consistent'] = q['n_patch_faces'] == q['n_boundary']
     if verbose:
         print(f"""
   ---- {label} {'-' * (60 - len(label))}
   cells                       {q['n_cells']:>14,d}   (100% hexahedra)
   internal faces              {q['n_internal']:>14,d}
   boundary faces              {q['n_boundary']:>14,d}""")
-        if quads is not None:
-            print(f"  faces in patches            {q['n_patch_faces']:>14,d}   "
-                  f"{'OK' if q['patches_consistent'] else '!! MISMATCH -- defaultFaces'}")
+        print(f"  faces in patches            {q['n_patch_faces']:>14,d}   "
+              f"{'OK' if q['patches_consistent'] else '!! MISMATCH -- defaultFaces'}")
         print(f"""  a face shared by 3+ cells   {str(q['triple_face']):>14}
   cells with volume <= 0      {q['n_negative']:>14,d}
   total volume                {q['vol_total']:>14,.3f} m3
@@ -154,7 +168,3 @@ def audit(nodes, hexes, quads=None, verbose=True, label='mesh audit'):
                      mean     {q['ar_mean']:>14.2f}
   -----------------------------------------------------------------""")
     return q
-
-
-if __name__ == '__main__':
-    print('meshFinish.py is a library; run build.py')

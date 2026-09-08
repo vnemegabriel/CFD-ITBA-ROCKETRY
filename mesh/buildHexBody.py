@@ -36,7 +36,6 @@ of a radial index, not the residue of a shrink-and-grow that decayed from
 75.9 % coverage to 0.47 %.  There is nothing to snap, so nothing to control.
 """
 
-import os
 import numpy as np
 import gmsh
 
@@ -385,10 +384,3 @@ class BodyMesh:
             gmsh.model.setPhysicalName(2, g, nm)
         g = gmsh.model.addPhysicalGroup(3, [v for _, v in gmsh.model.getEntities(3)])
         gmsh.model.setPhysicalName(3, g, 'internal')
-
-
-if __name__ == '__main__':
-    m = BodyMesh()
-    m.build()
-    print('geometry:', m.D.stats(), ' blocks:', len(m.segs))
-    gmsh.finalize()

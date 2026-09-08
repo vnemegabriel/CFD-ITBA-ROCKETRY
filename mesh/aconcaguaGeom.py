@@ -17,8 +17,8 @@ against the analytic form.  The nosecone was identified as a Von Karman
     x = 0.62223  ->  STL r = 0.068972   LV-Haack r = 0.068971
 
 Agreement to ~5 significant figures over the whole nose is not a coincidence;
-it is the curve the CAD was drawn with.  run `python3 aconcaguaGeom.py` to
-re-run that verification against the STL at any time.
+it is the curve the CAD was drawn with.  `python3 aconcaguaGeom.py` runs
+validate(); give it an STL path and it re-derives the fit against that STL.
 
 Why this matters for meshing
 ----------------------------
@@ -146,13 +146,7 @@ def drdx_body(x):
     return s if s.size > 1 else float(s[0])
 
 
-def wall_normal(x):
-    """Outward unit normal of the surface of revolution in the (x, r) plane."""
-    s = np.asarray(drdx_body(x), dtype=float)
-    n = np.sqrt(1.0 + s * s)
-    return (-s / n, 1.0 / n)          # (n_x, n_r)
-
-
+# ------------------------------------------------------------- fin sections --
 def x_at_slope(target):
     """Station on the NOSE where dr/dx equals `target` (slope decreases with x)."""
     lo, hi = 1e-9, L_NOSE
@@ -226,17 +220,34 @@ def fin_halfthickness(xi, chord, section='wedge', t=None, **kw):
     raise ValueError(f'unknown fin section {section!r}')
 
 
-def fin_le_radius(chord, section='naca', t=None):
-    """Leading-edge radius, which is what actually sets the LE cell size.
+def fin_edge_x(r):
+    """Axial station of the fin LEADING and TRAILING edge at radius r.
 
-    A sharp LE ('wedge', 'diamond', 'biconvex') has radius 0 and needs an
-    H- or O-grid closing on the edge.  A NACA LE is round and wants a C-grid
-    with about 20 cells over the nose; r_LE = 1.1019 (t/c)^2 c.
+    The planform edges are straight lines in the (x, r) plane, so this is the
+    curve the MESH has to land on if the edge is to be a block boundary rather
+    than something the grid crosses in diagonal -- see finEdge.py.
+
+    Frozen below R_BODY: under the body surface the fin is buried inside the
+    solid, so there is nothing there for the mesh to follow, and freezing the
+    value is what makes the warp vanish exactly at the wall.
     """
-    if section not in ('naca', 'naca_te'):
-        return 0.0
-    tt = FIN_T if t is None else t
-    return 1.1019 * (tt / chord) ** 2 * chord
+    rr = np.maximum(np.asarray(r, dtype=float), R_BODY)
+    sigma = np.clip((rr - FIN_ROOT_R) / (FIN_TIP_R - FIN_ROOT_R), 0.0, 1.0)
+    le, chord = fin_planform(sigma)
+    return le, le + chord
+
+
+# Where the two edges meet the body surface.  Both come out on round numbers,
+# which is not luck: the fin was drawn to the body.
+#
+#   FIN_LE_X_WALL = 2.530000  =  X_BASE - 0.425
+#   FIN_TE_X_WALL = 2.830002  =  X_BODY_2 + 2.5 um, i.e. the trailing edge root
+#                                sits ON the cylinder / boattail junction
+#
+# The second one is why the trailing edge needs no station of its own: the
+# block boundary it wants is already there.
+FIN_LE_X_WALL = float(fin_edge_x(R_BODY)[0])
+FIN_TE_X_WALL = float(fin_edge_x(R_BODY)[1])
 
 
 def fin_half_thickness(x, r, section='wedge', tip_smear=0.004):
@@ -283,11 +294,6 @@ def fin_half_angle(x, r, section='wedge', tip_smear=0.004):
     return np.arcsin(np.clip(t / r, 0.0, 0.999))
 
 
-def on_fin_planform(x, r, section='wedge'):
-    """True where a point of the symmetry plane is covered by the fin."""
-    return fin_half_thickness(x, r, section, tip_smear=0.0) > 1e-9
-
-
 # --------------------------------------------------------------- self-check --
 def validate():
     """Assert the invariants the mesh topology depends on.  Cheap insurance."""
@@ -303,6 +309,8 @@ def validate():
         errs.append('fin root radius is outside the body surface it mounts on')
     if FIN_LE_BEVEL + FIN_TE_BEVEL >= (FIN_TIP_TE - FIN_TIP_LE):
         errs.append('fin bevels overlap at the tip chord')
+    if not (X_BODY_1 < FIN_LE_X_WALL < FIN_TE_X_WALL <= X_BASE):
+        errs.append('fin root chord does not lie on the cylinder')
     if N_FINS != 4:
         errs.append('N_FINS must be 4: the fins lie in the planes of the structured '
                     'quadrant (see docs/MESH_DESIGN.md)')
@@ -325,8 +333,13 @@ def reference_values(fraction=0.25):
 
 
 # ------------------------------------------------------------ verification ---
-def verify_against_stl(path='constant/triSurface/Aconcagua.stl', verbose=True):
-    """Re-derive the fit from the STL.  Returns max |r_stl - r_analytic|."""
+def verify_against_stl(path, verbose=True):
+    """Re-derive the fit from an STL.  Returns max |r_stl - r_analytic|.
+
+    The repo carries no STL any more -- this module replaced it -- so the path
+    is required: point it at a fresh CAD export to check that the constants
+    above still describe the part being built.
+    """
     import re
     txt = open(path).read()
     solids = dict((n, np.array([[float(c) for c in m] for m in
@@ -337,10 +350,7 @@ def verify_against_stl(path='constant/triSurface/Aconcagua.stl', verbose=True):
     rows = []
     for name in ('nosecone', 'body', 'boattail'):
         v = solids[name]
-        x = v[:, 0]
-        r = np.hypot(v[:, 1], v[:, 2])
-        ra = r_body(x)
-        e = np.abs(r - ra)
+        e = np.abs(np.hypot(v[:, 1], v[:, 2]) - r_body(v[:, 0]))
         worst = max(worst, e.max())
         rows.append((name, len(v) // 3, e.max(), e.max() / R_BODY))
 
@@ -350,14 +360,13 @@ def verify_against_stl(path='constant/triSurface/Aconcagua.stl', verbose=True):
             print(f'{n:<10}{f:>8}{e:>16.3e}{rel:>14.2e}')
         print(f'\nworst deviation over the whole body : {worst:.3e} m '
               f'({worst / R_BODY * 100:.4f} % of body radius)')
-        print(f'boattail half-angle                 : {BOATTAIL_HALF_ANGLE:.3f} deg')
-        print(f'slope dr/dx = 1 (45 deg) at x       : {x_at_slope(1.0):.6f} m, '
-              f'r = {r_body(x_at_slope(1.0)):.6f} m')
     return worst
 
 
 if __name__ == '__main__':
     import sys
     validate()
-    p = sys.argv[1] if len(sys.argv) > 1 else 'constant/triSurface/Aconcagua.stl'
-    verify_against_stl(p)
+    print(f'geometry OK.  boattail half-angle {BOATTAIL_HALF_ANGLE:.3f} deg, '
+          f'dr/dx = 1 at x = {x_at_slope(1.0):.6f} m')
+    if len(sys.argv) > 1:
+        verify_against_stl(sys.argv[1])

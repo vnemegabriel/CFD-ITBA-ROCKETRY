@@ -1,8 +1,8 @@
+
+> **Estado.** HAY QUE VALIDAR TODO!!!!
 # Solvers y modelos: los tres regímenes
 
-Qué resuelve cada plantilla, con qué modelo, y de dónde sale cada cosa. El
-objetivo de este documento es que puedas **rehacer las cuentas a mano** y
-verificar que el caso hace lo que dice.
+Qué resuelve cada plantilla, con qué modelo, y de dónde sale cada cosa. El objetivo de este documento es que puedas **rehacer las cuentas a mano** y verificar que el caso hace lo que dice.
 
 ```bash
 ./newCase.sh ~/runs/x <malla.msh> --regime sub     # M < 0.3    simpleFoam
@@ -10,161 +10,66 @@ verificar que el caso hace lo que dice.
 ./newCase.sh ~/runs/x <malla.msh> --regime super   # M > 1.2    rhoCentralFoam
 ```
 
-> **Estado.** Ninguna está validada contra datos: lo que sigue describe la
-> configuración, no un resultado. Verificado sobre la malla `smoke half`
-> (61 536 celdas), que es de prueba y no de producción:
->
-> | | corre | residual de Ux | `Cd` | notas |
-> |---|---|---|---|---|
-> | `sub` | 150 it | 1.0 → 1.1e-05 | 0.4246, estable a 5 cifras | |
-> | `trans` | 150 it | 0.999 → 8.8e-06 | 0.4621, estable a 4 cifras | T entre 277 y 312 K, con holgura respecto del recorte de `fvOptions` |
-> | `super` | 260 pasos | | ~0.78 | el paso queda bien controlado (Courant 0.30), pero la corrida **se cae en el transitorio de arranque**, a t = 8.6e-05 s de 4.8e-03 que dura una pasada |
->
-> O sea: las dos primeras están listas para que las uses y las valides. La
-> tercera arranca, marcha y da un `Cd` del orden esperado, pero **todavía no
-> llega al estacionario en esta malla**. Los detalles y qué probar están en
-> §2.3.
-
 ## 1. Panorama
 
-| | `sub` | `trans` | `super` |
-|---|---|---|---|
-| directorio | `case-subsonic/` | `case-transonic/` | `case-supersonic/` |
-| solver | `simpleFoam` | `rhoSimpleFoam` | `rhoCentralFoam` |
-| formulación | incompresible | compresible, basada en presión | compresible, basada en densidad |
-| tiempo | `steadyState` | `steadyState` | `Euler` transitorio, paso adaptativo |
-| ρ | constante, no se resuelve | variable, de la ecuación de estado | variable, **es la incógnita** |
-| `p` | cinemática, m²/s² | Pa | Pa |
-| energía | no se resuelve | `e` sensible | `e` sensible, dentro de `rhoE` |
-| campos en `0/` | `U p k omega nut` | `+ T alphat` | `+ T alphat` |
-| viscosidad | ν constante | Sutherland μ(T) | Sutherland μ(T) |
-| turbulencia | k-ω SST | k-ω SST | k-ω SST |
-| se parametriza con | `Uinf` | `Minf`, `pInf`, `Tinf` | `Minf`, `pInf`, `Tinf` |
-| inicialización | `potentialFoam` | corriente uniforme | corriente uniforme |
-
-El límite de 0.3 es la convención usual: el error de despreciar la
-compresibilidad en la presión es del orden de M²/4, o sea 2.3 % a M 0.3.
-Anderson, *Fundamentals of Aerodynamics*, 6ª ed., §8.3, da el desarrollo
-`p₀/p = 1 + M²/4 + ...` del que sale ese número.
+|                    | `sub`                     | `trans`                            | `super`                              |
+| ------------------ | ------------------------- | ---------------------------------- | ------------------------------------ |
+| directorio         | `case-subsonic/`          | `case-transonic/`                  | `case-supersonic/`                   |
+| solver             | `simpleFoam`              | `rhoSimpleFoam`                    | `rhoCentralFoam`                     |
+| formulación        | incompresible             | compresible, basada en presión     | compresible, basada en densidad      |
+| tiempo             | `steadyState`             | `steadyState`                      | `Euler` transitorio, paso adaptativo |
+| ρ                  | constante, no se resuelve | variable, de la ecuación de estado | variable, **es la incógnita**        |
+| `p`                | cinemática, m²/s²         | Pa                                 | Pa                                   |
+| energía            | no se resuelve            | `e` sensible                       | `e` sensible, dentro de `rhoE`       |
+| campos en `0/`     | `U p k omega nut`         | `+ T alphat`                       | `+ T alphat`                         |
+| viscosidad         | ν constante               | Sutherland μ(T)                    | Sutherland μ(T)                      |
+| turbulencia        | k-ω SST                   | k-ω SST                            | k-ω SST                              |
+| se parametriza con | `Uinf`                    | `Minf`, `pInf`, `Tinf`             | `Minf`, `pInf`, `Tinf`               |
+| inicialización     | `potentialFoam`           | corriente uniforme                 | corriente uniforme                   |
+El límite de 0.3 es la convención usual: el error de despreciar la compresibilidad en la presión es del orden de M²/4, o sea 2.3 % a M 0.3. 
+Anderson, *Fundamentals of Aerodynamics*, 6ª ed.  Sección 8.3, da el desarrollo `p₀/p = 1 + M²/4 + ...` del que sale ese número.
 
 ## 2. Ecuaciones y modelos, por régimen
 
+## 2.0 Que són los factores de relajación 
+
+Controlan y ajustan las actualizaciones de valor del siguiente paso en la simulación.
+
 ### 2.1 Subsónico: `simpleFoam`
 
-Resuelve las RANS incompresibles estacionarias, con `p` dividida por la
-densidad, que es constante:
+Resuelve las RANS incompresibles estacionarias, con `p` dividida por la densidad, que es constante:
 
 ```
 div(U) = 0
 div(U⊗U) − div(νeff grad(U)) = −grad(p)          p ≡ presión / ρ
 ```
 
-Acoplamiento presión-velocidad **SIMPLEC** (`consistent yes`), que es SIMPLE
-con la aproximación consistente de Van Doormaal y Raithby (1984), *Numer.
-Heat Transfer* 7, 147-163. Permite factores de relajación más altos que
-SIMPLE, por eso `U 0.9` en vez de los 0.7 habituales.
+Acoplamiento presión-velocidad **SIMPLEC** (`consistent yes`), que es SIMPLE con la aproximación consistente de Van Doormaal y Raithby (1984), *Numer. Heat Transfer* 7, 147-163. Permite valores de relajación más altos.
 
-**Viscosidad:** `transportModel Newtonian`, ν constante tomada de
-`flowConditions`. No hay temperatura, así que no hay ley de viscosidad.
+**Viscosidad:** `transportModel Newtonian`, ν constante tomada de `flowConditions`. No hay temperatura, así que no hay ley de viscosidad.
 
 ### 2.2 Transónico: `rhoSimpleFoam`
 
-RANS compresibles estacionarias, basadas en presión. El interruptor que
-importa está en `fvSolution`:
+RANS compresibles estacionarias, basadas en presión. En `fvSolution` se activa la condición transónica:
 
 ```
 SIMPLE { transonic yes; }
 ```
 
-Con eso la ecuación de presión gana un término convectivo, `div(phid,p)`, y
-cambia de carácter de elíptica a hiperbólica donde M > 1. Sin él,
-`rhoSimpleFoam` no pasa de M ≈ 0.7. La discretización de ese término está en
-`fvSchemes` como `div(phid,p) Gauss upwind`.
+Con eso la ecuación de presión gana un término convectivo, `div(phid,p)`, y cambia de carácter de elíptica a hiperbólica donde M > 1. Sin él, `rhoSimpleFoam` no pasa de M ≈ 0.7. La discretización de ese término está en `fvSchemes` como `div(phid,p) Gauss upwind`.
 
-`pMinFactor` y `pMaxFactor` acotan la actualización de presión por iteración.
-No son cosmética: con `perfectGas`, una presión negativa da densidad negativa
-y termina la corrida.
-
+`pMinFactor` y `pMaxFactor` acotan la actualización de presión por iteración, para no tener un valor negativo que interrumpa la iteración.
 ### 2.3 Supersónico: `rhoCentralFoam`
 
-**No resuelve una ecuación de presión.** Avanza las variables conservadas
-ρ, ρU y ρE con un flujo central-upwind, y después aplica implícitamente las
-correcciones difusivas. Por eso su `fvSolution` no tiene ni `SIMPLE` ni
-factores de relajación: un esquema explícito basado en densidad no tiene qué
-sub-relajar.
+**No resuelve una ecuación de presión.** Avanza las variables conservadas ρ, ρU y ρE con un flujo central-upwind, y después aplica implícitamente las correcciones difusivas. Por eso su `fvSolution` no tiene ni `SIMPLE` ni factores de relajación: un esquema explícito basado en densidad no tiene qué sub-relajar.
 
-**Esquema de flujo:** `fluxScheme Kurganov`, el esquema central-upwind que
-parte el flujo de cara según las velocidades de onda locales `a⁺` y `a⁻`.
-Captura el choque sin resolver un problema de Riemann y sin viscosidad
-artificial ajustada a mano.
+**Esquema de flujo:** `fluxScheme Kurganov`, el esquema central-upwind que parte el flujo de cara según las velocidades de onda locales `a⁺` y `a⁻`. Captura el choque sin resolver un problema de Riemann y sin viscosidad artificial ajustada a mano.
 
-- Kurganov y Tadmor (2000), "New High-Resolution Central Schemes for Nonlinear
-  Conservation Laws and Convection-Diffusion Equations", *J. Comput. Phys.*
-  **160**, 241-282.
+- Kurganov y Tadmor (2000), "New High-Resolution Central Schemes for Nonlinear Conservation Laws and Convection-Diffusion Equations", *J. Comput. Phys.* **160**, 241-282.
 - Kurganov, Noelle y Petrova (2001), *SIAM J. Sci. Comput.* **23**(3), 707-740.
-- La implementación en OpenFOAM y su validación: Greenshields, Weller,
-  Gasparini y Reese (2010), "Implicit and explicit schemes for flows of
-  aerodynamic and turbomachinery fluids", *Int. J. Numer. Meth. Fluids*
-  **63**, 1-21.
+- La implementación en OpenFOAM y su validación: Greenshields, Weller, Gasparini y Reese (2010), "Implicit and explicit schemes for flows of aerodynamic and turbomachinery fluids", *Int. J. Numer. Meth. Fluids* **63**, 1-21.
 
-**Reconstrucción:** las variables primitivas se llevan a las caras con
-limitador van Leer (`reconstruct(rho) vanLeer`, `reconstruct(U) vanLeerV`,
-`reconstruct(T) vanLeer`). El limitador baja el esquema a primer orden en la
-discontinuidad y lo mantiene de segundo orden en las zonas suaves, que es lo
-que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.*
-**32**, 101-136.
-
-**Paso de tiempo: el punto flojo de esta plantilla.** Se entrega con `Euler` y
-paso global adaptativo desde `maxCo`, que es lo que usan los tutoriales de
-flujo externo y lo único que verifiqué estable acá. Es una **marcha
-transitoria** hacia el estacionario, y es cara: el paso es el límite acústico
-de la celda más chica, y llegar al estacionario pide del orden de diez tiempos
-de paso, 48 ms a M 1.8. Son unos cientos de miles de pasos.
-
-El acelerador estándar es el **paso de tiempo local**, `ddtSchemes localEuler`,
-donde cada celda avanza con su propio paso estable. Es lo que usa el tutorial
-del biconico. **En mis pruebas sobre este caso no controló el paso**: el solver
-siguió reportando Courant del orden de 10⁶ y divergió antes de diez
-iteraciones, con y sin tope de `maxDeltaT`. No lo entrego activado por eso. Si
-alguien lo hace andar, es la mejora más grande disponible acá.
-
-### 2.4 El estado real del supersónico, y qué probar
-
-Con `Euler` y paso adaptativo la marcha arranca bien: el Courant se mantiene en
-0.30, el paso se acomoda solo en 3.5e-07 s y el `Cd` se estaciona alrededor de
-0.78. Pero **se cae con una excepción de punto flotante en la termodinámica**
-a t = 8.6e-05 s, cuando una pasada sobre el cuerpo dura 4.8e-03 s. O sea, muere
-en el 2 % del arranque.
-
-Lo que **descarté** con pruebas, porque conviene no repetirlas:
-
-| Hipótesis | Prueba | Resultado |
-|---|---|---|
-| el paso de tiempo | `maxCo` 0.3 contra 0.2 | se cae igual, y casi en el mismo instante físico |
-| la condición de farfield | `waveTransmissive` contra `zeroGradient` en `box` | se cae igual: t = 8.55e-05 contra 8.66e-05 s |
-| el recorte de temperatura | con y sin `fvOptions` | `fvOptions` evita la muerte en la iteración 1, no ésta |
-
-Que las dos variantes mueran en el mismo instante físico, con distinto paso y
-distinto borde, dice que **el disparador no es numérico de esos dos lados**: es
-un evento del arranque, probablemente el choque inicial formándose sobre una
-celda mala.
-
-**Lo primero que hay que probar** es cambiar de malla. Todo esto se corrió
-sobre `smoke half`, que la documentación marca explícitamente como de prueba de
-pipeline y no de resultados: 61 536 celdas y todo escalado ×6. `rhoCentralFoam`
-es mucho más sensible a la calidad de malla que un solver basado en presión.
-El siguiente paso natural es una malla dimensionada para M 1.8:
-
-```bash
-python3 build.py --preset coarse --sector half --set U=612
-```
-
-Si con eso sigue cayendo, la alternativa práctica es correr el supersónico con
-la plantilla transónica: `rhoSimpleFoam` con `transonic yes` funciona arriba de
-M 1, es implícita y estacionaria, y captura el choque de forma más difusa pero
-suficiente para arrastre. Perdés fidelidad en la estructura de la onda, no en
-la integral de fuerzas.
-
+**Reconstrucción:** las variables primitivas se llevan a las caras con limitador van Leer (`reconstruct(rho) vanLeer`, `reconstruct(U) vanLeerV`, `reconstruct(T) vanLeer`). El limitador baja el esquema a primer orden en la discontinuidad y lo mantiene de segundo orden en las zonas suaves, que es lo que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.* **32**, 101-136.
 ## 3. Turbulencia: idéntica en los tres
 
 ```
@@ -173,29 +78,18 @@ RASModel        kOmegaSST;
 turbulence      on;
 ```
 
-**Modelo de cierre.** Hipótesis de Boussinesq: el tensor de Reynolds se modela
-como una viscosidad turbulenta por la tasa de deformación,
+**Modelo de cierre.** Hipótesis de Boussinesq: el tensor de Reynolds se modela como una viscosidad turbulenta por la tasa de deformación,
 
 ```
 −⟨u'ᵢu'ⱼ⟩ = νt (∂Uᵢ/∂xⱼ + ∂Uⱼ/∂xᵢ) − (2/3) k δᵢⱼ
 ```
 
-con `νt = a₁k / max(a₁ω, S F₂)`. Ese denominador es el **limitador de tensión
-cortante** que distingue al SST de un k-ω común, y es la razón de elegirlo
-para un cohete: acota la producción de νt en gradiente de presión adverso, que
-es exactamente lo que pasa en el boattail y en la unión aleta-cuerpo, donde un
-k-ε o un k-ω sin limitar predicen la separación tarde.
+con `νt = a₁k / max(a₁ω, S F₂)`. Ese denominador es el **limitador de tensión cortante** que distingue al SST de un k-ω común, y es la razón de elegirlo para un cohete: acota la producción de νt en gradiente de presión adverso, que es exactamente lo que pasa en el boattail y en la unión aleta-cuerpo, donde un k-ε o un k-ω sin limitar predicen la separación tarde.
 
 **Referencias.**
 
-- Menter (1994), "Two-Equation Eddy-Viscosity Turbulence Models for
-  Engineering Applications", *AIAA Journal* **32**(8), 1598-1605. El modelo
-  original, con las funciones de mezcla F₁ y F₂.
-- Menter, Kuntz y Langtry (2003), "Ten Years of Industrial Experience with the
-  SST Turbulence Model", *Turbulence, Heat and Mass Transfer* **4**, 625-632.
-  **Ésta es la versión que implementa OpenFOAM**, no la de 1994: cambian la
-  constante de producción y el limitador. Si comparás contra literatura, fijate
-  cuál de las dos usa.
+- Menter (1994), "Two-Equation Eddy-Viscosity Turbulence Models for Engineering Applications", *AIAA Journal* **32**(8), 1598-1605. El modelo original, con las funciones de mezcla F₁ y F₂.
+- Menter, Kuntz y Langtry (2003), "Ten Years of Industrial Experience with the SST Turbulence Model", *Turbulence, Heat and Mass Transfer* **4**, 625-632. **Ésta es la versión que implementa OpenFOAM**, no la de 1994: cambian la constante de producción y el limitador. Si comparás contra literatura, fijate cuál de las dos usa.
 - La implementación exacta, con todas las constantes, está en el código:
   `src/TurbulenceModels/turbulenceModels/RAS/kOmegaSST/`. Constantes por
   defecto: `alphaK1 0.85`, `alphaK2 1.0`, `alphaOmega1 0.5`, `alphaOmega2
@@ -213,7 +107,7 @@ k-ε o un k-ω sin limitar predicen la separación tarde.
 
 El objetivo es y+ ≈ 32 en el centro de la primera celda. **La malla se
 dimensiona para una velocidad**: ver
-[PARAMETERS.md](PARAMETERS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
+[PARAMETERS.md](PARAMETROS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
 `Allrun` estima el y+ que te va a quedar y avisa si se fue de banda.
 
 ## 4. Propiedades termofísicas (solo `trans` y `super`)

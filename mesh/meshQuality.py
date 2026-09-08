@@ -132,11 +132,7 @@ def analyse(nodes, hexes, progress=None):
     with np.errstate(divide='ignore', invalid='ignore'):
         ar = (1.0 / 6.0) * sumS * np.cbrt(np.abs(vol)) / np.abs(vol)
 
-    worst = np.argsort(nonortho)[-40:][::-1]
-    hot = np.column_stack([Cf[worst], nonortho[worst]])
-    bad = nonortho > 40.0
-    return dict(hot=hot, hot_all=np.column_stack([Cf[bad], nonortho[bad]]),
-                n_cells=M, n_internal=n_int, n_boundary=n_bnd,
+    return dict(n_cells=M, n_internal=n_int, n_boundary=n_bnd,
                 triple_face=bool(triple),
                 vol_min=float(vol.min()), vol_max=float(vol.max()),
                 vol_total=float(vol.sum()), n_negative=int((vol <= 0).sum()),
@@ -148,5 +144,4 @@ def analyse(nodes, hexes, progress=None):
                 skew_max_internal=float(skew.max()), skew_max_boundary=float(skew_b.max()),
                 skew_mean=float(skew.mean()),
                 skew_gt4=int((skew > 4).sum() + (skew_b > 4).sum()),
-                skew_hot=np.column_stack([Cb[np.argsort(skew_b)[-10:]], np.sort(skew_b)[-10:]]),
                 ar_max=float(np.nanmax(ar)), ar_mean=float(np.nanmean(ar)))

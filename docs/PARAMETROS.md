@@ -1,20 +1,9 @@
-# Parámetros
-
-Referencia de todo lo que se puede cambiar sin tocar código: los parámetros
-de la malla (`mesh/meshParams.py`, presets, `--set`), las condiciones del caso
-(`case/system/flowConditions`) y lo que la malla le cuenta al caso
-(`constant/meshInfo`).
-
 ## Malla — `meshParams.py`
 
-Se dan **tamaños de celda**; los conteos se derivan del tramo que tienen que
-llenar (`c = (L−h₁)/(L−h_N)`, `n = 1 + ln(h_N/h₁)/ln c`, en forma cerrada).
-Nada se itera ni se "relaja" por calidad: "0.3 mm en la pared creciendo a
-20 mm en r = 0.35 m" es una afirmación sobre la malla, no un deseo.
+Se dan **tamaños de celda**; los conteos se derivan del tramo que tienen que llenar (`c = (L−h₁)/(L−h_N)`, `n = 1 + ln(h_N/h₁)/ln c`, en forma cerrada).
+Nada se itera ni se "relaja" por calidad: "0.3 mm en la pared creciendo a 20 mm en r = 0.35 m" es una afirmación sobre la malla, no un deseo.
 
-Toda variable de la tabla se puede fijar desde un preset o con
-`--set NOMBRE=valor`. Un nombre que no está en `OVERRIDABLE` es un error.
-
+Toda variable de la tabla se puede fijar desde un preset.
 ### Grosor global
 
 | Parámetro | Default | Qué hace |
@@ -29,53 +18,40 @@ Toda variable de la tabla se puede fijar desde un preset o con
 |---|---|---|
 | `U`, `NU`, `RHO` | 100, 1.5e-5, 1.225 | fijan Re_L y con él `y1`. **No** son las condiciones del caso: esas van en `flowConditions` |
 | `YPLUS_TARGET` | 32 | y+ en el **centro** de la primera celda → `y1 = 303 µm`; 31 celdas dentro de δ en la malla fina |
+Se introducen las variables de velocidad, viscosidad cinemática y densidad para definir dimensiones de resolución de malla cerca de la pared, que a su vez definen el refinamiento global de la malla.
 
-**La malla es específica de una velocidad, y esto es fácil de pasar por alto.**
-`U` no entra en la simulación: solo sirve para resolver `y1` de manera que el
-y+ dé en el objetivo. Si después corrés el caso a otra velocidad, la primera
-celda sigue siendo la misma y el y+ se va de rango **sin ningún error**. El
-sesgo es del tamaño del cambio de velocidad:
+| `U` [m/s] | Mach     | `y1` para y+ = 32 | y+ que da la malla de 100 m/s |
+| --------- | -------- | ----------------- | ----------------------------- |
+| 50        | 0.15     | 566 µm            | 17                            |
+| **100**   | **0.29** | **303 µm**        | **32**                        |
+| 170       | 0.50     | 188 µm            | 52                            |
+| 272       | 0.80     | 123 µm            | 79                            |
+| 340       | 1.00     | 101 µm            | 96                            |
+| 612       | 1.80     | 59 µm             | 163                           |
 
-| `U` [m/s] | Mach | `y1` para y+ = 32 | y+ que da la malla de 100 m/s |
-|---|---|---|---|
-| 50 | 0.15 | 566 µm | 17 |
-| **100** | **0.29** | **303 µm** | **32** |
-| 170 | 0.50 | 188 µm | 52 |
-| 272 | 0.80 | 123 µm | 79 |
-| 340 | 1.00 | 101 µm | 96 |
-| 612 | 1.80 | 59 µm | 163 |
-
-La regla es: **una malla por rango de velocidad.** Se construye pasando la
-velocidad de la corrida, y `y1` se re-resuelve solo:
+La regla es: **una malla por rango de velocidad.** Se construye pasando la velocidad de la corrida, y `y1` se re-resuelve solo:
 
 ```bash
 python build.py --preset medium --set U=272     # para correr cerca de M 0.8
 ```
 
-`Allrun` compara la `Uinf` de `flowConditions` con la `Uref` que la malla
-dejó grabada en `constant/meshInfo`, estima el y+ resultante y avisa si se
-fue de rango. Es un aviso, no un error: correr a otra velocidad es válido
-mientras sepas qué y+ te queda.
+`Allrun` compara la `Uinf` de `flowConditions` con la `Uref` que la malla dejó grabada en `constant/meshInfo`, estima el y+ resultante y reporta si sale del rango.
+### Zonas radiales 
 
-### Zonas radiales (lo que más se edita)
+Zonas concéntricas desde la pared hacia afuera. `ZONE_R[k]` es donde **termina** la zona k, así que la lista crece y **la última entrada es el radio del farfield**. `ZONE_H[k]` es el tamaño de celda en el borde **exterior** de la zona k; el borde interior de la zona 0 es `y1`.
 
-Zonas concéntricas desde la pared hacia afuera. `ZONE_R[k]` es donde **termina**
-la zona k, así que la lista crece y **la última entrada es el radio del
-farfield**. `ZONE_H[k]` es el tamaño de celda en el borde **exterior** de la
-zona k; el borde interior de la zona 0 es `y1`.
+| Parámetro       | Default                   | Qué hace                                                                                                                                                               |
+| --------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ZONE_R`        | `[0.35, 2.00, 11.775]` m  | fin de cada zona; la última es el farfield                                                                                                                             |
+| `ZONE_H`        | `[0.020, 0.200, 1.600]` m | tamaño de celda al final de cada zona                                                                                                                                  |
+| `WAKE_ZONE_K`   | 0                         | qué zona se abre en la estela. Las zonas interiores a ella (la de `FIN_H_R`, por ejemplo) se abren en proporción, así ninguna queda aplastada contra el tubo de salida |
+| `ZONE0_R_WAKE`  | 0.70 m                    | radio exterior de esa zona en el outlet                                                                                                                                |
+| `WAKE_SPREAD_P` | 0.5                       | la zona se abre como x^p (una estela turbulenta ensancha como x^½)                                                                                                     |
+| `F_INLET`       | 0.63                      | radio del tubo interior en el inlet, como **fracción** de la zona más interior (la de `FIN_H_R` si existe, si no `ZONE_R[0]`)                                          |
+| `F_WAKE_OUT`    | 0.50                      | idem en el outlet, fracción del radio de la zona más interior ahí                                                                                                      |
 
-| Parámetro | Default | Qué hace |
-|---|---|---|
-| `ZONE_R` | `[0.35, 2.00, 11.775]` m | fin de cada zona; la última es el farfield |
-| `ZONE_H` | `[0.020, 0.200, 1.600]` m | tamaño de celda al final de cada zona |
-| `WAKE_ZONE_K` | 0 | qué zona se abre en la estela. Las zonas interiores a ella (la de `FIN_H_R`, por ejemplo) se abren en proporción, así ninguna queda aplastada contra el tubo de salida |
-| `ZONE0_R_WAKE` | 0.70 m | radio exterior de esa zona en el outlet |
-| `WAKE_SPREAD_P` | 0.5 | la zona se abre como x^p (una estela turbulenta ensancha como x^½) |
-| `F_INLET` | 0.63 | radio del tubo interior en el inlet, como **fracción** de la zona más interior (la de `FIN_H_R` si existe, si no `ZONE_R[0]`) |
-| `F_WAKE_OUT` | 0.50 | idem en el outlet, fracción del radio de la zona más interior ahí |
-
-Agregar una zona es agregar una entrada a las dos listas. Ejemplo, una zona
-de 6 mm que termine en r = 0.28 m:
+Agregar una zona es agregar una entrada a las dos listas. 
+**Ejemplo**: una zona de 6 mm que termine en r = 0.28 m.
 
 ```python
 ZONE_R = [0.28, 0.35, 2.00, 11.775]
@@ -83,9 +59,7 @@ ZONE_H = [0.006, 0.020, 0.200, 1.600]
 WAKE_ZONE_K = 1        # la zona que se abre en la estela ahora es la 1
 ```
 
-Para la punta de las aletas hay un atajo: `FIN_H_R` (tabla de aletas) inserta
-la zona en el radio exacto de la punta sin tocar las listas ni `WAKE_ZONE_K`.
-Es lo que hace `presets/fintip.py`.
+Para la punta de las aletas hay un atajo: `FIN_H_R` (tabla de aletas) inserta la zona en el radio exacto de la punta sin tocar las listas ni `WAKE_ZONE_K`. Es lo que hace `presets/fintip.py`.
 
 ### Axial
 
@@ -118,17 +92,20 @@ Es lo que hace `presets/fintip.py`.
 | `FIN_SECTION` | `'wedge'` | `wedge` (como está dibujada: biseles absolutos), `diamond`, `biconvex`, `naca`, `naca_te` |
 | `FIN_TIP_SMEAR` | 0.004 m | banda radial en la que el espesor cierra a cero en la punta |
 | `FIN_H_X` | 0.005 m | celda axial sobre la cuerda; parte `cyl` en `cyl` + `cylfin` y refina `tail`. `None` = sin refinar |
-| `FIN_X_LEAD` | 0.060 m | cilindro incluido delante del borde de ataque de la raíz en el bloque refinado |
+| `FIN_X_LEAD` | 0.500 m | cilindro incluido delante del borde de ataque de la raíz. **Está acoplado a la flecha**: la cara aguas arriba del bloque es un plano y la de aguas abajo sigue el LE, así que el bloque mide `FIN_X_LEAD` en la raíz y `FIN_X_LEAD` + 250 mm en la punta, con la misma cantidad de celdas. `estiramiento = 1 + 0.2508 / L`. Con los 60 mm que tenía da 5.1 y aparece una isla de celdas de 26 mm justo delante del LE |
+| `FIN_LEAD_MAX_STRETCH` | 2.0 | tope de ese estiramiento. `validate_params()` lo calcula y rechaza el build diciéndote qué `FIN_X_LEAD` necesitás |
 | `FIN_H_R` | `None` | celda **radial en la punta** de la aleta. `None` = sin zona propia: la punta recibe lo que da la pila de zonas (12 mm en `fine`, 40 mm a `H_SCALE 3`). Un valor inserta un límite de zona en `FIN_TIP_R + FIN_TIP_SMEAR` (la aleta cierra sobre una línea de nodos) y la pila radial crece de `y1` a `FIN_H_R` sobre la envergadura. Se inserta en su radio dentro de `ZONE_R`; `WAKE_ZONE_K` sigue indexando **tu** lista. `coarse`/`medium` usan 0.012, `fintip` 0.006 |
+| `FIN_EDGE_FIT` | `True` | Pone el **borde de ataque y el de fuga sobre la malla** en vez de dejar que la grilla los cruce en diagonal. Corre las estaciones axiales, `x -> x + d(x, r)`: la estación en `FIN_LE_X_WALL` cae exacta sobre `x_LE(r)` y la de `X_BODY_2` sobre `x_TE(r)`. La malla sigue siendo hexaédrica y transfinita, y `split_symm()` no se toca: un nodo sobre el LE tiene `t = 0` y nunca se mueve, así que el parche deja de salir dilatado una celda. Cuesta 57.4° de no-ortogonalidad en el LE, que es la flecha |
+| `FIN_EDGE_R_BLEND` | `None` | Radio donde el corte se apagó. `None` = `ZONE_R[-2]` (2.0 m). Achicarlo aprieta la transición y la no-ortogonalidad crece como `0.25 m / (r_blend - 0.2395)` |
+| `FIN_EDGE_TAIL_RELIEF` | 0.5 | La estación del TE se corre 100 mm aguas abajo en la punta mientras el plano de base queda quieto, y eso comprime el bloque `tail` al 20 % de su largo ahí. Esta fracción del corte la lleva la estación de base y se libera sobre `wake1`. `0` = toda la compresión va a `tail` |
 
-La planform, el espesor y los biseles están en `aconcaguaGeom.py`
-([GEOMETRY.md](GEOMETRY.md)): son geometría, no malla.
+La planform, el espesor y los biseles están en `aconcaguaGeom.py` ([GEOMETRY.md](GEOMETRÍA.md)): son geometría, no malla.
 
 ### Sector
 
 | Parámetro | Default | Qué hace |
 |---|---|---|
-| `SECTOR` | `'quarter'` | `quarter`, `half`, `full`. `--sector`. Ver [SECTORS_AND_AOA.md](SECTORS_AND_AOA.md) |
+| `SECTOR` | `'quarter'` | `quarter`, `half`, `full`. `--sector`. Ver [SECTORS_AND_AOA.md](SECTORES_Y_AOA.md) |
 
 ### Validación
 
@@ -147,7 +124,7 @@ La planform, el espesor y los biseles están en `aconcaguaGeom.py`
 
 ### Derivados (no se editan)
 
-`r_far()`, `shell_spec()`, `derived()` (Re, u_τ, y1, δ, celdas por shell),
+`shell_spec()`, `derived()` (Re, u_τ, y1, δ, celdas por shell),
 `axial_plan()`, `az_angles()`, `predicted_cells()`. `python meshParams.py`
 o `build.py --plan` los imprimen.
 

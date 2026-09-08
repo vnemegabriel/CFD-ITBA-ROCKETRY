@@ -60,9 +60,9 @@ python build.py --preset medium --sector half
 | Documento | Para qué |
 |---|---|
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | el flujo de trabajo completo: construir, convertir, correr, chequear. **Empezar acá.** |
-| [docs/PARAMETERS.md](docs/PARAMETERS.md) | referencia de cada parámetro de la malla y del caso |
-| [docs/SECTORS_AND_AOA.md](docs/SECTORS_AND_AOA.md) | cuarto / mitad / completa, ángulo de ataque, cómo se ensambla |
-| [docs/GEOMETRY.md](docs/GEOMETRY.md) | la geometría de registro y cómo cambiarla (otro cohete, otras aletas) |
+| [docs/PARAMETERS.md](PARAMETROS.md) | referencia de cada parámetro de la malla y del caso |
+| [docs/SECTORS_AND_AOA.md](SECTORES_Y_AOA.md) | cuarto / mitad / completa, ángulo de ataque, cómo se ensambla |
+| [docs/GEOMETRY.md](GEOMETRÍA.md) | la geometría de registro y cómo cambiarla (otro cohete, otras aletas) |
 | [docs/MESH_DESIGN.md](docs/MESH_DESIGN.md) | por qué la topología es la que es; calidad; restricciones del toolchain (en inglés) |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | errores conocidos y qué significan |
 | [docs/SOLVERS.md](docs/SOLVERS.md) | los tres regímenes: solver, turbulencia, termodinámica, esquemas, con las citas |

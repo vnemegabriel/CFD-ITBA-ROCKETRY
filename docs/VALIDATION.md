@@ -14,7 +14,7 @@ analíticas confiables, y recién después los compresibles.
 |---|---|---|
 | `Cl` a α = 0 en malla `half` o `full` | ≈ 0 | la costura entre cuadrantes o la deformación de la aleta no son simétricas |
 | `CmRoll` a α = 0 | ≈ 0 | idem |
-| y+ por patch | grueso de la distribución en 20 a 100 | la malla se construyó para otra velocidad, ver [PARAMETERS.md](PARAMETERS.md#flujo-la-malla-se-dimensiona-para-una-velocidad) |
+| y+ por patch | grueso de la distribución en 20 a 100 | la malla se construyó para otra velocidad, ver [PARAMETERS.md](PARAMETROS.md#flujo-la-malla-se-dimensiona-para-una-velocidad) |
 | balance de `Cd` cuarto contra mitad | igual dentro de 1 % | `Aref` mal escalado, o el sector no es equivalente |
 | linealidad de `CN` entre α = 2° y 6° | pendiente constante | no convergió, o y+ fuera de rango en las aletas |
 

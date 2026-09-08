@@ -34,14 +34,13 @@ import aconcaguaGeom as G
 import meshParams as MP
 
 
-def fin_node_mask(nodes, section=None, smear=None):
+def fin_node_mask(nodes):
     """True for nodes the deformation will move: on the fin planform.
 
     Evaluated on UNDEFORMED coordinates.  Independent of which plane the node
     is on, so pass a plane mask and AND it in if you need one plane only.
     """
-    section = section or MP.FIN_SECTION
-    smear = MP.FIN_TIP_SMEAR if smear is None else smear
+    section, smear = MP.FIN_SECTION, MP.FIN_TIP_SMEAR
     x, y, z = nodes[:, 0], nodes[:, 1], nodes[:, 2]
     r = np.hypot(y, z)
     out = np.zeros(len(nodes), bool)
@@ -52,10 +51,9 @@ def fin_node_mask(nodes, section=None, smear=None):
     return out
 
 
-def deform(nodes, section=None, smear=None):
+def deform(nodes):
     """Apply the fin deformation.  Returns (new_nodes, n_moved, max_displacement)."""
-    section = section or MP.FIN_SECTION
-    smear = MP.FIN_TIP_SMEAR if smear is None else smear
+    section, smear = MP.FIN_SECTION, MP.FIN_TIP_SMEAR
     p = nodes.copy()
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     r = np.hypot(y, z)
@@ -87,20 +85,7 @@ def wetted_area(nodes, quads):
     return float(0.5 * np.linalg.norm(np.cross(d1, d2), axis=1).sum())
 
 
-def analytic_half_fin_area():
-    """Nominal planform area of ONE side of one fin, root chord to FIN_TIP_R.
-
-    This is the number a drawing gives, and it is NOT what the mesh should
-    reproduce: it leaves out the tip smear band and treats the bevels as flat.
-    Use wetted_area_analytic() to judge the mesh.
-    """
-    span = G.FIN_TIP_R - G.FIN_ROOT_R
-    c_root = G.FIN_ROOT_TE - G.FIN_ROOT_LE
-    c_tip = G.FIN_TIP_TE - G.FIN_TIP_LE
-    return 0.5 * (c_root + c_tip) * span
-
-
-def wetted_area_analytic(section=None, smear=None, n=2001):
+def wetted_area_analytic(n=2001):
     """True wetted area of ONE side of one fin: the area of the surface the
     deformation actually creates, z = -t_half(x, r).
 
@@ -116,8 +101,7 @@ def wetted_area_analytic(section=None, smear=None, n=2001):
     planform, a 4 % difference -- the same order as the discretisation error
     it was being blamed for.
     """
-    section = section or MP.FIN_SECTION
-    smear = MP.FIN_TIP_SMEAR if smear is None else smear
+    section, smear = MP.FIN_SECTION, MP.FIN_TIP_SMEAR
     hi = G.FIN_TIP_R + max(smear, 0.0)
     x = np.linspace(G.FIN_ROOT_LE, G.FIN_TIP_TE, n)
     r = np.linspace(G.FIN_ROOT_R, hi, n)
