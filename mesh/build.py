@@ -13,7 +13,7 @@ build.py -- the one command that makes a mesh.
 Precedence, lowest to highest: meshParams.py defaults < --preset < --scale /
 --sector / --fins < --set.  The final parameter set is written next to the
 .msh as <name>.params.py, and an OpenFOAM dictionary <name>.meshInfo tells
-the case what it is getting (sector, Aref, patch types).  case/Allmesh reads
+the case what it is getting (sector, Aref, patch types).  case-*/Allmesh reads
 both.
 """
 
@@ -119,9 +119,9 @@ def mesh_info(n_cells, d, quads):
                 Uref=float(MP.U), nuRef=float(MP.NU),
                 Aref=float(ref['Aref']), lRef=float(ref['lRef']),
                 rBody=float(G.R_BODY), lBody=float(G.L_TOTAL))
-    # Fin bounding geometry, so case/system/topoSetDict can place a local
+    # Fin bounding geometry, so case-*/system/topoSetDict can place a local
     # refinement region without repeating any of these numbers.  See
-    # case/Allrefine and docs/WORKFLOW.md section 3.
+    # case-*/Allrefine and docs/WORKFLOW.md section 3.
     if MP.FINS_ON:
         info.update(finRootR=float(G.FIN_ROOT_R), finTipR=float(G.FIN_TIP_R),
                     finTipSmear=float(MP.FIN_TIP_SMEAR),

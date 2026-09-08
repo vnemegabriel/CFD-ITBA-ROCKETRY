@@ -1,0 +1,82 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - compressible external aero |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      thermophysicalProperties;
+}
+// ============================================================================
+//  Air as a calorically perfect gas with Sutherland viscosity.
+//
+//  Each entry of thermoType selects one model; docs/SOLVERS.md gives the
+//  equation and the source for every one of them.
+//
+//    hePsiThermo             energy-based thermo using psi = 1/(R T), the
+//                            compressibility.  This is what the pressure-based
+//                            compressible solvers (rhoSimpleFoam, rhoPimpleFoam)
+//                            and rhoCentralFoam expect.
+//    pureMixture             one specie, no transport of composition
+//    sutherland              mu(T) = As sqrt(T) / (1 + Ts/T)
+//    hConst                  Cp constant; h = Cp (T - Tstd) + Hf
+//    perfectGas              p = rho R T
+//    sensibleInternalEnergy  the solved energy variable is e, not h.  Required
+//                            by rhoCentralFoam and used by rhoSimpleFoam here
+//                            so both templates share this file unchanged.
+//
+//  VALIDITY.  Cp is held constant at 1005 J/(kg K), its value near 300 K.
+//  The stagnation temperature is T0 = T (1 + (gamma-1)/2 M^2):
+//
+//      M 0.8 -> T0 = 325 K      Cp error < 0.5 %
+//      M 1.2 -> T0 = 371 K      Cp error ~ 0.8 %
+//      M 1.8 -> T0 = 475 K      Cp error ~ 1.8 %
+//
+//  Above about M 2.5 (T0 > 600 K) replace `hConst` with `janaf`, which is what
+//  the rhoCentralFoam tutorials use.  See docs/SOLVERS.md.
+// ============================================================================
+
+thermoType
+{
+    type            hePsiThermo;
+    mixture         pureMixture;
+    transport       sutherland;
+    thermo          hConst;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleInternalEnergy;
+}
+
+mixture
+{
+    // dry air
+    specie
+    {
+        molWeight       28.96;      // kg/kmol -> R = 8314.46/28.96 = 287.05
+    }
+
+    thermodynamics
+    {
+        Cp              1005;       // J/(kg K)  -> gamma = Cp/(Cp - R) = 1.400
+        Hf              0;          // J/kg      no chemistry, reference only
+    }
+
+    // Sutherland's law.  White, Viscous Fluid Flow, 3rd ed., eq. 1-36, with
+    // the constants for air: mu_ref 1.716e-05 Pa s at 273.15 K, S = 110.4 K,
+    // recast into OpenFOAM's two-parameter form
+    //     mu = As sqrt(T) / (1 + Ts/T)
+    // Check: T = 288.15 K gives mu = 1.790e-05 Pa s, the standard value.
+    transport
+    {
+        As              1.4792e-06; // kg/(m s sqrt(K))
+        Ts              116;        // K
+    }
+}
+
+// ************************************************************************* //

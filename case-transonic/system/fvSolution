@@ -1,0 +1,87 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - transonic external aero    |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+
+solvers
+{
+    p
+    {
+        solver           GAMG;
+        smoother         GaussSeidel;
+        tolerance        1e-8;
+        relTol           0.05;
+        nPreSweeps       0;
+        nPostSweeps      2;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 100;
+        agglomerator     faceAreaPair;
+        mergeLevels      1;
+    }
+
+    "(U|e|k|omega)"
+    {
+        solver           smoothSolver;
+        smoother         symGaussSeidel;
+        tolerance        1e-9;
+        relTol           0.1;
+        nSweeps          1;
+        minIter          1;
+    }
+}
+
+SIMPLE
+{
+    // THE transonic switch.  It adds the convective term div(phid,p) to the
+    // pressure equation, so the equation changes character from elliptic to
+    // hyperbolic where M > 1 and the solver can carry a supersonic pocket.
+    // Without it rhoSimpleFoam is limited to roughly M < 0.7.
+    transonic                   yes;
+
+    nNonOrthogonalCorrectors    1;
+
+    // bounds on the pressure update, as factors of the current field.  They
+    // stop a single bad iteration from driving p negative, which with
+    // perfectGas would give a negative density and end the run.
+    pMinFactor                  0.1;
+    pMaxFactor                  2.0;
+
+    residualControl
+    {
+        p               1e-4;
+        U               1e-4;
+        "(k|omega|e)"   1e-4;
+    }
+}
+
+// Relaxation follows the aerofoilNACA0012 tutorial.  The very small rho factor
+// is not a typo: density is relaxed hard because it feeds the pressure
+// equation through psi, and letting it move freely makes the SIMPLE loop
+// diverge in the first few hundred iterations.
+relaxationFactors
+{
+    fields
+    {
+        p               0.7;
+        rho             0.01;
+    }
+    equations
+    {
+        U               0.3;
+        e               0.7;
+        "(k|omega)"     0.7;
+    }
+}
+
+// ************************************************************************* //

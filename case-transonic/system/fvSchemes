@@ -1,0 +1,91 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - transonic external aero    |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// ============================================================================
+//  Follows $FOAM_TUTORIALS/compressible/rhoSimpleFoam/aerofoilNACA0012, which
+//  is the shipped steady compressible EXTERNAL aerodynamics case, with the
+//  laplacian and snGrad limiters raised to 0.33 for this mesh's 7,563 faces
+//  above 70 degrees of non-orthogonality.  docs/SOLVERS.md explains each entry.
+// ============================================================================
+
+ddtSchemes
+{
+    default         steadyState;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+    // cell-limited gradient, used by name below in linearUpwind.  The limiter
+    // keeps the reconstructed face value inside the neighbouring cell range,
+    // which is what stops linearUpwind from overshooting across a shock.
+    limited         cellLimited Gauss linear 1;
+    grad(U)         $limited;
+    grad(e)         $limited;
+}
+
+divSchemes
+{
+    default         none;
+
+    // momentum: second order upwind-biased, gradient-limited
+    div(phi,U)      bounded Gauss linearUpwind limited;
+
+    // energy.  rhoSimpleFoam solves for e here (sensibleInternalEnergy), and
+    // carries the kinetic energy K and the pressure work Ekp as separate terms
+    energy          bounded Gauss linearUpwind limited;
+    div(phi,e)      $energy;
+    div(phi,K)      $energy;
+    div(phi,Ekp)    $energy;
+
+    // turbulence: first order upwind.  k and omega are strictly positive and
+    // the model is calibrated with upwinding; a limited higher-order scheme
+    // buys accuracy that the turbulence closure does not have.
+    turbulence      bounded Gauss upwind;
+    div(phi,k)      $turbulence;
+    div(phi,omega)  $turbulence;
+
+    // the transonic terms: div(phid,p) is the convective part of the pressure
+    // equation, active only with `transonic yes` in fvSolution
+    div(phid,p)     Gauss upwind;
+    div((phi|interpolate(rho)),p)  bounded Gauss upwind;
+
+    div(((rho*nuEff)*dev2(T(grad(U)))))  Gauss linear;
+}
+
+laplacianSchemes
+{
+    // `limited corrected 0.33`: full non-orthogonal correction up to a
+    // 0.33 limiter, the standard compromise for a mesh with a few thousand
+    // faces above 70 deg.  Pair it with nNonOrthogonalCorrectors >= 1.
+    default         Gauss linear limited corrected 0.33;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         limited corrected 0.33;
+}
+
+wallDist
+{
+    method          meshWave;
+}
+
+// ************************************************************************* //

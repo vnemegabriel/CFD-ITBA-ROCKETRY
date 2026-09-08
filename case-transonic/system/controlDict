@@ -1,0 +1,132 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - transonic external aero    |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+#include "${FOAM_CASE}/constant/meshInfo"      // written by mesh/build.py
+
+// rhoSimpleFoam: steady, pressure-based, compressible.  With `transonic yes`
+// in fvSolution the pressure equation carries a convective term, which is what
+// lets it run past M 1.  See docs/SOLVERS.md.
+application     rhoSimpleFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         5000;           // iterations; residualControl exits earlier
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   1000;
+purgeWrite      2;
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    // -- Force coefficients ------------------------------------------------
+    //  COMPRESSIBLE: p is in Pa, so the force integration uses the rho FIELD
+    //  (`rho rho`), not a reference value.  rhoInf is still required, for the
+    //  dynamic pressure that normalises the coefficients.
+    //  Aref, lRef and the wall patch list come from constant/meshInfo, so they
+    //  always match the mesh.  Moments are about the NOSE TIP, pitch axis z;
+    //  the centre of pressure is x_cp = -Cm lRef / CN measured from the tip.
+    forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   10;
+        log             yes;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        dragDir         ($dx $dy $dz);
+        liftDir         ($lx $ly $lz);
+        CofR            (0 0 0);
+        pitchAxis       (0 0 1);
+        magUInf         $Uinf;
+        lRef            $lRef;
+        Aref            $Aref;
+    }
+
+    // -- Forces per patch, dimensional (N) ---------------------------------
+    forces1
+    {
+        type            forces;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   10;
+        log             no;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        CofR            (0 0 0);
+    }
+
+    // -- Mach number field: THE thing to look at in a transonic run ---------
+    //  Where it crosses 1 you have a supersonic pocket; if that pocket reaches
+    //  the boattail the flow is no longer transonic in the mild sense and the
+    //  supersonic template is the better tool.
+    MachNo
+    {
+        type            MachNo;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    // -- y+ on the walls ----------------------------------------------------
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    // -- Residuals ----------------------------------------------------------
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        fields          (U p e k omega);
+        writeResidualFields no;
+    }
+
+    // -- Wall shear stress and pressure coefficient -------------------------
+    wallShearStress
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        patches         $wallPatches;
+    }
+    Cp
+    {
+        type            pressure;
+        libs            (fieldFunctionObjects);
+        mode            staticCoeff;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        pInf            $pInf;
+        UInf            ($Ux $Uy $Uz);
+        writeControl    writeTime;
+    }
+}
+
+// ************************************************************************* //

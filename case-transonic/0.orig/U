@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - transonic external aero    |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform ($Ux $Uy $Uz);
+
+boundaryField
+{
+    // freestreamVelocity is inletOutlet with the free-stream value: it fixes
+    // the velocity where flow enters and extrapolates where it leaves, so the
+    // same entry is correct on all three open boundaries at any angle of
+    // attack and whether the local flow is entering or leaving.
+    "(inlet|outlet|box)"
+    {
+        type            freestreamVelocity;
+        freestreamValue $internalField;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    "(cone|walls|tail|fins)"
+    {
+        type            noSlip;
+    }
+}
+
+// ************************************************************************* //

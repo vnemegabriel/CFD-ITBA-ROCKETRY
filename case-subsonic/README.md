@@ -1,11 +1,17 @@
-# case/ — plantilla OpenFOAM v2412
+# case-subsonic/ — plantilla incompresible, M < 0.3
 
 `simpleFoam` + `kOmegaSST` con wall functions, aire incompresible. Es una
-**plantilla**: se copia a un directorio de corrida (`../newCase.sh`) y se
-corre ahí. Flujo completo en [../docs/WORKFLOW.md](../docs/WORKFLOW.md).
+**plantilla**: se copia a un directorio de corrida (`../newCase.sh --regime sub`)
+y se corre ahí. Flujo completo en [../docs/WORKFLOW.md](../docs/WORKFLOW.md);
+los modelos, esquemas y sus referencias en
+[../docs/SOLVERS.md](../docs/SOLVERS.md).
+
+Las hermanas compresibles son `../case-transonic/` (0.3 a 1.2) y
+`../case-supersonic/` (M > 1.2). Comparten los scripts `All*` y
+`fixPatchTypes.py` byte por byte: si tocás uno, tocá los tres.
 
 ```
-case/
+case-subsonic/
 ├── Allmesh   <msh>      gmshToFoam + meshInfo + fixPatchTypes + checkMesh + renumberMesh
 ├── Allrefine [tip|fins] OPCIONAL: refinado local 2:1 alrededor de las aletas
 ├── Allrun    [N]        chequeo sector/ángulos + decomposePar + potentialFoam + simpleFoam + reconstructPar

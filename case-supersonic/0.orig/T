@@ -1,0 +1,50 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform $Tinf;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    box
+    {
+        type            inletOutlet;
+        inletValue      $internalField;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    // adiabatic.  At M 1.8 the recovery temperature is about 470 K, which the
+    // airframe cannot follow in a 4 s burn, so zero heat flux is the right
+    // limit rather than a fixed wall temperature.
+    "(cone|walls|tail|fins)"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

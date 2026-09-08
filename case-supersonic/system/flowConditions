@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowConditions;
+}
+// ============================================================================
+//  THE ONE FILE YOU EDIT TO SET A RUN.  Supersonic template, M > 1.2.
+//
+//  Same parameterisation as the transonic template: a Mach number plus the
+//  ambient state, with system/flowDerived doing the algebra.
+//
+//      foamDictionary system/flowConditions -entry Minf -set 1.5
+//
+//  Never run foamDictionary -set on a file containing #eval.
+//
+//  TWO THINGS THIS TEMPLATE DOES NOT FIX FOR YOU, both in the mesh:
+//
+//   1. The Mach cone leaves through the lateral farfield, not the outlet.  At
+//      M 1.8 the cone from the nose reaches r = 11.775 m at x = 17.6 m, inside
+//      the domain.  The boundary condition here is non-reflecting, but the
+//      cells out there are 1.6 m, so the shock is smeared long before it
+//      arrives.  If you need the shock structure rather than just the drag,
+//      refine along the cone.
+//
+//   2. The mesh is dimensioned for ONE speed.  Read Uinf off the ./Allrun
+//      banner and rebuild with  python3 build.py --preset <p> --set U=<Uinf>.
+//      At M 1.8 that is 612 m/s; running that on the 100 m/s mesh gives y+ 163
+//      instead of 32.
+//
+//  Both are explained in docs/SOLVERS.md.
+// ============================================================================
+
+Minf            1.80;       // -     free-stream Mach number
+alpha           0;          // deg   angle of attack   (needs half or full)
+beta            0;          // deg   sideslip          (needs full)
+
+pInf            101325;     // Pa    ambient static pressure (ISA sea level)
+Tinf            288.15;     // K     ambient static temperature (ISA sea level)
+
+Ti              0.005;      // -     free-stream turbulence intensity (0.5 %)
+nuRatio         5;          // -     nut / nu in the free stream
+
+// ************************************************************************* //

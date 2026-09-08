@@ -29,6 +29,11 @@ lx              #eval{ -sin(degToRad($alpha)) };
 ly              #eval{ cos(degToRad($alpha)) };
 lz              0;
 
+// Uinf ya viene de flowConditions; nuInf se expone con el mismo nombre que
+// usan las plantillas compresibles para que ./Allrun pueda estimar el y+ sin
+// saber de que regimen se trata.
+nuInf           $nu;
+
 kInlet          #eval{ 1.5*sqr($Uinf*$Ti) };
 nutInlet        #eval{ $nuRatio*$nu };
 omegaInlet      #eval{ $kInlet/$nutInlet };

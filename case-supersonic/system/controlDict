@@ -1,0 +1,134 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+#include "${FOAM_CASE}/constant/meshInfo"      // written by mesh/build.py
+
+// rhoCentralFoam: density-based, explicit, central-upwind shock capturing.
+application     rhoCentralFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+
+// REAL seconds.  The step adapts to maxCo below, so endTime is physical time,
+// and reaching a steady state takes of order ten flow-through times: at M 1.8
+// one pass over the 2.955 m body is 4.8 ms, so 0.05 s is the right order.
+// Expect a few hundred thousand steps; see the note in fvSchemes.
+deltaT          1e-8;
+endTime         0.05;
+
+writeControl    adjustable;
+writeInterval   0.005;
+purgeWrite      2;
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+// The step is raised until the worst cell sits at maxCo, then capped at
+// maxDeltaT.  0.3 is conservative for an explicit central scheme; the shipped
+// tutorials use 0.2 to 0.5.
+adjustTimeStep  yes;
+maxCo           0.3;
+maxDeltaT       1e-5;
+
+functions
+{
+    // -- Force coefficients ------------------------------------------------
+    //  Compressible: p is in Pa, so the force integration uses the rho FIELD.
+    //  rhoInf is still needed for the dynamic pressure that normalises the
+    //  coefficients.  Aref, lRef and the wall patches come from
+    //  constant/meshInfo, so they always match the mesh.
+    forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   50;
+        log             yes;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        dragDir         ($dx $dy $dz);
+        liftDir         ($lx $ly $lz);
+        CofR            (0 0 0);
+        pitchAxis       (0 0 1);
+        magUInf         $Uinf;
+        lRef            $lRef;
+        Aref            $Aref;
+    }
+
+    forces1
+    {
+        type            forces;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   50;
+        log             no;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        CofR            (0 0 0);
+    }
+
+    // -- Mach number: the field to look at.  The bow shock, the expansion
+    //    over the boattail and the Mach cone all show up here first.
+    MachNo
+    {
+        type            MachNo;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        fields          (U e k omega);
+        writeResidualFields no;
+    }
+
+    wallShearStress
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        patches         $wallPatches;
+    }
+    Cp
+    {
+        type            pressure;
+        libs            (fieldFunctionObjects);
+        mode            staticCoeff;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        pInf            $pInf;
+        UInf            ($Ux $Uy $Uz);
+        writeControl    writeTime;
+    }
+}
+
+// ************************************************************************* //

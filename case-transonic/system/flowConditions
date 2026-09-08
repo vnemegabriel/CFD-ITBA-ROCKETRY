@@ -1,0 +1,50 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - transonic external aero    |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowConditions;
+}
+// ============================================================================
+//  THE ONE FILE YOU EDIT TO SET A RUN.  Transonic template, 0.3 < M < 1.2.
+//
+//  Compressible, so the free stream is stated as a MACH NUMBER plus the
+//  ambient state.  system/flowDerived turns that into the speed of sound, the
+//  velocity vector, the density and the free-stream turbulence; the fields,
+//  thermophysicalProperties and controlDict #include THAT file.
+//
+//  Plain numbers only here.  Set them from the shell with
+//
+//      foamDictionary system/flowConditions -entry Minf -set 0.9
+//
+//  and never with foamDictionary on a file that contains #eval, which would
+//  freeze the derived values.
+//
+//  Angles in DEGREES, body axis +x, nose at x = 0.
+//      alpha   free stream rotated from +x towards +y   (needs sector half or full)
+//      beta    rotated towards +z                       (needs sector full)
+//
+//  The MESH must be built for the speed you run at: y1 is resolved from one
+//  velocity and does not adapt.  Uinf here is derived, so read it off the
+//  ./Allrun banner and build with  --set U=<that>.  See docs/SOLVERS.md.
+// ============================================================================
+
+Minf            0.80;       // -     free-stream Mach number
+alpha           0;          // deg   angle of attack   (needs half or full)
+beta            0;          // deg   sideslip          (needs full)
+
+pInf            101325;     // Pa    ambient static pressure (ISA sea level)
+Tinf            288.15;     // K     ambient static temperature (ISA sea level)
+
+Ti              0.005;      // -     free-stream turbulence intensity (0.5 %)
+nuRatio         5;          // -     nut / nu in the free stream
+
+// ************************************************************************* //

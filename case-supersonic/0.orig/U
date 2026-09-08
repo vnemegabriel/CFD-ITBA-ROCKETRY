@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform ($Ux $Uy $Uz);
+
+boundaryField
+{
+    // SUPERSONIC INLET: every characteristic enters the domain, so every
+    // variable is imposed and nothing is extrapolated.
+    inlet
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    // SUPERSONIC OUTLET: every characteristic leaves, so nothing may be
+    // imposed.  Fixing anything here would be over-specified and would
+    // reflect back upstream.
+    outlet
+    {
+        type            zeroGradient;
+    }
+    // LATERAL FARFIELD.  The free stream is axial, so the velocity NORMAL to
+    // this boundary is nearly zero: it is not a supersonic boundary in the
+    // normal direction, and waves can cross it both ways.  inletOutlet keeps
+    // the free stream where flow enters and extrapolates where the Mach cone
+    // crosses on its way out.
+    box
+    {
+        type            inletOutlet;
+        inletValue      $internalField;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    "(cone|walls|tail|fins)"
+    {
+        type            noSlip;
+    }
+}
+
+// ************************************************************************* //

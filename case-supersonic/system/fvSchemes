@@ -1,0 +1,100 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// ============================================================================
+//  rhoCentralFoam is DENSITY-BASED: it does not solve a pressure equation at
+//  all.  It advances rho, rhoU and rhoE with a central-upwind flux and then
+//  applies the diffusive corrections implicitly.  So this file looks nothing
+//  like the pressure-based one: the interesting entries are `fluxScheme` and
+//  the `reconstruct(...)` interpolations, not divSchemes.
+//
+//  Follows $FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35,
+//  the shipped supersonic external RANS case.  docs/SOLVERS.md gives the
+//  references for the flux scheme and the limiter.
+// ============================================================================
+
+// Kurganov-Tadmor / Kurganov-Noelle-Petrova central-upwind flux.  It splits
+// the face flux by the local wave speeds a+ and a-, so it captures a shock
+// without a Riemann solver and without tuned artificial viscosity.
+fluxScheme      Kurganov;
+
+ddtSchemes
+{
+    // Transient march to a steady state, with the global time step set from
+    // maxCo in controlDict.  This is the configuration that the shipped
+    // rhoCentralFoam tutorials use for external flow, and it is stable here.
+    //
+    // IT IS ALSO THE EXPENSIVE ONE.  The step is the acoustic limit of the
+    // smallest cell: on this mesh the solver reports a flow time scale of
+    // about 4e-7 s, so at maxCo 0.3 the step is ~1.2e-7 s, and reaching a
+    // steady state needs of order ten flow-through times, 48 ms at M 1.8.
+    // That is a few hundred thousand steps.  Budget for it, or coarsen the
+    // wall spacing for the supersonic sweep.
+    //
+    // `localEuler` (local time stepping) is the standard acceleration and is
+    // what $FOAM_TUTORIALS/.../biconic25-55Run35 uses.  In testing on this
+    // case it did NOT limit the step -- the solver kept reporting Courant
+    // numbers of order 1e6 and diverged within ten iterations -- so it is not
+    // shipped enabled.  If you get it working, it is the single biggest win
+    // available here.  See docs/SOLVERS.md.
+    default         Euler;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+    // the only explicit divergence: the deviatoric part of the viscous stress
+    div(tauMC)      Gauss linear;
+    // turbulence transport, upwinded
+    div(phi,k)      Gauss upwind;
+    div(phi,omega)  Gauss upwind;
+}
+
+interpolationSchemes
+{
+    default         linear;
+
+    // MUSCL reconstruction of the primitive variables to the faces, with the
+    // van Leer limiter.  This is where the shock capturing happens: the
+    // limiter drops the scheme to first order at a discontinuity and keeps it
+    // second order in smooth regions, so the shock stays monotone.
+    // vanLeerV is the vector form, which limits on the direction of steepest
+    // change rather than component by component.
+    reconstruct(rho)    vanLeer;
+    reconstruct(U)      vanLeerV;
+    reconstruct(T)      vanLeer;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear limited corrected 0.33;
+}
+
+snGradSchemes
+{
+    default         limited corrected 0.33;
+}
+
+wallDist
+{
+    method          meshWave;
+}
+
+// ************************************************************************* //

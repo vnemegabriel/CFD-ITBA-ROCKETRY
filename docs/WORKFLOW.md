@@ -16,7 +16,7 @@ línea de comando┘           │
                             ├─► output/<nombre>.meshInfo    dict OpenFOAM: sector, Aref, patches
                             └─► output/<nombre>.params.py   parámetros usados (reproducible)
                                        │
-./newCase.sh <dir> <msh> [--alpha ..]  │   copia case/ y corre Allmesh
+./newCase.sh <dir> <msh> [--regime R]  │   copia case-<R>/ y corre Allmesh
                                        ▼
                      <dir>/  Allmesh  →  gmshToFoam + fixPatchTypes + checkMesh + renumberMesh
                              Allrefine [tip|fins]    (opcional) topoSet + refineMesh
@@ -141,8 +141,23 @@ Los números de `checkMesh` son los que valen y están en
 
 ## 2. Del `.msh` al caso
 
-`case/` es una **plantilla**: no se corre en el repo. `newCase.sh` la copia,
-fija las condiciones de vuelo y convierte la malla:
+Hay **tres plantillas**, una por régimen de velocidad, y ninguna se corre en
+el repo. `newCase.sh` copia la que elijas, fija las condiciones de vuelo y
+convierte la malla:
+
+| `--regime` | Directorio | Solver | Rango |
+|---|---|---|---|
+| `sub` (default) | `case-subsonic/` | `simpleFoam` | M < 0.3 |
+| `trans` | `case-transonic/` | `rhoSimpleFoam` con `transonic yes` | 0.3 a 1.2 |
+| `super` | `case-supersonic/` | `rhoCentralFoam` | M > 1.2 |
+
+Los modelos de cada una, con sus referencias, están en
+[SOLVERS.md](SOLVERS.md). Las dos compresibles **no están validadas**: corren,
+pero sus números no tienen respaldo hasta hacer [VALIDATION.md](VALIDATION.md).
+
+En las compresibles la condición se da como número de Mach y la velocidad se
+deriva, así que `--Uinf` no existe ahí y `--Minf` no existe en la subsónica.
+`newCase.sh` rechaza la combinación equivocada en vez de ignorarla.
 
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
@@ -156,7 +171,7 @@ sobreescribe un directorio existente.
 A mano es lo mismo:
 
 ```bash
-cp -r case ~/runs/a05 && cd ~/runs/a05
+cp -r case-subsonic ~/runs/a05 && cd ~/runs/a05
 ./Allmesh /ruta/a/aconcagua_half_s2.msh
 foamDictionary system/flowConditions -entry alpha -set 5
 ```
@@ -406,6 +421,19 @@ Convenciones del `forceCoeffs`:
   espaciamiento lo fija `AZ_FIN_H`, no `YPLUS_TARGET`.
 
 ## 7. Estudios típicos
+
+**Cambiar de velocidad.** La malla se dimensiona para una velocidad: `U` en
+`meshParams.py` fija `y1` para que el y+ dé en el objetivo, y correr a otra
+velocidad deja el y+ fuera de rango sin avisar. Una malla por rango:
+
+```bash
+python build.py --preset medium --set U=272     # M 0.8
+python build.py --preset medium --set U=612     # M 1.8
+```
+
+La tabla de `y1` contra velocidad está en
+[PARAMETERS.md](PARAMETERS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
+`Allrun` avisa si la `Uinf` del caso no se corresponde con la malla.
 
 **Convergencia de malla.** `H_SCALE_WALL = False` mantiene `y1` (y por lo
 tanto y+ y las wall functions) mientras todo lo demás se engrosa:

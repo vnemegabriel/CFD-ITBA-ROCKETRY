@@ -23,12 +23,39 @@ Toda variable de la tabla se puede fijar desde un preset o con
 | `H_SCALE_WALL` | `True` | `False` mantiene fija **la primera celda de cada pared** mientras el resto escala: `y1` (y por lo tanto y+) en las paredes laterales, la celda axial en la punta del cono (`up.h_end`/`nose.h_start`) y la celda axial sobre la base (`H_WAKE_BASE`). Lo correcto para un estudio de convergencia con wall functions. La de la punta importa también por calidad: el casquete es casi vertical en el ápice y las celdas del núcleo miden ~0.1 mm, así que una celda axial de 4.5 mm ahí (`H_SCALE 3`) lleva el skewness de las caras de pared a 4.6 |
 | `H_SCALE_FIN` | `True` | `False` mantiene la **aleta** a resolución completa mientras el resto escala: `FIN_H_X` (cuerda), `AZ_FIN_H` y las celdas de los dos bloques azimutales que tocan la aleta (normal), `FIN_H_R` (envergadura). Con todo escalado ×3 la aleta de 12 mm queda de una celda de espesor y sus bordes caen dos celdas aparte: no es una aleta, es un bulto. `coarse` y `medium` lo ponen en `False` |
 
-### Flujo (sólo para dimensionar la pared)
+### Flujo: la malla se dimensiona para una velocidad
 
 | Parámetro | Default | Qué hace |
 |---|---|---|
 | `U`, `NU`, `RHO` | 100, 1.5e-5, 1.225 | fijan Re_L y con él `y1`. **No** son las condiciones del caso: esas van en `flowConditions` |
 | `YPLUS_TARGET` | 32 | y+ en el **centro** de la primera celda → `y1 = 303 µm`; 31 celdas dentro de δ en la malla fina |
+
+**La malla es específica de una velocidad, y esto es fácil de pasar por alto.**
+`U` no entra en la simulación: solo sirve para resolver `y1` de manera que el
+y+ dé en el objetivo. Si después corrés el caso a otra velocidad, la primera
+celda sigue siendo la misma y el y+ se va de rango **sin ningún error**. El
+sesgo es del tamaño del cambio de velocidad:
+
+| `U` [m/s] | Mach | `y1` para y+ = 32 | y+ que da la malla de 100 m/s |
+|---|---|---|---|
+| 50 | 0.15 | 566 µm | 17 |
+| **100** | **0.29** | **303 µm** | **32** |
+| 170 | 0.50 | 188 µm | 52 |
+| 272 | 0.80 | 123 µm | 79 |
+| 340 | 1.00 | 101 µm | 96 |
+| 612 | 1.80 | 59 µm | 163 |
+
+La regla es: **una malla por rango de velocidad.** Se construye pasando la
+velocidad de la corrida, y `y1` se re-resuelve solo:
+
+```bash
+python build.py --preset medium --set U=272     # para correr cerca de M 0.8
+```
+
+`Allrun` compara la `Uinf` de `flowConditions` con la `Uref` que la malla
+dejó grabada en `constant/meshInfo`, estima el y+ resultante y avisa si se
+fue de rango. Es un aviso, no un error: correr a otra velocidad es válido
+mientras sepas qué y+ te queda.
 
 ### Zonas radiales (lo que más se edita)
 
@@ -125,6 +152,26 @@ La planform, el espesor y los biseles están en `aconcaguaGeom.py`
 o `build.py --plan` los imprimen.
 
 ## Caso — `system/flowConditions`
+
+Hay una versión por plantilla. La subsónica se parametriza por velocidad; las
+dos compresibles por **número de Mach** más el estado ambiente, y derivan la
+velocidad. Modelos y referencias en [SOLVERS.md](SOLVERS.md).
+
+### Compresibles (`case-transonic/`, `case-supersonic/`)
+
+| Entrada | Default | Qué es |
+|---|---|---|
+| `Minf` | 0.80 / 1.80 | número de Mach de la corriente libre |
+| `pInf` | 101325 | Pa, presión estática ambiente (ISA nivel del mar) |
+| `Tinf` | 288.15 | K, temperatura estática ambiente |
+| `alpha`, `beta` | 0 | deg, igual que en la subsónica |
+| `Ti`, `nuRatio` | 0.005, 5 | igual que en la subsónica |
+
+`Uinf`, `rhoInf`, `muInf` y `nuInf` salen derivadas en `flowDerived`; las
+fórmulas y su verificación numérica están en
+[SOLVERS.md](SOLVERS.md#5-de-qué-se-derivan-las-condiciones).
+
+### Subsónica (`case-subsonic/`)
 
 | Entrada | Default | Qué es |
 |---|---|---|

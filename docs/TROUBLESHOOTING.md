@@ -74,7 +74,7 @@ Se usó `foamDictionary -set` sobre un archivo con `#eval` o `#include`
 (`controlDict`, un campo, o `flowDerived`). `foamDictionary` reescribe el
 archivo con todo evaluado y expandido, congelando los valores. Sólo
 `system/flowConditions` (números planos) se edita con `foamDictionary`; el
-resto con un editor o `sed`. Restaurar el archivo desde `case/` (o `git`).
+resto con un editor o `sed`. Restaurar el archivo desde la plantilla (`case-subsonic/`, `case-transonic/` o `case-supersonic/`) o desde `git`.
 
 **`checkMesh`: `Failed 3 mesh checks`**
 Con `-allGeometry` es lo esperado en esta malla: aspect ratio > 1000 en
@@ -120,6 +120,32 @@ Usaste `./Allrefine fins`, cuya región llega hasta la pared del cuerpo. Para
 una descomposición de arrastre por componente eso significa comparar patches a
 dos y+ distintos. `./Allrefine tip` no toca la capa límite.
 
+## Casos compresibles
+
+**El solver muere en la primera iteración con `Floating point exception` y una
+traza que termina en `libfluidThermophysicalModels`**
+La temperatura se fue de rango en el transitorio inicial desde la corriente
+uniforme, y con `perfectGas` eso da una velocidad del sonido imaginaria. Lo
+cubre `constant/fvOptions`, que recorta T entre 150 y 1200 K. Si el caso no lo
+tiene, copialo de la plantilla. Si lo tiene y aun así muere, bajá los factores
+de relajación de `fvSolution`.
+
+**Después de converger, `min(T)` o `max(T)` coinciden con los límites de `fvOptions`**
+Entonces el resultado lo está fijando ese archivo y no la física. Ampliá los
+límites y volvé a correr; si la solución se sigue apoyando en ellos, hay algo
+más mal.
+
+**El número de Courant del log supersónico es absurdo, del orden de 10⁵**
+Es esperado y no es un síntoma. Con `ddtSchemes localEuler` cada celda avanza
+con su propio paso, y el Courant que imprime el log se calcula con el paso
+global, que ya no gobierna nada.
+
+**`newCase.sh`: `system/flowConditions has no entry 'Uinf'`**
+Pasaste una condición que no corresponde al régimen. La subsónica toma
+`--Uinf --nu --rhoInf`; las compresibles toman `--Minf --pInf --Tinf`, porque
+ahí la velocidad es derivada. Es un error a propósito: antes habría sido un
+valor ignorado en silencio.
+
 ## Lo que se ve en ParaView
 
 **La aleta se ve como un bulto borroso / escalonada (preset `coarse` o `--scale` > 1)**
@@ -142,6 +168,13 @@ celdas enteras), o `Slice` con **Triangulate the slice** desactivado, o mover
 el origen del plano fuera de una capa de nodos.
 
 ## y+
+
+**y+ alto o bajo en TODAS las paredes por igual**
+La malla se construyó para otra velocidad. `U` en `meshParams.py` solo sirve
+para resolver `y1`; si corrés a otra `Uinf`, la primera celda no cambia y el
+y+ escala como `(U/nu)^0.9`. Con la malla de 100 m/s corrida a 272 m/s el y+
+pasa de 32 a 79. Reconstruí con `--set U=<la velocidad de la corrida>`. El
+aviso que imprime `Allrun` al arrancar te da el y+ estimado.
 
 **y+ muy alto en `cone`/`walls`/`tail` con un preset**
 `smoke` escala la pared también (`H_SCALE_WALL = True`): y+ ≈ 200. Es un

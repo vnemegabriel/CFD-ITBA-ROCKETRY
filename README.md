@@ -14,8 +14,10 @@ CFD-ITBA-ROCKETRY/
 │   ├── aconcaguaGeom.py   geometría de registro del cohete
 │   ├── presets/           smoke, coarse, medium, fine, fintip, wake_unsteady
 │   └── output/            .msh + sidecars (.meshInfo, .params.py); no se versiona
-├── case/        plantilla OpenFOAM v2412 (simpleFoam + kOmegaSST).  NO se corre acá
-│   ├── system/flowConditions   Uinf, alpha, beta, nu ...  lo único que se edita
+├── case-subsonic/    plantilla OpenFOAM v2412, simpleFoam, M < 0.3
+├── case-transonic/   rhoSimpleFoam transonic, 0.3 < M < 1.2
+├── case-supersonic/  rhoCentralFoam, M > 1.2
+│   ├── system/flowConditions   Uinf o Minf, alpha, beta ...  lo único que se edita
 │   ├── Allmesh / Allrefine / Allrun / Allclean
 │   └── 0.orig/ constant/ system/
 ├── newCase.sh   plantilla + malla + condiciones  ->  directorio de corrida
@@ -63,7 +65,9 @@ python build.py --preset medium --sector half
 | [docs/GEOMETRY.md](docs/GEOMETRY.md) | la geometría de registro y cómo cambiarla (otro cohete, otras aletas) |
 | [docs/MESH_DESIGN.md](docs/MESH_DESIGN.md) | por qué la topología es la que es; calidad; restricciones del toolchain (en inglés) |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | errores conocidos y qué significan |
-| [case/README.md](case/README.md) | el caso OpenFOAM archivo por archivo |
+| [docs/SOLVERS.md](docs/SOLVERS.md) | los tres regímenes: solver, turbulencia, termodinámica, esquemas, con las citas |
+| [docs/VALIDATION.md](docs/VALIDATION.md) | contra qué comparar y con qué cuentas |
+| [case-subsonic/README.md](case-subsonic/README.md) | el caso OpenFOAM archivo por archivo |
 
 ## Requisitos
 
@@ -76,8 +80,25 @@ Las mallas `.msh` no se versionan (un cuarto fino son 520 MB): se regeneran
 desde su `.params.py` en segundos o minutos. Mantener `mesh/output/` y los
 directorios de corrida **fuera de OneDrive** y, en WSL, fuera de `/mnt/c`.
 
+## Régimen
+
+Hay tres plantillas, una por régimen de velocidad. `newCase.sh --regime`
+elige. Ninguna de las compresibles está validada todavía; ver
+[docs/SOLVERS.md](docs/SOLVERS.md) y [docs/VALIDATION.md](docs/VALIDATION.md).
+
+```bash
+./newCase.sh ~/runs/x malla.msh --regime sub                 # simpleFoam
+./newCase.sh ~/runs/x malla.msh --regime trans --Minf 0.9    # rhoSimpleFoam
+./newCase.sh ~/runs/x malla.msh --regime super --Minf 1.8    # rhoCentralFoam
+```
+
+La malla se dimensiona para **una** velocidad: para los compresibles hay que
+reconstruirla con `--set U=<Uinf>`. `Allrun` avisa si no coinciden.
+
 ## Pendiente
 
+- Validación de las tres plantillas
+- Chorro de la tobera para el arrastre de base con motor encendido
 - Calculadora de fin flutter
 - Calentamiento de nosecone
 - Modelo de vuelo (sub + supersonico)

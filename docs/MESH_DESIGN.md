@@ -169,7 +169,7 @@ cd <run>; ./Allmesh <file.msh>            # gmshToFoam -> meshInfo -> patch type
 | `finPatch.py` | fin deformation and symmetry/fin face classification, on arrays |
 | `sectorAssembly.py` | quadrant -> half / full by rotate-and-stitch |
 | `meshQuality.py` | OpenFOAM's quality measures, computed before OpenFOAM does |
-| `../case/fixPatchTypes.py` | **run right after gmshToFoam, not optional**; types from `meshInfo` |
+| `../case-*/fixPatchTypes.py` | **run right after gmshToFoam, not optional**; types from `meshInfo` |
 
 Everything after `gmsh.model.mesh.generate(3)` works on plain arrays: no
 per-node gmsh API calls, one vectorised pass each for the snap and the fin

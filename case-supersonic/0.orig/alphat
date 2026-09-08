@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      alphat;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [1 -1 -1 0 0 0 0];      // rho * alpha_t, kg/(m s)
+
+internalField   uniform $alphatInlet;
+
+boundaryField
+{
+    "(inlet|outlet|box)"
+    {
+        type            calculated;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    // turbulent thermal diffusivity at the wall, from nut and Prt.  Only the
+    // compressible solvers need this field.
+    "(cone|walls|tail|fins)"
+    {
+        type            compressible::alphatWallFunction;
+        Prt             0.85;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

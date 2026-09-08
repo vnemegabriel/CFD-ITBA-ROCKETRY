@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [1 -1 -2 0 0 0 0];      // Pa
+
+internalField   uniform $pInf;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    // waveTransmissive is the non-reflecting condition: it advects the
+    // pressure out at u + c and relaxes towards fieldInf over the length
+    // lInf.  A plain fixedValue here would reflect the bow shock back into
+    // the domain once the Mach cone reaches the boundary, which at M 1.8
+    // happens at x = 17.6 m, well inside this domain.
+    box
+    {
+        type            waveTransmissive;
+        field           p;
+        phi             phi;
+        rho             rho;
+        psi             thermo:psi;
+        gamma           1.4;
+        fieldInf        $pInf;
+        lInf            10;             // m, of order the farfield radius
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    "(cone|walls|tail|fins)"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

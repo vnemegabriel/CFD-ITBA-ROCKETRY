@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// ============================================================================
+//  rhoCentralFoam solves the conserved variables EXPLICITLY, so rho, rhoU and
+//  rhoE need no linear solver: `diagonal` just divides through by the
+//  diagonal.  Only the implicit diffusive corrections on U and e, and the
+//  turbulence transport, get a real solver.
+//
+//  There is no SIMPLE or PIMPLE dictionary here: the local time step comes
+//  from maxCo and maxDeltaT in controlDict.  That is also why there are no
+//  relaxation factors -- an explicit density-based scheme has nothing to
+//  under-relax.
+// ============================================================================
+
+solvers
+{
+    "(rho|rhoU|rhoE)"
+    {
+        solver          diagonal;
+    }
+
+    "(U|e)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-9;
+        relTol          0.01;
+        nSweeps         2;
+    }
+
+    "(k|omega)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-9;
+        relTol          0.1;
+        nSweeps         1;
+    }
+}
+
+// ************************************************************************* //
