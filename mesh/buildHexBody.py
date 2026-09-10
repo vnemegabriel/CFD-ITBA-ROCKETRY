@@ -95,13 +95,20 @@ def cap_x(u, v):
 
 
 class Station:
-    """One cross-plane cut of the block structure."""
+    """One cross-plane cut of the block structure.
 
-    def __init__(self, name, x, ri, has_core, kind, shells, shell1_c, th):
+    The azimuthal block boundaries are NOT a property of the mesh, they are a
+    property of this station and of the radius within it: MP.az_relax() hands
+    back how far the fin clustering has relaxed toward uniform at (x, r), and
+    every shell of this station gets its own theta array from it.  The core is
+    a Cartesian grid and does not use them at all; its edges borrow shell 1's
+    distribution, which is the ring block they sit opposite.
+    """
+
+    def __init__(self, name, x, ri, has_core, kind, shells, shell1_c):
         self.name, self.x, self.ri = name, float(x), float(ri)
         self.has_core, self.kind, self.shell1_c = has_core, kind, shell1_c
-        self.th = th
-        self.N = len(th) - 1
+        self.N = MP.N_AZ_BLOCKS
         self.M = self.N // 2
         self.a = MP.CORE_FRAC * self.ri
         # one zone in the stack opens out downstream of the base so the fine
@@ -109,6 +116,8 @@ class Station:
         self.zr = [MP.zone_r_out(k, self.x) for k in range(len(shells))]
         self.r1_out = self.zr[0]
         self.radii = [None, self.ri] + self.zr
+        self.lam = [None] + [MP.az_relax(self.x, r) for r in self.radii[1:]]
+        self.th = [None] + [MP.az_angles(l) for l in self.lam[1:]]
         if has_core:
             assert self.a * SQ2 < self.ri, f'{name}: core square exceeds inner circle'
 
@@ -117,8 +126,8 @@ class Station:
             _, i, j = key
             return (self.a * i / self.M, self.a * j / self.M)
         _, lev, j = key
-        r = self.radii[lev]
-        return (r * np.cos(self.th[j]), r * np.sin(self.th[j]))
+        r, th = self.radii[lev], self.th[lev][j]
+        return (r * np.cos(th), r * np.sin(th))
 
     def on_wall(self, key):
         return self.kind == 'cap' and (key[0] == 'c' or key[1] <= 1)
@@ -132,7 +141,6 @@ class BodyMesh:
 
     def __init__(self):
         self.d = MP.derived()
-        self.th = MP.az_angles()
         self.N = MP.N_AZ_BLOCKS
         self.M = self.N // 2
         self.nlev = len(self.d['shells']) + 2
@@ -180,8 +188,7 @@ class BodyMesh:
             nm = f'st{i}'
             kind = 'cap' if abs(x - d['x_cap']) < 1e-12 else 'plane'
             ri, core, bias = self._station_spec(x, kind, c_wall)
-            self.S[nm] = Station(nm, x, ri, core, kind, d['shells'], bias,
-                                 self.th)
+            self.S[nm] = Station(nm, x, ri, core, kind, d['shells'], bias)
             self.order.append(nm)
         for i, s in enumerate(segs):
             s['s0'], s['s1'] = self.order[i], self.order[i + 1]
@@ -218,13 +225,19 @@ class BodyMesh:
 
     # ============================================================== counts ===
     def _counts(self):
-        coefs = MP.az_coefs()
         c = {'ring': (MP.n_ring(), 1.0)}
-        for k, co in enumerate(coefs):
-            c[f'azv{k}'] = (MP.n_az_cells_block(k), co)        # arcs, and core v-edges
-        for i in range(self.M):                                # core u-edges face block N-1-i
-            c[f'azu{i}'] = (MP.n_az_cells_block(self.N - 1 - i),
-                            1.0 / coefs[self.N - 1 - i])
+        # The azimuthal distribution relaxes with x AND with r, so a family is
+        # keyed by station and shell, not global.  Cell COUNTS never change --
+        # they cannot, the blocks have to conform -- only the progressions.
+        for nm, st in self.S.items():
+            for lev in range(1, self.nlev):
+                coefs = MP.az_coefs(st.lam[lev])
+                for k, co in enumerate(coefs):                 # arcs of shell lev
+                    c[f'azv{k}@{lev}@{nm}'] = (MP.n_az_cells_block(k), co)
+                if lev == 1:                                   # core u-edges face
+                    for i in range(self.M):                    # block N-1-i
+                        c[f'azu{i}@1@{nm}'] = (MP.n_az_cells_block(self.N - 1 - i),
+                                               1.0 / coefs[self.N - 1 - i])
         for seg in self.segs:
             c[f"ax_{seg['name']}"] = (seg['n'], seg['c'])
         for k, sh in enumerate(self.d['shells'], start=1):
@@ -258,20 +271,23 @@ class BodyMesh:
         meaningless without one; face() recovers the sign from the endpoints.
 
         `azv{j}` is the arc of block j AND the core's v-direction edges -- the
-        same edge of the same ring block, so they must share a distribution.
+        same edge of the same ring block, so they must share a distribution,
+        which is why the core borrows shell 1's.
         `azu{i}` is the core's u-direction edge, which faces block N-1-i and is
         traversed the other way, hence the reciprocal coefficient in _counts.
+        The shell index is part of the label because the progression relaxes
+        with radius; c_cross() appends the station.
         """
         if ka[0] == 'r':
             j = min(ka[2], kb[2])
-            return ('r', ka[1], j), ('r', ka[1], j + 1), f'azv{j}'
+            return ('r', ka[1], j), ('r', ka[1], j + 1), f'azv{j}@{ka[1]}'
         _, i0, j0 = ka
         _, i1, j1 = kb
         if i0 == i1:
             j = min(j0, j1)
-            return ('c', i0, j), ('c', i0, j + 1), f'azv{j}'
+            return ('c', i0, j), ('c', i0, j + 1), f'azv{j}@1'
         i = min(i0, i1)
-        return ('c', i, j0), ('c', i + 1, j0), f'azu{i}'
+        return ('c', i, j0), ('c', i + 1, j0), f'azu{i}@1'
 
     def c_cross(self, st, ka, kb):
         D = self.D
@@ -279,12 +295,13 @@ class BodyMesh:
                (ka[0] == 'r' and kb[0] == 'r' and ka[1] == kb[1])
         if same:                                             # azimuthal family
             ka, kb, fam = self._az(ka, kb)
+            nc = self.cnt[f'{fam}@{st.name}']
             p, q = D.P(*st.pos(ka)), D.P(*st.pos(kb))
             if ka[0] == 'r':
-                return D.arc(p, q, st.x, self.cnt[fam])      # an exact circle
+                return D.arc(p, q, st.x, nc)                 # an exact circle
             if st.on_wall(ka):
-                return D.spline(p, q, self._ray(st, ka, kb), self.cnt[fam])
-            return D.line(p, q, self.cnt[fam])
+                return D.spline(p, q, self._ray(st, ka, kb), nc)
+            return D.line(p, q, nc)
         p, q = D.P(*st.pos(ka)), D.P(*st.pos(kb))
         # RADIAL FAMILY.  Canonicalise inward -> outward before creating the
         # curve.  A block asks for this edge forwards on one side and BACKWARDS
@@ -303,22 +320,44 @@ class BodyMesh:
             return D.spline(p, q, self._ray(st, lo, hi), self.cnt[lab])
         return D.line(p, q, self.cnt[lab])
 
+    def shell_radius(self, seg, lev, x):
+        """Radius of shell boundary `lev` at station x, inside this segment.
+
+        Shell 1 is the inner boundary -- the wall on the body, the blend tube
+        upstream, the opening wake tube downstream.  Everything outside is a
+        zone radius, which MP.zone_r_out resolves (it is only x-dependent
+        where the wake zone opens out).
+        """
+        if lev == 1:
+            return float(self.inner_radius(seg['inner'], x))
+        return float(MP.zone_r_out(lev - 2, x))
+
     def c_axial(self, seg, s0, s1, key):
         D = self.D
         p, q = D.P(*s0.pos(key)), D.P(*s1.pos(key))
         lab = f"ax_{seg['name']}"
-        straight = (seg['inner'] == 'body'
-                    and seg['x0'] >= G.X_BODY_1 - 1e-12)   # cylinder + boattail
-        if key[0] == 'r' and key[1] == 1 and not straight \
-                and seg['inner'] in ('body', 'up'):
-            th = float(self.th[key[2]])
-            kind, x0, dx = seg['inner'], s0.x, s1.x - s0.x
-            def f(t):
-                x = x0 + t * dx
-                r = self.inner_radius(kind, x)
-                return (x, r * np.cos(th), r * np.sin(th))
-            return D.spline(p, q, f, self.cnt[lab])
-        return D.line(p, q, self.cnt[lab])
+        if key[0] != 'r':
+            return D.line(p, q, self.cnt[lab])
+        lev, j = key[1], key[2]
+        # A straight line is right only where the node path IS straight.  Two
+        # ways it is not: the inner boundary is a curved meridian (the nose and
+        # the upstream blend), and -- this is the new one -- theta itself moves,
+        # because the azimuthal relaxation is a function of x.  lam is monotone
+        # in x inside a segment, so equal lam at both ends means constant lam
+        # all the way across and the line is still exact.
+        curved = (seg['inner'] == 'body'
+                  and seg['x0'] >= G.X_BODY_1 - 1e-12)      # cylinder + boattail
+        bends = lev == 1 and not curved and seg['inner'] in ('body', 'up')
+        turns = abs(s1.lam[lev] - s0.lam[lev]) > 1e-12
+        if not (bends or turns):
+            return D.line(p, q, self.cnt[lab])
+        x0, dx = s0.x, s1.x - s0.x
+        def f(t):
+            x = x0 + t * dx
+            r = self.shell_radius(seg, lev, x)
+            th = MP.az_angle(j, MP.az_relax(x, r))
+            return (x, r * np.cos(th), r * np.sin(th))
+        return D.spline(p, q, f, self.cnt[lab])
 
     # =============================================================== faces ===
     def face_cross(self, st, quad, physical=None):

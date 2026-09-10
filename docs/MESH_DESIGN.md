@@ -341,6 +341,8 @@ para que no puedan crecer más que la zona que los contiene.
 | `N_AZ_CELLS` | 3 | celdas por bloque → 36 por cuadrante, 144 alrededor |
 | `AZ_BLOCK_GROWTH` | 1.50 | relación de anchos, desde los planos de simetría hacia adentro |
 | `AZ_FIN_H` | 5e-4 m | primera celda azimutal en r = R_BODY en el bloque que toca cada plano. `None` = uniforme |
+| `AZ_RELAX` | `True` | relaja las dos de arriba hacia uniforme lejos de las aletas — ver § *La distribución azimutal se relaja lejos de las aletas* |
+| `AZ_RELAX_X0` / `X1` / `R` | 0.80 / 2.029 / 0.35 m | dónde empieza y termina esa relajación, y hasta qué radio es completa |
 | `N_RING` | 10 | celdas a lo ancho del anillo butterfly |
 | `YPLUS_TARGET` | 32 | y⁺ en el **centro** de la primera celda; y₁ = 303 µm, 31 celdas dentro de δ |
 | `SEGMENTS` | `h_start, h_end` | tamaño axial por segmento. `None` = continuar desde el vecino |
@@ -460,10 +462,10 @@ ahí, y sacarlo pediría una distribución axial que varíe con el radio, o sea 
 topología. `fvSchemes` lleva `limited corrected 0.33` y
 `nNonOrthogonalCorrectors 1`.
 
-**Dos defectos diagnosticados y sin arreglar todavía.** Los dos se ven en el
-render y los dos están medidos; el trabajo no está hecho.
+**Un defecto diagnosticado y sin arreglar todavía.** Se ve en el render y está
+medido; el trabajo no está hecho.
 
-*(a) El tamaño de celda se invierte al cruzar r = FIN_TIP_R sobre la nariz.*
+*El tamaño de celda se invierte al cruzar r = FIN_TIP_R sobre la nariz.*
 Sólo el shell 0 se re-ajusta por estación (`buildHexBody._counts`); los shells
 de afuera conservan su ratio global. El borde interior del shell 0 es la pared y
 el exterior un cilindro fijo, así que hacia la nariz el span crece de 160 a
@@ -488,28 +490,89 @@ y el salto se muda a su borde exterior. Para que no cascadee tienen que seguir
 la pared **todos** los bordes de zona, y ahí el farfield deja de ser un cilindro
 — lo que toca el patch `box`, el blend del inlet y la apertura de la estela.
 
-*(b) La distribución azimutal de las aletas se aplica a todo el cuerpo.*
+### La distribución azimutal se relaja lejos de las aletas
+
 `AZ_BLOCK_GROWTH` y `AZ_FIN_H` agrupan celdas contra los dos planos de simetría
-en TODA estación axial, con max/min = 14.4 en el arco de celda:
+**porque ahí están las aletas**, y las aletas ocupan x ∈ [2.53, 2.93], el
+13.5 % del cuerpo:
 
 ```
 anchos de bloque [deg]: 2.17 3.25 4.87 7.31 10.96 16.44 16.44 10.96 7.31 4.87 3.25 2.17
 ```
 
-En la nariz a x = 0.10 eso da un arco de 0.134 mm contra 1.94 mm en el medio,
-conviviendo con una celda radial de 303 µm: relación de aspecto pésima donde a
-α = 0 el flujo es axisimétrico y la resolución azimutal no aporta nada. Las
-aletas ocupan x ∈ [2.53, 2.93], el **13.5 %** del cuerpo.
+Aplicada en toda estación, esa distribución daba en la nariz a x = 0.10 un arco
+de celda de 0.134 mm contra 1.94 mm en el medio (max/min = 14.4) conviviendo con
+una celda radial de 303 µm: relación de aspecto pésima donde a α = 0 el flujo es
+axisimétrico y la resolución azimutal no aporta nada. No costaba celdas — son 36
+por cuadrante igual — era cómo estaban repartidas.
 
-No cuesta celdas — son 36 por cuadrante de cualquier manera — es sólo cómo están
-repartidas. El arreglo es del mismo tipo que `finEdge`: que `th` sea función de
-x, uniforme en la nariz y mezclando hacia la distribución agrupada antes de las
-aletas. Lo único invasivo es que `az_coefs()` hoy da un coeficiente por bloque
-compartido entre estaciones y habría que hacerlo por estación.
+Ahora `th` es función de la estación **y del radio**:
 
-Mitigación de una línea mientras tanto: `AZ_BLOCK_GROWTH = 1.0` uniformiza los
-anchos de bloque y se lleva la parte 7.6:1 de esos 14.4, sin tocar `AZ_FIN_H` ni
-la resolución normal a la aleta. Sin medir.
+```
+th_j(x, r) = th_fin_j + lam(x, r) (th_uni_j - th_fin_j)
+lam(x, r)  = (1 - A(x)) min(1, AZ_RELAX_R / r)
+```
+
+`A(x)` es un smoothstep de 0 en `AZ_RELAX_X0` (fin de la nariz, x = 0.80) a 1 en
+`AZ_RELAX_X1` (`fin_x_start()`, x = 2.029), así que **la banda de la aleta y todo
+lo de aguas abajo conservan exactamente la malla que tenían**. Sobre la pared de
+la nariz el arco de celda pasa de 0.134 / 1.94 mm a 0.885 mm parejo: max/min
+14.4 → 1.00.
+
+**El 1/r no es cosmético, es lo que hace que esto se pueda pagar.** Relajar sólo
+en x — la lectura obvia — mueve todos los nodos que están en `th_j`, y en el
+farfield ese movimiento es r·dth = 11.775 × 12.4° = **2.55 m de arco**, que hay
+que soltar en los 1.23 m de cilindro disponibles: 64° de no-ortogonalidad de
+pendiente media, 72° en el pico del smoothstep, en todo el campo exterior. No es
+cuestión de ajustar nada; no hay largo de cilindro que alcance.
+
+Con el 1/r el nodo se corre `AZ_RELAX_R·dth`, **el mismo arco a cualquier
+radio**. Salen dos cosas de ahí. El corte axial deja de depender de r: 76 mm en
+1.23 m, 5.3° en el pico. Y afuera de `AZ_RELAX_R` el patrón queda *trasladado*,
+no abierto en abanico, que es la forma barata de moverlo: lo que se paga es la
+inclinación de las líneas radiales, atan(`AZ_RELAX_R`·dth/r) — 12.2° apenas
+afuera de `AZ_RELAX_R`, 4.3° en r = 1 m, 0.4° en el farfield. Adentro de
+`AZ_RELAX_R` no hay inclinación ninguna, porque ahí la relajación es una
+rotación pura.
+
+Por eso `AZ_RELAX_R` es el borde exterior de la banda radial fina (`ZONE_R[0]`,
+0.35 m) y no el radio del cuerpo: deja toda la capa límite y toda la envergadura
+de la aleta del lado sin inclinar, y manda la banda de 12° al campo grueso.
+Anclado en `R_BODY` la no-ortogonalidad media da 7.97°; en `ZONE_R[0]`, 7.65°,
+contra 7.56° sin relajar (`coarse`).
+
+Lo que se movió en el baseline `coarse` (la cuenta de celdas no se mueve: son
+las mismas 36 por cuadrante, repartidas distinto):
+
+| Métrica | Antes | Ahora | De dónde sale |
+|---|---|---|---|
+| arco de celda en la pared de la nariz, max/min | 43.34 | **3.00** | el arreglo. El 3.00 que queda es `H_SCALE_FIN = False`, que le deja 3 celdas a los bloques de la aleta y 1 al resto; a `H_SCALE 1` da 14.4 → **1.00** |
+| no-ortogonalidad media | 7.56° | 7.65° | la inclinación radial afuera de 0.35 m |
+| no-ortogonalidad máxima | 75.09° | 76.35° | casquete butterfly, ver abajo |
+| skewness máxima | 2.541 | 2.176 | |
+| volumen total | 6390.107 | 6390.663 | +87 ppm, ver abajo |
+
+Los dos que subieron:
+
+- **La máxima está en el casquete butterfly**, donde ya estaba. Ahí `lam = 1`,
+  o sea que el anillo que pega el cuadrado del núcleo contra el círculo interior
+  ve ahora arcos parejos en vez de agrupados, y ese mapeo cuadrado→círculo
+  encaja 1.26° peor (2.2 % en `fine`, y ahí también 5.7 % más caras arriba de
+  70°). Es el mismo bloque que ya daba el máximo de la malla; no aparece un
+  lugar malo nuevo. Lo que lo arreglaría de verdad no es esto: es que la arista
+  del núcleo se distribuya como `atan(v/a)` en vez de pareja, que es la
+  distribución angular que el anillo le pide. Es otro trabajo — toca el
+  butterfly, no la azimutal.
+- **El volumen** sube 87 ppm porque el farfield es un **polígono inscripto** en
+  el cilindro, y emparejar los arcos ahí (`lam ≈ 0.03` a r = 11.775) agranda un
+  poco el polígono. Los nodos siguen sobre el cilindro con 0.032 mm de error.
+
+`AZ_RELAX = False` reconstruye la malla anterior **exacta**, no parecida: con
+`lam = 0` en todas partes `az_angles()` y `az_coefs()` devuelven lo de antes y
+`c_axial()` vuelve a las rectas, así que las métricas de `coarse` dan los
+dígitos del baseline viejo. Eso es la configuración `norelax` de `check.py`, y
+está en el baseline: si algún día se mueve, lo que se movió no es la
+relajación.
 
 ### Calidad azimutal
 
