@@ -23,6 +23,9 @@ FoamFile
 //  Two sets, both a cylinder sector about the body axis, differing only in
 //  whether the region reaches the body wall:
 //
+//  The fin ends AT finTipR: the tip chamfer runs inboard of it, so nothing
+//  sticks out past that radius and rOut needs no allowance for finTipSmear.
+//
 //    finTip   an annular band around the fin TIP.  Starts at rIn, well
 //             outside the body, so it does NOT touch the boundary layer and
 //             y+ is unchanged.  This is the cheap one.
@@ -44,7 +47,7 @@ tipBand         0.050;      // m  thickness of the tip band, inward from the tip
 // ---- derived: do not edit --------------------------------------------------
 xLo             #eval{ $finX0 - $margin };
 xHi             #eval{ $finX1 + $margin + $wake };
-rOut            #eval{ $finTipR + $finTipSmear + $margin };
+rOut            #eval{ $finTipR + $margin };
 rIn             #eval{ $finTipR - $tipBand };
 
 actions

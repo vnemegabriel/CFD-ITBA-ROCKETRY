@@ -146,7 +146,7 @@ def drdx_body(x):
     return s if s.size > 1 else float(s[0])
 
 
-# ------------------------------------------------------------- fin sections --
+# ---------------------------------------------------------- profile queries --
 def x_at_slope(target):
     """Station on the NOSE where dr/dx equals `target` (slope decreases with x)."""
     lo, hi = 1e-9, L_NOSE
@@ -255,8 +255,21 @@ def fin_half_thickness(x, r, section='wedge', tip_smear=0.004):
 
     This is the field the mesh deformation reads.  It goes to zero CONTINUOUSLY
     at the leading and trailing edges, because the real fin is bevelled there --
-    which is what lets the fin be introduced without a topology change.  Only
-    the tip is a genuine discontinuity, so it is smeared over `tip_smear`.
+    which is what lets the fin be introduced without a topology change.
+
+    The TIP is a genuine discontinuity and the method cannot hold one: the fin
+    is an azimuthal deformation, so a square tip would need a face at constant
+    r spanning the thickness, with no cells inboard of it in that azimuthal
+    range and cells outboard -- which one conformal block structure cannot do.
+    The tip is therefore a CHAMFER, closing over `tip_smear` INBOARD of
+    FIN_TIP_R.  Inboard, not outboard: the semi-span is a number off the
+    drawing and the mesh has no business exceeding it.  Tapering outboard, as
+    this did, put the edge at 0.2395 instead of 0.2355 -- 4 mm of span and
+    1.7 % of planform the fin does not have, in the one place the tip vortex
+    is formed.
+
+    The chamfer the MESH ends up with is max(tip_smear, radial cell at the
+    tip), so tip_smear below FIN_H_R buys nothing: see docs/MESH_DESIGN.md.
     """
     x = np.atleast_1d(np.asarray(x, float))
     r = np.atleast_1d(np.asarray(r, float))
@@ -270,7 +283,7 @@ def fin_half_thickness(x, r, section='wedge', tip_smear=0.004):
     rb = np.broadcast_to(r, out.shape)
     xib = np.broadcast_to(xi, out.shape)
     cb = np.broadcast_to(chord, out.shape)
-    hi = FIN_TIP_R + max(tip_smear, 0.0)
+    hi = FIN_TIP_R
     # no lower radial bound: below the root chord the fin is buried in the body,
     # and the STL models it that way (full-thickness vertices sit at r = 0.07494)
     inside = (xib >= 0.0) & (xib <= 1.0) & (rb <= hi + 1e-12)
@@ -282,7 +295,7 @@ def fin_half_thickness(x, r, section='wedge', tip_smear=0.004):
         # integrates over, where it cost 112 s against 0.9 s vectorised.
         # Verified identical to the last bit for all five sections.
         out[inside] = fin_halfthickness(xib[inside], cb[inside], section)
-        if tip_smear > 0.0:      # taper the tip instead of ending on a cliff
+        if tip_smear > 0.0:      # chamfer inward instead of ending on a cliff
             out *= np.clip((hi - rb) / tip_smear, 0.0, 1.0)
     return out if out.size > 1 else float(out.reshape(-1)[0])
 

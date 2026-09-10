@@ -91,7 +91,7 @@ def window(r):
     price is a peak slope 1.5x the average, which is folded into the ~8 deg
     quoted above.
     """
-    r0 = G.FIN_TIP_R + max(MP.FIN_TIP_SMEAR, 0.0)
+    r0 = G.FIN_TIP_R
     r1 = MP.fin_edge_r_blend()
     t = np.clip((np.asarray(r, float) - r0) / (r1 - r0), 0.0, 1.0)
     return 1.0 - t * t * (3.0 - 2.0 * t)

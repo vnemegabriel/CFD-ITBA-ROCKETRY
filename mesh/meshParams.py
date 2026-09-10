@@ -133,7 +133,13 @@ def n_ring():
 # leading and trailing edges, so the deformation relaxes to zero there.
 FINS_ON      = True
 FIN_SECTION  = 'wedge'       # wedge | diamond | biconvex | naca | naca_te
-FIN_TIP_SMEAR = 0.004        # m, radial band over which the tip taper closes
+# Radial band over which the tip closes, measured INBOARD from FIN_TIP_R.
+# The method cannot make a square tip (see fin_half_thickness), so the tip is
+# a chamfer and this is its height -- but only if the mesh resolves it: what
+# you actually get is max(FIN_TIP_SMEAR, the radial cell at the tip), which is
+# FIN_H_R when that is set.  4 mm against the 6 mm cell of `fintip` means the
+# chamfer is 6 mm and the shape is whatever one cell gives.
+FIN_TIP_SMEAR = 0.004        # m
 
 # --- refinement around the fins ---------------------------------------------
 # Three directions, three knobs.
@@ -172,15 +178,26 @@ FIN_X_LEAD   = 0.500         # m   of cylinder ahead of the root LE to include
 # above FIN_LEAD_MAX_STRETCH.
 FIN_LEAD_MAX_STRETCH = 2.0   # of the approach block, at the fin tip
 
-# Spanwise: radial cell size AT THE FIN TIP.  None = no dedicated zone, the tip
-# gets whatever the ZONE stack gives there (12 mm at H_SCALE 1, 40 mm at 3).
-# A value inserts a zone boundary at the outer edge of the tip smear,
-# FIN_TIP_R + FIN_TIP_SMEAR, so the fin closes exactly on a node line; the
+# Spanwise: radial cell size AT THE FIN TIP.  It inserts a zone boundary AT
+# FIN_TIP_R, which is what makes the fin close exactly on a node line; the
 # radial stack grows from y1 to FIN_H_R over the span and continues outward
-# from there.  The zone is inserted into the ZONE_R/ZONE_H list at the right
-# radius -- WAKE_ZONE_K still indexes YOUR list.  Exempt from H_SCALE when
+# from there.  The zone goes into the ZONE_R/ZONE_H list at the right radius --
+# WAKE_ZONE_K still indexes YOUR list.  Exempt from H_SCALE when
 # H_SCALE_FIN = False.
-FIN_H_R      = 0.001          # m   e.g. 0.012
+#
+# None is not a neutral choice: without the node line the tip outline is
+# quantised again and the fin patch comes out +4.1 % on `coarse`.
+#
+# It also sets the tip CHAMFER, which is max(FIN_TIP_SMEAR, the radial cell
+# there) -- see fin_half_thickness.  12 mm is the working value: it matches
+# `coarse` and `medium`, and the chamfer only needs to be smaller than that if
+# you are after the tip vortex at incidence, which the Cd sweep is not.
+# `fintip` takes it to 6 mm when you are.  Going to 1 mm costs 10.9 M annular
+# cells at H_SCALE 1 against 3.0 M, and buys nothing at zero incidence.
+#
+# H_SCALE 6 (presets/smoke.py) cannot take a tip zone at all: scaled x6 it no
+# longer fits between the tip and ZONE_R[0].  That preset declares None itself.
+FIN_H_R      = 0.012          # m
 
 # --- fin edges ON the mesh, not across it -----------------------------------
 # The leading and trailing edges are swept: dx/dr = 1.56 at the LE, 0.62 at the
@@ -240,10 +257,14 @@ F_WAKE_OUT  = 0.50           # of the zone-0 radius at the outlet -> 0.350 m
 
 # --- derived: do NOT edit ----------------------------------------------------
 def fin_zone_r():
-    """Outer radius of the fin zone (None when FIN_H_R is off)."""
+    """Outer radius of the fin zone (None when FIN_H_R is off).
+
+    FIN_TIP_R itself, so the fin closes ON a node line: the tip chamfer runs
+    inboard of it and every node from there out is left where it was.
+    """
     if FIN_H_R is None or not FINS_ON:
         return None
-    return G.FIN_TIP_R + max(FIN_TIP_SMEAR, 0.0)
+    return G.FIN_TIP_R
 
 
 def shell_spec():

@@ -93,8 +93,7 @@ def wetted_area_analytic(n=2001):
     exceeds the nominal planform for two reasons that are geometry, not
     discretisation:
 
-      * the tip taper extends the fin FIN_TIP_SMEAR past FIN_TIP_R
-      * the bevels and the tip taper are inclined, so the surface is larger
+      * the bevels and the tip chamfer are inclined, so the surface is larger
         than its projection by sqrt(1 + (dt/dx)^2 + (dt/dr)^2)
 
     For the as-drawn wedge fin that is 376.0 cm2 against a 361.5 cm2 nominal
@@ -102,7 +101,7 @@ def wetted_area_analytic(n=2001):
     it was being blamed for.
     """
     section, smear = MP.FIN_SECTION, MP.FIN_TIP_SMEAR
-    hi = G.FIN_TIP_R + max(smear, 0.0)
+    hi = G.FIN_TIP_R
     x = np.linspace(G.FIN_ROOT_LE, G.FIN_TIP_TE, n)
     r = np.linspace(G.FIN_ROOT_R, hi, n)
     X, R = np.meshgrid(x, r, indexing='ij')

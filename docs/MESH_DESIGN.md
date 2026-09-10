@@ -1,47 +1,55 @@
-# Aconcagua — gmsh structured mesh: design notes
+# Aconcagua — malla estructurada en gmsh: notas de diseño
 
-*Why the mesh is built the way it is.  For how to use it see
-[WORKFLOW.md](WORKFLOW.md) (Spanish); every parameter is listed in
-[PARAMETERS.md](PARAMETROS.md); half and full meshes in
-[SECTORS_AND_AOA.md](SECTORES_Y_AOA.md).*
+*Por qué la malla está hecha así. Para usarla, [WORKFLOW.md](WORKFLOW.md); los
+parámetros uno por uno, [PARAMETROS.md](PARAMETROS.md); medias y completas,
+[SECTORES_Y_AOA.md](SECTORES_Y_AOA.md); la geometría, [GEOMETRÍA.md](GEOMETRÍA.md).*
 
-3,538,188 cells per quadrant, 100 % hexahedra, fins resolved, amplified wake.
-checkMesh: non-orthogonality max 86.7 deg, mean 5.35, 7,563 faces above 70 of
-10.7 million; skewness max 2.75.  Half (2 quadrants) and full (4) meshes are
-assembled from this quadrant with identical quality.
+Cuadrante 100 % hexaédrico, aletas resueltas, estela amplificada. Las medias
+(2 cuadrantes) y completas (4) se arman rotando y cosiendo este cuadrante, con
+la misma calidad por copia.
+
+**Los números de referencia no están en este archivo.** Los genera
+`python mesh/check.py --full` y viven en `mesh/check.baseline.json`, así que no
+envejecen cuando algo cambia. Lo que sí está acá son las razones.
 
 ---
 
-## 1. Mesh zones
+## 1. Zonas
 
-**Streamwise segments and radial levels.** Both axes are piecewise-linear so every
-block is visible — the picture is not to scale.
+Los dos ejes de la figura son lineales a trozos para que se vea cada bloque: no
+está a escala.
 
-![meridional zones](img/zones_meridional.png)
+![zonas meridionales](img/zones_meridional.png)
 
-The copper line is **shell 1**, the fine radial band. Downstream of the base it
-**opens out from 0.35 m to 0.70 m** so it tracks the spreading wake instead of the
-wake growing out of it. Plum is the butterfly core and ring, which exist only where
-the axis is fluid — upstream of the nose cap and downstream of the base.
+La línea cobre es el **shell 0**, la banda radial fina. Aguas abajo de la base
+**se abre de 0.35 m a 0.70 m** para seguir a la estela que se ensancha, en vez
+de que la estela se le salga. En ciruela, el núcleo butterfly y su anillo, que
+existen sólo donde el eje es fluido: aguas arriba del casquete de nariz y aguas
+abajo de la base.
 
-**Cross-plane tiling** of the quarter: 12 azimuthal blocks × 3 cells, block widths
-graded toward both symmetry planes because that is where the fins are. The butterfly
-core is a 6 × 6 grid of sub-blocks: a single quad core can present only two edges to
-the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
+![zonas en el plano transversal](img/zones_crossplane.png)
 
-![cross-plane zones](img/zones_crossplane.png)
+El cuarto de sección transversal lleva 12 bloques azimutales × 3 celdas, con los
+anchos de bloque graduados hacia los dos planos de simetría porque ahí están las
+aletas. El núcleo es una grilla de 18 × 18 sub-bloques: un núcleo cuadrado único
+sólo puede presentarle dos aristas al anillo, así que `N_AZ_BLOCKS > 2` obliga a
+un núcleo (N/2) × (N/2).
 
-| Level | Zone | Extent | Cells | Present where |
+| Nivel | Zona | Hasta | Celdas radiales | Existe donde |
 |---|---|---|---|---|
-| L0 | core | butterfly square, half-width 0.45·R_i | 18 × 18 | axis fluid only |
-| L1 | ring | square → inner circle R_i(x) | 10 radial | axis fluid only |
-| L2 | zone 0 | wall → `ZONE_R[0]` = 0.35 m (0.70 m at the outlet) | 57 radial | everywhere |
-| L3 | zone 1 | → `ZONE_R[1]` = 2.00 m | 21 radial | everywhere |
-| L4 | zone 2 | → `ZONE_R[2]` = 11.775 m — **this is the farfield** | 14 radial | everywhere |
+| L0 | núcleo | cuadrado de semiancho 0.45·Rᵢ | 18 × 18 | sólo con eje fluido |
+| L1 | anillo | cuadrado → círculo interior Rᵢ(x) | 10 | sólo con eje fluido |
+| L2 | zona de aleta | pared → `FIN_TIP_R` = 0.2355 m | 49 | siempre |
+| L3 | zona 0 | → `ZONE_R[0]` = 0.35 m (0.70 m en el outlet) | 7 | siempre |
+| L4 | zona 1 | → `ZONE_R[1]` = 2.00 m | 21 | siempre |
+| L5 | zona 2 | → `ZONE_R[2]` = 11.775 m — **este es el farfield** | 14 | siempre |
 
-| Segment | x₀ | x₁ | Axial cells | Wall patch |
+A `H_SCALE 1`: y₁ = 303 µm, 31 celdas dentro de δ = 38 mm, 91 celdas radiales
+en total, 144 azimutales alrededor.
+
+| Segmento | x₀ | x₁ | Celdas axiales | Patch de pared |
 |---|---|---|---|---|
-| up (×6) | −17.730 | 0.026 | 79 | — |
+| up (×6) | −17.730 | 0.026 | 80 | — |
 | nose (×14) | 0.026 | 0.800 | 153 | cone |
 | cyl | 0.800 | 2.029 | 102 | walls |
 | cylfin | 2.029 | 2.530 | 63 | walls |
@@ -51,492 +59,487 @@ the ring, so `N_AZ_BLOCKS > 2` requires an (N/2) × (N/2) core.
 | wake2 | 3.255 | 6.955 | 222 | — |
 | wake3 | 6.955 | 41.370 | 91 | — |
 
-`finchord` is the fin chord itself: its two bounding stations are bent onto the
-leading and trailing edges, so its 60 axial cells span 300 mm at the root and
-150 mm at the tip — the axial index IS the chord fraction.  `cylfin` is the
-approach: its upstream face is a plane and its downstream face is the leading
-edge, so it is `FIN_X_LEAD` long at the root and `FIN_X_LEAD` + 250 mm at the
-tip.  See *Fin edges on the mesh* and *What the sweep costs the approach*
-below.
-
-**Fins.** Planform and section:
-
-![fin planform and section](img/zones_fin.png)
-
-### Fin edges on the mesh, not across it
-
-The planform edges are swept: dx/dr = 1.5626 at the leading edge, 0.6249 at the
-trailing edge.  Axial stations that are PLANES therefore cross them in diagonal,
-and `finPatch.split_symm()` — which can only call a whole face wall or symmetry
-— quantises the outline to the cell.
-
-That rule cannot simply be made smarter.  At assembly a symmetry-plane face is
-merged into the interior only if all four of its nodes are still at z = 0, so
-"any node displaced -> wall" is forced by the topology, not chosen.  A centroid
-test would cut the area bias from +10.3 % to −0.2 % and break the stitch.  The
-input has to become exact instead:
-
-| | patch area vs planform | span rows | chord cells |
-|---|---|---|---|
-| H_SCALE 1 | +10.3 % | 50 | 81 |
-| H_SCALE 3 | +18.9 % | 16 | 27 |
-| H_SCALE 6 | +21.1 % | 8 | 14 |
-
-Always larger, never smaller, and because the wedge section has t → 0 at the
-leading edge the extra ring of faces carries almost no thickness: a serrated
-flange of near-zero thickness standing ahead of the real edge.
-
-`FIN_EDGE_FIT` shears the axial stations in the (x, r) plane instead —
-`x -> x + d(x, r)`, applied to the finished node array exactly the way
-`finPatch` applies the fin deformation, so no block is added and nothing is
-snapped:
-
-| anchor station | shift it carries |
-|---|---|
-| `fin_x_start()` = 2.4692 | 0, pinned |
-| `FIN_LE_X_WALL` = 2.5300 | `x_LE(r) − x_LE(R_BODY)` → lands on the leading edge |
-| `FIN_TE_X_WALL` = 2.830002 | `x_TE(r) − x_TE(R_BODY)` → lands on the trailing edge |
-| `X_BASE` = 2.9550 | `FIN_EDGE_TAIL_RELIEF ×` the above |
-| `X_BASE + X_WAKE_1` = 3.2550 | 0, pinned |
-
-The trailing edge needs no station of its own because it already has one: the
-fin root TE is at x = 2.830002 and the cylinder/boattail junction at 2.830000,
-2.5 µm apart, so `cyl_end()` moves the junction station those 2.5 µm rather
-than adding a second one.  That is not pedantry.  Left at 2.830000 the station
-sits 2.5 µm ahead of its own trailing edge, every node on it keeps a
-half-thickness of 0.7 µm instead of zero, `any` hands the entire first column
-of `tail` faces to the fin patch — 76 faces, +1.8 % of planform area — and the
-staircase is replaced by a strip.  The leading edge root lands on
-2.530001 = X_BASE − 0.425.  Neither number is luck (the fin was drawn to the
-body) but `validate()` asserts the trailing one rather than trusting it, since
-a change to `L_CYL` would silently break it.
-
-The wall does not move: every shift is measured from its own value at
-r = R_BODY and `G.fin_edge_x()` freezes below R_BODY, so d vanishes identically
-on the body surface.  `snap()` runs first and its nanometre result survives.
-
-*What it costs.*  A face lying on the leading edge is at 57.4 deg to the axial
-direction, because that IS the sweep, and no blend improves it while the radial
-lines are circles — the only way down is a collar wrapped around the planform
-edge, i.e. a different topology.  Measured at H_SCALE 3, quarter, with
-`FIN_H_R` = 12 mm:
-
-| | off | on |
-|---|---|---|
-| cells | 371,920 | 371,920 |
-| fin faces | 3,962 | 4,560 |
-| wetted area per half fin | +4.0 % | **−0.8 %** |
-| faces outside the true planform | ~1 cell all round | 0 |
-| non-orthogonality max | 74.92 deg | 74.92 deg |
-| faces above 70 deg | 658 | 658 |
-| faces above 40 deg | 3,999 | 65,947 |
-| skewness max | 4.578 | 4.578 |
-
-The −0.8 % is the reference, not the mesh: `wetted_area_analytic()` integrates
-from `FIN_ROOT_R` = 0.075, which is 0.5 mm inside the wall the mesh starts at
-(−0.40 %), and puts the surface on y = r rather than on the cylinder
-y = √(r² − t²) the deformation actually wraps it around (−0.24 %).  Not one
-face lies outside the planform, at either scale.
-
-The maximum is unchanged — it lives at the butterfly cap, not at the fin — and
-the shear adds no face above 70 deg.  What it does add is a large band between
-40 and 70, which is the shear itself and is the price of the edge.
-
-Gmsh's own `Curve In Surface` is not an alternative: embedded entities are
-supported only under the unstructured Delaunay and HXT algorithms, so an
-embedded curve and a transfinite block are mutually exclusive.  The edge has to
-be a block boundary, which is what this is.
-
-### What the sweep costs the approach
-
-Bending the downstream face of a block onto the leading edge stretches that
-block, because its upstream face is still a plane and its cell count is fixed
-along the radial index:
-
-    stretch = 1 + (FIN_TIP_LE − FIN_ROOT_LE) / FIN_X_LEAD = 1 + 0.2508 / L
-
-`FIN_X_LEAD` was 60 mm, chosen when the approach block was an ordinary
-constant-x band and 60 mm of lead was all it meant.  Against a 250 mm sweep it
-gives a stretch of 5.1: the block is 61 mm long at the root and 311 mm at the
-tip, and its 12 uniform cells go from 5 mm to 26 mm.  The axial sizes along the
-tip radius then run
-
-    5.0 mm  (cyl)  →  25.9 mm  (cylfin)  →  2.5 mm  (finchord)
-
-a 5:1 step up followed by a 10:1 step down, with the coarse island sitting
-exactly where the leading-edge shock is.  This is not something H_SCALE fixes:
-every size scales together, so the ratio is invariant.
-
-Two changes, and the parameter is now checked rather than left free:
-
-* `FIN_X_LEAD` is 500 mm, which puts the stretch at 1.50 and the cell at the
-  tip leading edge at 7.7 mm.
-* `cylfin` is GRADED from the cylinder size down to `FIN_H_X` instead of being
-  uniform at `FIN_H_X`, and `cyl` is no longer forced to end at `FIN_H_X`.
-  Uniform over 500 mm would be 100 cells; graded it is 32, and they sit against
-  the leading edge instead of being spread over half the cylinder.
-* `validate_params()` computes `fin_lead_stretch()` and refuses anything above
-  `FIN_LEAD_MAX_STRETCH` (2.0), naming the lead you need.
-
-Measured on `coarse`, quarter:
-
-| | lead 60 mm | lead 500 mm, graded |
-|---|---|---|
-| cells | 530,000 | **472,592** |
-| axial cell at the tip leading edge | 25.9 mm | **7.7 mm** |
-| non-orthogonality max | 75.09 deg | 75.09 deg |
-| faces above 70 deg | 1,165 | 1,165 |
-| faces above 40 deg | 89,089 | 115,649 |
-| non-orthogonality mean | 5.78 deg | 7.59 deg |
-| skewness max | 2.541 | 2.541 |
-
-Fewer cells and a 3.4x better leading-edge spacing, paid for in the band
-between 40 and 70 deg — the shear is now released over 500 mm of cylinder
-instead of 60 mm, so more of it is tilted.  The maximum does not move, because
-it lives at the butterfly cap and not at the fin.
-
-The side effect worth knowing: `cyl` now keeps the size `SEGMENTS` asks of it
-(12 mm at H_SCALE 1) instead of being silently graded down to `FIN_H_X` over
-its whole length.  The mid-cylinder is coarser than it was, which is where the
-57,000 cells went.  If you want it finer, that is `SEGMENTS['cyl']['h_end']`,
-which is what it is for.
-
-Going further would mean releasing the shear over the whole cylinder rather
-than over an approach block — 5.9 mm at the tip leading edge, but 144,725 faces
-above 40 deg and a mean of 9.1.  Not obviously worth it.
-
-### Volume refinement is a separate job
-
-None of this is the tool for making the CELLS around the fin smaller; it only
-makes them regular.  Local 2:1 refinement is `case-*/Allrefine`, which runs
-`topoSet` + `refineMesh` on a region `system/topoSetDict` reads out of
-`constant/meshInfo`.  Chordwise (`FIN_H_X`) and fin-normal (`AZ_FIN_H`)
-spacings are already local to the fin; the radial one is a cylinder that runs
-the length of the domain, and that is the one `Allrefine` exists to fix.
+`finchord` **es** la cuerda de la aleta: sus dos estaciones de borde están
+dobladas sobre los bordes de ataque y de fuga, así que sus 60 celdas axiales
+cubren 300 mm en la raíz y 150 mm en la punta — el índice axial *es* la fracción
+de cuerda. `cylfin` es la aproximación, con la cara de aguas arriba plana y la
+de aguas abajo sobre el borde de ataque.
 
 ---
 
-## 2. Parameters — `meshParams.py`
+## 2. Las aletas
 
-You give **cell sizes**; counts are derived from `c = (L−h₁)/(L−h_N)` and
-`n = 1 + ln(h_N/h₁)/ln c`. Both closed form.
+![planform y sección de la aleta](img/zones_fin.png)
 
-`meshParams.py` holds the defaults; anything in it can be overridden from
-`build.py` (`--preset`, `--scale`, `--sector`, `--set KEY=VALUE`) without
-editing, and the parameter set actually used is written next to every mesh as
-`<name>.params.py`.  The tables below describe the defaults.
+### Entran deformando, sin agregar bloques
 
-### Global coarsity — one number
-
-```python
-H_SCALE      = 1.0     # multiplies every cell size, divides every cell count
-H_SCALE_WALL = True    # False holds y1 (and y+) fixed while the rest scales
-```
-
-Everything re-solves from the scaled sizes, so distributions stay correct rather
-than being thinned out. `build.py --scale <H>` sets it from the command line.
-
-| `H_SCALE` | cells | non-orth mean | max skew | build |
-|---|---|---|---|---|
-| 0.8 | 7,430,784 | — | — | |
-| **1.0** | **3,538,188** | **1.49°** | 3.16 | ~2 min |
-| 2.0 | 590,304 | 1.71° | 2.72 | ~25 s |
-| 3.0 | 124,716 | 2.02° | — | ~10 s |
-| 4.0 | 70,596 | 2.26° | — | |
-| 6.0 | 30,768 | 2.73° | — | ~5 s |
-
-Set `H_SCALE_WALL = False` for a grid-convergence study: y⁺ stays at 32 while every
-other direction coarsens.
-
-### Refinement zones — the block to edit
-
-```python
-ZONE_R = [0.35, 2.00, 11.775]    # where each zone ENDS; LAST ONE IS THE FARFIELD
-ZONE_H = [0.020, 0.200, 1.600]   # cell size at the OUTER edge of each zone
-WAKE_ZONE_K   = 0                # which zone opens into the wake
-ZONE0_R_WAKE  = 0.70             # that zone's outer radius at the outlet
-WAKE_SPREAD_P = 0.5              # turbulent wake spreads as x^(1/2)
-F_INLET    = 0.63                # blend tube at the inlet, as a FRACTION of zone 0
-F_WAKE_OUT = 0.50                # blend tube at the outlet, same
-```
-
-`R_FAR` and `SHELLS` are **derived** from `ZONE_R`/`ZONE_H` — the farfield radius is
-stated once, as `ZONE_R[-1]`. The blend tubes are fractions rather than metres so they
-cannot outgrow the zone that contains them.
-
-`validate_params()` runs on every build and names what is wrong:
-
-| Rule | Error if broken |
-|---|---|
-| `ZONE_R` strictly increasing | `ZONE_R must increase: [...]` |
-| `ZONE_R[0] > R_BODY` | `ZONE_R[0] = ... is inside the body` |
-| `ZONE_R[k] ≤ ZONE0_R_WAKE < ZONE_R[k+1]`, k = `WAKE_ZONE_K` | that zone would close up, or swallow the next |
-| `FIN_X_LEAD` keeps the fin block start on the cylinder | names the resulting x and the valid range |
-| `FIN_X_LEAD` against the sweep | names the stretch, the cap, and the lead you need |
-| `H_SCALE > 0` | out of range |
-| `ZONE_H[k]` smaller than zone k | `ZONE_H[k] is not smaller than zone k, which is ... wide` |
-| `0 < F_INLET, F_WAKE_OUT < 1` | out of range |
-| `CORE_FRAC < 1/√2` | the core square would poke through its own ring |
-| `N_AZ_BLOCKS` even and ≥ 2 | the core grid is undefined otherwise |
-
-### Everything else
-
-| Parameter | Value | What it does |
-|---|---|---|
-| `N_AZ_BLOCKS` | 12 | azimuthal blocks per quadrant, **must be even** (the core is an (N/2)² grid) |
-| `N_AZ_CELLS` | 3 | cells per azimuthal block → 36 per quadrant, 144 around |
-| `AZ_BLOCK_GROWTH` | 1.50 | block-width ratio, from the symmetry planes inward |
-| `AZ_FIN_H` | 5e-4 m | first azimuthal cell at r = R_BODY in the block touching each symmetry plane. `None` = uniform |
-| `N_RING` | 10 | cells across the butterfly ring |
-| `YPLUS_TARGET` | 32 | y⁺ at the first cell **centre**; y₁ = 303 µm, 31 cells inside δ |
-| `SEGMENTS` | `h_start, h_end` | streamwise cell size. `None` = continue from the neighbour |
-| `F_UP_INLET` | 0.50 | inlet streamwise cell, as a fraction of the first upstream sub-block (capped by `F_UP_MAX`) |
-| `H_WAKE_BASE` | 5e-4 m | first cell off the flat base — it is a wall |
-| `CAP_R_FRAC` | 0.10 | butterfly cap rim / R_BODY. Rim 7.55 mm at x = 26.3 mm |
-| `CORE_FRAC` | 0.45 | core half-width / R_i. Must stay < 0.707 (validated) |
-| `X_WAKE_1` / `X_WAKE_2` | 0.30 / 4.00 m | near wake runs to 27 body diameters |
-| `WAKE_ZONE_K` | 0 | which zone opens into the wake |
-| `FIN_H_X` / `FIN_X_LEAD` | 0.005 / 0.500 m | streamwise cell over the fin chord, and the approach ahead of it |
-| `H_SCALE` / `H_SCALE_WALL` | 1.0 / `True` | global coarsity |
-| `UPSTREAM_L` / `DOWNSTREAM_L` | 6 / 13 | domain, in body lengths |
-| `FINS_ON` | `True` | |
-| `FIN_SECTION` | `'wedge'` | `wedge` / `diamond` / `biconvex` / `naca` / `naca_te` |
-| `FIN_TIP_SMEAR` | 0.004 m | radial band closing the tip taper |
-
-Geometry constants live in `aconcaguaGeom.py`: five numbers define the body
-(`L_NOSE`, `L_CYL`, `L_TAIL`, `R_BODY`, `R_BASE`), everything else derived, and
-`validate()` asserts the invariants.
-
-## 3. Scripts
-
-```
-python build.py --plan                    # print the plan before building anything
-python build.py --preset fine             # build -> snap -> fins -> audit -> write   (~2 min)
-python build.py --preset smoke            # pipeline test, ~25 s
-python build.py --preset medium --sector full
-cd <run>; ./Allmesh <file.msh>            # gmshToFoam -> meshInfo -> patch types -> checkMesh -> renumberMesh
-```
-
-| File | What it is |
-|---|---|
-| `aconcaguaGeom.py` | geometry of record, replaces the STL. Self-verifying. |
-| `meshParams.py` | defaults, validation, the cell-count solver.  The only file you normally edit |
-| `presets/*.py` | named parameter sets layered on the defaults |
-| `build.py` | the command line: presets, overrides, sector, output, sidecars |
-| `blockTools.py` | memoising structured-block layer over gmsh |
-| `buildHexBody.py` | the block topology |
-| `meshIO.py` | gmsh model -> numpy arrays; .msh v2.2 writer; `.meshInfo` / `.params.py` sidecars |
-| `meshFinish.py` | the quadrant pipeline: build, mesh, extract, snap, fit the fin edges, deform, classify |
-| `finEdge.py` | the shear that puts the fin leading and trailing edges on block boundaries |
-| `finPatch.py` | fin deformation and symmetry/fin face classification, on arrays |
-| `sectorAssembly.py` | quadrant -> half / full by rotate-and-stitch |
-| `meshQuality.py` | OpenFOAM's quality measures, computed before OpenFOAM does |
-| `../case-*/fixPatchTypes.py` | **run right after gmshToFoam, not optional**; types from `meshInfo` |
-
-Everything after `gmsh.model.mesh.generate(3)` works on plain arrays: no
-per-node gmsh API calls, one vectorised pass each for the snap and the fin
-deformation, and a writer that emits exactly what gmshToFoam consumes.  Only
-nodes referenced by a hexahedron are written, so spline control points never
-reach the file.
-
-Setup:
-
-```
-pip install gmsh numpy scipy
-sudo apt install libglu1-mesa     # Linux/WSL: import gmsh fails with OSError: libGLU.so.1 without it
-```
-
-The quadrant `.msh` is 520 MB ASCII — **generate it locally, do not copy it**;
-the `.params.py` sidecar rebuilds it.
-
-`gmshToFoam` makes every patch `type patch`. `symm` fails loudly; **`cone`/`walls`/
-`tail`/`fins` fail silently** — wall functions, yPlus and forceCoeffs all quietly
-wrong. `fixPatchTypes.py` sets them from the `patchTypes` entry of `meshInfo` and
-errors on anything unrecognised.
-
-Patches: `inlet` `outlet` `symm` `box` `cone` `walls` `tail` `fins` — 266,244 faces
-in the quadrant, exactly the boundary-face count (build.py checks this and refuses
-to write otherwise), so nothing lands in `defaultFaces`.
-
----
-
-## 4. Additional modifications
-
-### How the fins went in
-
-No blocks were added. The azimuthal coordinate is **deformed**:
+La coordenada azimutal se deforma:
 
 ```
 theta -> theta_f(x,r) + theta * (90 - 2 theta_f) / 90     theta_f = arcsin(t_half / r)
 ```
 
-A node that was on the symmetry plane lands at `z = -t_half`, which **is** the fin
-surface, exact to **0.0 nm**; wetted area 718.62 cm² against 723.00 cm² analytic.
+Un nodo que estaba en el plano de simetría aterriza en `z = -t_half`, que **es**
+la superficie de la aleta: geometría exacta, topología intacta. Funciona sólo
+porque la aleta real está biselada — el espesor va a cero de forma continua en
+el borde de ataque y en el de fuga, así que la deformación se relaja sola ahí.
+Los dos planos de simetría la reciben: el cuadrante contiene dos medias aletas,
+una en cada plano. `theta_f` vale 2.28° en la raíz y 0.73° en la punta.
 
-It works only because the real fin is bevelled — thickness goes to zero continuously
-at the leading and trailing edges, so the deformation relaxes to nothing there. Both
-symmetry planes get it: the quarter contains two half fins, one lying in each.
-`theta_f` is 2.28° at the root, 0.73° at the tip.
+**Qué cara es aleta.** Una cara del plano de simetría con *algún* nodo desplazado
+queda fuera del plano, así que es `fins`; sólo las que tienen los cuatro nodos
+quietos siguen siendo `symm`. Esa regla no se puede hacer más lista: al ensamblar
+sectores, una cara del plano se fusiona al interior únicamente si sus cuatro
+nodos siguen en z = 0, así que "algún nodo desplazado → pared" está **forzado por
+la topología**. Un test por centroide bajaría el sesgo de área de +10.3 % a
+−0.2 % y rompería el cosido. La misma función decide las dos cosas, así que el
+cuarto, la media y la completa no pueden discrepar (`sectorAssembly.py`).
 
-**Which faces are fin.** A symmetry-plane face with *any* displaced node is off the
-plane, so it is tagged `fins`; only faces whose four nodes stayed put remain `symm`.
-The patch therefore carries a one-cell rim around the planform, which shrinks
-first-order with `FIN_H_X` and `FIN_H_R`: against the exact wetted area of the
-deformed surface, 376.0 cm² per half-fin, the mesh gives +3.8 % at 5/12 mm,
-+2.0 % at 2.5/6 mm and +0.9 % at 1.25/3 mm.  The **normal** is right everywhere —
-the fin is a flat plate in the plane — so this is not the staircase that corrupts
-wall shear stress; it is a quantised outline.  Note that the exact reference is
-376.0 and not the 361.5 cm² nominal planform: the nominal figure omits the tip
-smear band and treats the bevels as flat, and comparing against it inflated the
-apparent discretisation error by about 4 %.  The same test decides, when two
-quadrants are stitched into a half or full mesh, which interface faces become
-interior and which stay as the two walls of the now full-thickness fin — one rule,
-so the quarter, half and full patches cannot disagree (see `sectorAssembly.py`).
+Lo que hay que arreglar entonces no es la regla, es su entrada.
 
-### Refining around the fins
+### Los bordes son frontera de bloque
 
-Three directions, three places to edit.
+Los bordes del planform tienen flecha: dx/dr = 1.5626 en el de ataque, 0.6249 en
+el de fuga. Estaciones axiales que son **planos** los cruzan en diagonal, y la
+clasificación cuantiza el contorno a la celda. El parche sale siendo el planform
+**dilatado una celda**, nunca más chico:
 
-| Direction | Parameter | Now | Effect |
+| | área del parche vs planform | filas en envergadura | celdas de cuerda |
 |---|---|---|---|
-| **azimuthal** | `AZ_FIN_H` | 5e-4 m | first cell off the fin surface → y⁺ ≈ 53 |
-| | `AZ_BLOCK_GROWTH` | 1.50 | how fast blocks widen away from the fin |
-| **streamwise** | `FIN_H_X` | 0.005 m | cell over the fin chord; splits `cyl` into `cyl` + `cylfin` and refines `tail`. `None` = off |
-| | `FIN_X_LEAD` | 0.500 m | approach block ahead of the root leading edge.  Coupled to the sweep: see *What the sweep costs the approach* |
-| | `FIN_LEAD_MAX_STRETCH` | 2.0 | cap on that block's stretch at the tip; `validate_params()` enforces it |
-| **radial** | `ZONE_R` / `ZONE_H` | see below | add a zone just outside the tip |
+| H_SCALE 1 | +10.3 % | 50 | 81 |
+| H_SCALE 3 | +18.9 % | 16 | 27 |
+| H_SCALE 6 | +21.1 % | 8 | 14 |
 
-What those settings currently produce:
+Y como el espesor va a cero en el borde de ataque, ese anillo de caras de más
+casi no tiene espesor: una pestaña serrada parada delante del borde real.
 
-| | value |
+`FIN_EDGE_FIT` corta las estaciones axiales en el plano (x, r) — `x -> x + d(x, r)`,
+aplicado al array de nodos terminado igual que la deformación de la aleta, sin
+agregar un bloque ni snapear nada:
+
+| Estación ancla | Corrimiento que lleva |
 |---|---|
-| first cell off the fin, azimuthal | 0.500 mm |
-| streamwise over the chord, `cylfin` x 2.4692 … 2.8300 | 5.000 mm, 72 cells |
-| streamwise over the boattail, `tail` | 5.000 mm, 25 cells |
-| radial at the fin tip, r − R = 0.16 m | 11.89 mm |
-| fin faces | 5,218 |
+| `fin_x_start()` = 2.0292 | 0, fija |
+| `FIN_LE_X_WALL` = 2.530001 | `x_LE(r) − x_LE(R_BODY)` → cae sobre el borde de ataque |
+| `FIN_TE_X_WALL` = 2.830002 | `x_TE(r) − x_TE(R_BODY)` → cae sobre el de fuga |
+| `X_BASE` = 2.9550 | `FIN_EDGE_TAIL_RELIEF ×` lo anterior |
+| `X_BASE + X_WAKE_1` = 3.2550 | 0, fija |
 
-**Radial refinement at the tip** is the one that needs a zone rather than a stack
-parameter. The tip sits at r = 0.2355 m, inside zone 0, where the radial stack has
-already grown to ~12 mm. `FIN_H_R` inserts a zone boundary at the outer edge of the
-tip smear (`FIN_TIP_R + FIN_TIP_SMEAR` = 0.2395 m, so the fin closes on a node line)
-with that radial size:
+Con eso un nodo **sobre** el borde de ataque tiene t = 0 exacto, nunca se
+desplaza, y la regla `any` cae sola sobre el contorno verdadero: no queda nada
+que cuantizar.
 
-```python
-FIN_H_R = 0.006          # presets/fintip.py
+El borde de fuga no necesita estación propia porque ya la tiene: la raíz del TE
+está en 2.830002 y la junta cilindro/boattail en 2.830000, a 2.5 µm. `cyl_end()`
+mueve la junta esos 2.5 µm en vez de agregar una segunda estación. **No es
+pedantería**: dejándola en 2.830000 cada nodo de esa estación conserva 0.7 µm de
+semiespesor en lugar de cero, `any` se lleva la primera columna entera de caras
+de `tail` al parche — 76 caras, +1.8 % de área — y el escalón se convierte en una
+tira. La raíz del LE cae en 2.530001 = X_BASE − 0.425. Ninguno de los dos números
+es casualidad, la aleta fue dibujada contra el cuerpo, pero `validate()` lo
+afirma en vez de confiar, porque un cambio de `L_CYL` lo rompería en silencio.
+
+**La pared no se mueve**: cada corrimiento se mide desde su propio valor en
+r = R_BODY y `G.fin_edge_x()` congela por debajo, así que `d` se anula idéntica
+sobre la superficie del cuerpo. `snap()` corre antes y su resultado en nanómetros
+sobrevive.
+
+**Lo que cuesta.** Una cara apoyada en el borde de ataque queda a 57.4° de la
+dirección axial, porque eso *es* la flecha. No baja mientras las líneas radiales
+sean círculos: el único camino es un collar envolviendo el borde del planform, o
+sea otra topología. Medido a `H_SCALE 3`, cuadrante, `FIN_H_R` = 12 mm:
+
+| | apagado | encendido |
+|---|---|---|
+| celdas | 371,920 | 371,920 |
+| caras de aleta | 3,962 | 4,560 |
+| área mojada por semialeta | +4.0 % | **−0.8 %** |
+| caras fuera del planform real | ~1 celda alrededor | **0** |
+| no-ortogonalidad máx | 74.92° | 74.92° |
+| caras > 70° | 658 | 658 |
+| caras > 40° | 3,999 | 65,947 |
+| skewness máx | 4.578 | 4.578 |
+
+El máximo no se mueve porque vive en el butterfly cap, no en la aleta. Lo que sí
+crece es la banda entre 40 y 70: ese es el corte, y es el precio del borde.
+
+El −0.8 % es la referencia, no la malla: `wetted_area_analytic()` integra desde
+`FIN_ROOT_R` = 0.075, que está 0.5 mm adentro de la pared donde arranca la malla
+(−0.40 %), y pone la superficie en y = r en vez del cilindro y = √(r² − t²) donde
+la deformación realmente la envuelve (−0.24 %).
+
+`Curve In Surface` de gmsh no es alternativa: las entidades embebidas sólo andan
+con los algoritmos no estructurados Delaunay y HXT, así que una curva embebida y
+un bloque transfinito se excluyen. El borde tiene que ser frontera de bloque.
+
+### Lo que la flecha le cuesta al bloque de aproximación
+
+Doblar la cara de aguas abajo sobre el borde de ataque **estira** ese bloque,
+porque la de aguas arriba sigue siendo un plano y la cantidad de celdas es fija
+a lo largo del índice radial:
+
+```
+estiramiento = 1 + (FIN_TIP_LE − FIN_ROOT_LE) / FIN_X_LEAD = 1 + 0.2508 / L
 ```
 
-That gives 85 cells from the wall to the tip at ratio 1.036, 6 mm at the tip instead
-of 12, and 129 radial cells in total against 92. The zone is inserted into the
-ZONE_R list at its radius, `WAKE_ZONE_K` keeps indexing the user's list, and every
-zone inside the wake zone opens with it in proportion downstream of the base — an
-inner zone that stayed cylindrical while the wake tube grew to 0.35 m at the outlet
-was squeezed to negative width, 816 inverted cells, which `build.py` refused to
-write. A transfinite block carries its radial count everywhere, so the fin zone's
-cells also run the length of the domain: that is the price of a fin zone, and why
-`fine` does not have one by default.
+Con los 60 mm que `FIN_X_LEAD` tenía cuando el bloque era una banda común, contra
+una flecha de 250 mm, eso da 5.1: 61 mm de largo en la raíz y 311 mm en la punta,
+con 12 celdas uniformes que pasan de 5 mm a 26 mm. Los tamaños axiales en el
+radio de la punta quedaban
 
-**Coarsening and the fin.** `H_SCALE_FIN = False` (the coarse and medium presets)
-exempts the fin from `H_SCALE`: `FIN_H_X`, `AZ_FIN_H`, the cell count of the two
-azimuthal blocks touching the fin, and `FIN_H_R`. With everything scaled by 3 the
-12 mm fin was one cell thick with its edges two cells apart — a bump with a fin's
-planform — and the `fins` patch carried a 30 % rim. The per-block azimuthal count
-is consistent because a core u-edge shares its count with the ring block it faces
-(`azu{i}` ↔ block N−1−i) and symmetric in k ↔ N−1−k, which the sector stitching
-needs.
+```
+5.0 mm (cyl)  →  25.9 mm (cylfin)  →  2.5 mm (finchord)
+```
 
-That clustering reaches the nose apex through the butterfly core (the core's
-edges share the ring blocks' azimuthal distributions), so the cells on the axis at
-the tip are ~0.1 mm across.  With the streamwise cell at the cap scaled to 4.5 mm
-the cap's boundary faces there reached skewness 4.6 (checkMesh flags > 4).
-`H_SCALE_WALL = False` therefore also holds the streamwise first cell at the tip and
-off the base, not just `y1`: 2.5 in the coarse preset against 2.75 in `fine`.
+un escalón 5:1 para arriba y 10:1 para abajo, con la isla gruesa justo donde va
+el choque del borde de ataque. **`H_SCALE` no lo arregla**: todos los tamaños
+escalan juntos, así que la relación es invariante.
 
-**Audit vs checkMesh.** `meshQuality.py` now uses OpenFOAM's own skewness
-definitions (internal faces normalised by the face extent in the skew direction,
-boundary faces against the owner's normal projection); an earlier version
-normalised by √area and over-reported stretched faces by 2–3×.  Non-orthogonality
-still differs (vertex-averaged vs volume-weighted cell centres): 75.9° here against
-86.7° in checkMesh on the same mesh.  checkMesh's numbers are the ones that count.
+Tres cambios:
 
-### Azimuthal quality
+* `FIN_X_LEAD` es 500 mm, lo que deja el estiramiento en 1.50 y la celda en el LE
+  de la punta en 7.7 mm.
+* `cylfin` está **graduado** desde el tamaño del cilindro hasta `FIN_H_X`, y `cyl`
+  ya no se fuerza a terminar en `FIN_H_X`. Uniforme sobre 500 mm serían 100
+  celdas; graduado son 32, y caen contra el borde de ataque.
+* `validate_params()` calcula `fin_lead_stretch()` y rechaza cualquier valor por
+  encima de `FIN_LEAD_MAX_STRETCH` (2.0), nombrando el lead que necesitás.
 
-| non-orth mean | **1.49°** |
+Medido en `coarse`, cuadrante:
+
+| | lead 60 mm | lead 500 mm graduado |
+|---|---|---|
+| celdas | 530,000 | **472,592** |
+| celda axial en el LE de la punta | 25.9 mm | **7.7 mm** |
+| no-ortogonalidad máx | 75.09° | 75.09° |
+| caras > 70° | 1,165 | 1,165 |
+| caras > 40° | 89,089 | 115,649 |
+| media | 5.78° | 7.59° |
+| skewness máx | 2.541 | 2.541 |
+
+Menos celdas y 3.4× mejor espaciado en el LE, pagado en la banda de 40 a 70.
+
+Efecto lateral: `cyl` ahora respeta el tamaño que le pide `SEGMENTS` (12 mm a
+`H_SCALE` 1) en vez de graduarse en silencio hasta `FIN_H_X` a lo largo de todo
+su largo. El cilindro medio quedó más grueso; ahí se fueron las 57 k celdas. Si
+lo querés más fino, `SEGMENTS['cyl']['h_end']` existe para eso.
+
+### La punta es un chaflán y no puede ser cuadrada
+
+La aleta es una deformación azimutal. Una punta **cuadrada** necesita una cara a
+r constante que cubra el espesor, con celdas del lado de afuera y ninguna del de
+adentro en ese rango azimutal. Una estructura de bloques conforme no lo da:
+adentro y afuera de `FIN_TIP_R` la parametrización azimutal difiere justo en
+`theta_f`, así que la celda que cruza la punta queda cortada azimutalmente a lo
+largo de su extensión radial, y ese corte **es** el chaflán. Haría falta un corte
+topológico, como el borde de ataque necesitó ser frontera de bloque. No hay
+perilla.
+
+Lo que sí estaba mal y está arreglado: el chaflán corría **hacia afuera** de
+`FIN_TIP_R`, así que la aleta llegaba a r = 0.2395 en vez de 0.2355 — 4 mm de
+envergadura y 1.7 % de planform que el vehículo no tiene, justo donde nace el
+vórtice de punta. Ahora cierra hacia adentro y `fin_zone_r()` pone la línea de
+nodos **en** `FIN_TIP_R`, así que la aleta termina sobre un nodo. Sin esa línea
+el contorno se vuelve a cuantizar: `coarse` con `FIN_H_R = None` da +4.1 % de
+área mojada contra −0.9 % con ella.
+
+El chaflán que queda es `max(FIN_TIP_SMEAR, celda radial en la punta)`, o sea que
+un smear por debajo de `FIN_H_R` no compra nada. Medido en `coarse`:
+
+| `FIN_H_R` | celda radial en la punta | chaflán | celdas/cuadrante | |
+|---|---|---|---|---|
+| `None` | 6.6 mm | 6.6 mm | 367,776 | sin nodo en la punta, contorno cuantizado |
+| **0.012** | 12.1 mm | 12.1 mm | 459,392 | default, y `coarse` |
+| 0.008 | 8.0 mm | 8.0 mm | 583,728 | |
+| 0.006 | 6.0 mm | 6.0 mm | 688,432 | `fintip` |
+| 0.004 | 4.0 mm | 4.0 mm | 884,752 | |
+| 0.003 (smear 2 mm) | 3.0 mm | 3.0 mm | 1,048,352 | |
+| 0.002 (smear 2 mm) | 2.0 mm | 2.0 mm | 1,329,744 | |
+
+Ojo con lo que hace `FIN_H_R = 0.012` en `coarse`: la pila natural ahí ya daba
+6.6 mm, así que la zona **engruesa** la punta a 12 mm y encima cuesta 92 k
+celdas. Lo que compra es la línea de nodos, que vale más. Si te importa el
+vórtice de punta, 0.006 te da las dos cosas.
+
+### El refinamiento de volumen es otro trabajo
+
+Nada de esto sirve para hacer las **celdas** alrededor de la aleta más chicas;
+sólo las hace regulares. El refinamiento local 2:1 es `case-*/Allrefine`, que
+corre `topoSet` + `refineMesh` sobre una región que `system/topoSetDict` lee de
+`constant/meshInfo`. Los espaciados de cuerda (`FIN_H_X`) y normal a la aleta
+(`AZ_FIN_H`) ya son locales; el radial es un cilindro que recorre todo el
+dominio, y ése es el que `Allrefine` existe para arreglar.
+
+**Coarsening y la aleta.** `H_SCALE_FIN = False` (presets `coarse` y `medium`)
+exime a la aleta de `H_SCALE`: `FIN_H_X`, `AZ_FIN_H`, `FIN_H_R` y la cantidad de
+celdas de los dos bloques azimutales que la tocan. Con todo escalado por 3 la
+aleta de 12 mm quedaba de una celda de espesor con los bordes a dos celdas: eso
+no es una aleta, es un bulto con su planform.
+
+---
+
+## 3. Parámetros — `meshParams.py`
+
+Vos das **tamaños de celda**; las cantidades salen de `c = (L−h₁)/(L−h_N)` y
+`n = 1 + ln(h_N/h₁)/ln c`. Las dos en forma cerrada, nada iterado.
+
+`meshParams.py` tiene los defaults, y todo se puede pisar desde `build.py`
+(`--preset`, `--scale`, `--sector`, `--set CLAVE=VALOR`) sin editar el archivo.
+El conjunto de parámetros que se usó de verdad se escribe al lado de cada malla
+como `<nombre>.params.py`, y ese archivo se puede volver a pasar con `--preset`.
+
+### Grosería global — un solo número
+
+```python
+H_SCALE      = 1.0     # multiplica cada tamaño de celda, divide cada cantidad
+H_SCALE_WALL = True    # False mantiene y1 (y por lo tanto y+) mientras el resto escala
+```
+
+Todo se vuelve a resolver desde los tamaños escalados, así que las
+distribuciones siguen siendo correctas en vez de quedar diezmadas.
+`build.py --scale <H>` lo pone desde la línea de comandos.
+
+Para un estudio de convergencia de malla, `H_SCALE_WALL = False`: y+ se queda en
+32 mientras el resto se engruesa.
+
+### Zonas de refinamiento — el bloque que se edita
+
+```python
+ZONE_R = [0.35, 2.00, 11.775]    # donde TERMINA cada zona; LA ÚLTIMA ES EL FARFIELD
+ZONE_H = [0.020, 0.200, 1.600]   # tamaño de celda en el borde EXTERIOR de cada zona
+WAKE_ZONE_K   = 0                # qué zona se abre hacia la estela
+ZONE0_R_WAKE  = 0.70             # radio exterior de esa zona en el outlet
+WAKE_SPREAD_P = 0.5              # una estela turbulenta se abre como x^(1/2)
+F_INLET    = 0.63                # tubo de blend en el inlet, como FRACCIÓN de la zona 0
+F_WAKE_OUT = 0.50                # tubo de blend en el outlet, igual
+```
+
+El radio de farfield se declara una sola vez, como `ZONE_R[-1]`: los shells se
+**derivan** de estas dos listas. Los tubos de blend son fracciones y no metros
+para que no puedan crecer más que la zona que los contiene.
+
+`validate_params()` corre en cada build y nombra lo que está mal:
+
+| Regla | Error si se rompe |
 |---|---|
-| non-orth max | 75.85° |
-| faces > 70° | 6,999 of 10,481,442 |
-| max skewness | 3.16 |
-| mean skewness | 0.012 |
+| `ZONE_R` estrictamente creciente | `ZONE_R must increase: [...]` |
+| `ZONE_R[0] > R_BODY` | la zona 0 estaría adentro del cuerpo |
+| `ZONE_R[k] ≤ ZONE0_R_WAKE < ZONE_R[k+1]`, k = `WAKE_ZONE_K` | esa zona se cerraría, o se comería a la siguiente |
+| `FIN_X_LEAD` deja el bloque de aletas sobre el cilindro | nombra la x resultante y el rango válido |
+| `FIN_X_LEAD` contra la flecha | nombra el estiramiento, el tope y el lead que necesitás |
+| la raíz del TE sobre la junta cilindro/boattail | `FIN_EDGE_FIT` no puede anclar el borde de fuga si no |
+| `ZONE_H[k]` más chico que la zona k | `ZONE_H[k] is not smaller than zone k` |
+| `0 < F_INLET, F_WAKE_OUT < 1` | fuera de rango |
+| `CORE_FRAC < 1/√2` | el cuadrado del núcleo atravesaría su propio anillo |
+| `N_AZ_BLOCKS` par y ≥ 2 | la grilla del núcleo queda indefinida |
 
-Two things produce this, and both are needed.
+### El resto
 
-**Radial curves are canonicalised inward → outward before creation.** A radial curve is
-edge 0 of one annulus block and edge 2 of its neighbour, so the two blocks request it in
-opposite directions, and whichever call reaches the memo first fixes the direction gmsh
-runs the progression in. Without canonicalisation one azimuthal column gets the intended
-wall-clustered stack and every other column gets its reciprocal — first radial cell
-11.5 mm against 30.5 mm at the same station, cells shrinking outward instead of growing.
-The same rule already applies to the azimuthal families in `_az`.
+| Parámetro | Valor | Qué hace |
+|---|---|---|
+| `N_AZ_BLOCKS` | 12 | bloques azimutales por cuadrante, **tiene que ser par** |
+| `N_AZ_CELLS` | 3 | celdas por bloque → 36 por cuadrante, 144 alrededor |
+| `AZ_BLOCK_GROWTH` | 1.50 | relación de anchos, desde los planos de simetría hacia adentro |
+| `AZ_FIN_H` | 5e-4 m | primera celda azimutal en r = R_BODY en el bloque que toca cada plano. `None` = uniforme |
+| `N_RING` | 10 | celdas a lo ancho del anillo butterfly |
+| `YPLUS_TARGET` | 32 | y⁺ en el **centro** de la primera celda; y₁ = 303 µm, 31 celdas dentro de δ |
+| `SEGMENTS` | `h_start, h_end` | tamaño axial por segmento. `None` = continuar desde el vecino |
+| `F_UP_INLET` | 0.50 | celda axial en el inlet, como fracción del primer sub-bloque (con tope `F_UP_MAX`) |
+| `H_WAKE_BASE` | 5e-4 m | primera celda contra la base plana — es una pared |
+| `CAP_R_FRAC` | 0.10 | radio del casquete butterfly / R_BODY. 7.55 mm en x = 26.3 mm |
+| `CORE_FRAC` | 0.45 | semiancho del núcleo / Rᵢ. Tiene que quedar < 0.707 |
+| `X_WAKE_1` / `X_WAKE_2` | 0.30 / 4.00 m | la estela cercana llega a 27 diámetros |
+| `FIN_H_X` / `FIN_X_LEAD` | 0.005 / 0.500 m | celda axial sobre la cuerda, y la aproximación delante |
+| `FIN_LEAD_MAX_STRETCH` | 2.0 | tope del estiramiento del bloque de aproximación |
+| `FIN_H_R` | 0.012 m | celda radial en la punta; también fija el chaflán |
+| `FIN_TIP_SMEAR` | 0.004 m | altura del chaflán de punta, hacia adentro de `FIN_TIP_R` |
+| `FIN_SECTION` | `'wedge'` | `wedge` / `diamond` / `biconvex` / `naca` / `naca_te` |
+| `UPSTREAM_L` / `DOWNSTREAM_L` | 6 / 13 | dominio, en largos de cuerpo |
 
-**Small angular spans.** A transfinite quad blends radius linearly in index, so the
-interpolation error scales with the block's arc-to-chord sagitta. The widest sector is
-now 16.4° (sagitta 0.0103) against 45° (0.0761).
+Las constantes de geometría viven en `aconcaguaGeom.py`: cinco números definen
+el cuerpo (`L_NOSE`, `L_CYL`, `L_TAIL`, `R_BODY`, `R_BASE`), todo lo demás se
+deriva, y `validate()` afirma los invariantes.
 
-### Still open
+---
 
-checkMesh counts 7,563 faces above 70° out of 10.7 million (the vertex-centred audit
-in `meshQuality.py` says 6,999 and a 75.9° maximum; checkMesh's volume-weighted
-centroids give 86.7°).  With `-allGeometry` it also flags 3,030 cells of aspect
-ratio up to 3,026: all in the farfield (r > 2 m) just behind the base, where the
-0.5 mm first streamwise cell off the base meets 1.6 m radial cells — a transfinite
-block carries one axial distribution across all radii.  Harmless there; removing it
-would need a radially varying axial distribution, i.e. a different topology.
-Neither is blocking; `fvSchemes` carries `limited corrected 0.33` and
+## 4. Scripts
+
+```
+python mesh/build.py --plan                 # imprime el plan sin construir nada
+python mesh/build.py --preset fine          # build -> snap -> aletas -> auditoría -> escritura
+python mesh/build.py --preset smoke         # prueba de pipeline, ~25 s
+python mesh/build.py --preset medium --sector full
+python mesh/check.py [--full]               # la batería de regresión
+cd <run>; ./Allmesh <archivo.msh>           # gmshToFoam -> meshInfo -> tipos -> checkMesh -> renumberMesh
+```
+
+| Archivo | Qué es |
+|---|---|
+| `aconcaguaGeom.py` | geometría de registro, reemplaza al STL. Se auto-verifica |
+| `meshParams.py` | defaults, validación, el solver de cantidades. El único que normalmente editás |
+| `presets/*.py` | conjuntos de parámetros con nombre, apilados sobre los defaults |
+| `build.py` | la línea de comandos: presets, overrides, sector, salida, sidecars |
+| `check.py` | la batería de regresión, contra `check.baseline.json` |
+| `blockTools.py` | capa de bloques estructurados con memoización sobre gmsh |
+| `buildHexBody.py` | la topología de bloques |
+| `meshIO.py` | modelo gmsh → arrays numpy; escritor .msh v2.2; sidecars |
+| `meshFinish.py` | el pipeline del cuadrante: construir, mallar, extraer, snap, ajustar bordes, deformar, clasificar |
+| `finEdge.py` | el corte que pone los bordes de la aleta sobre fronteras de bloque |
+| `finPatch.py` | deformación de aleta y clasificación de caras, sobre arrays |
+| `sectorAssembly.py` | cuadrante → media / completa, rotando y cosiendo |
+| `meshQuality.py` | las métricas de OpenFOAM, calculadas antes que OpenFOAM |
+| `../case-*/fixPatchTypes.py` | **se corre justo después de gmshToFoam, no es opcional** |
+
+Todo lo que pasa después de `gmsh.model.mesh.generate(3)` trabaja sobre arrays:
+ni una llamada a la API de gmsh por nodo, una pasada vectorizada para el snap y
+otra para la deformación, y un escritor que emite exactamente lo que gmshToFoam
+consume. Sólo se escriben los nodos que referencia algún hexaedro, así que los
+puntos de control de spline nunca llegan al archivo.
+
+```
+pip install gmsh numpy scipy
+sudo apt install libglu1-mesa    # Linux/WSL: sin esto, import gmsh tira OSError: libGLU.so.1
+```
+
+El `.msh` del cuadrante `fine` pesa cientos de MB en ASCII: **generalo local, no
+lo copies**, y usá `--out` para sacarlo de OneDrive. El sidecar `.params.py` lo
+reconstruye.
+
+`gmshToFoam` deja **todos** los patches como `type patch`. `symm` falla ruidoso;
+`cone`, `walls`, `tail` y `fins` fallan **en silencio** — wall functions, yPlus y
+forceCoeffs quedan mal sin decir nada. `fixPatchTypes.py` los pone desde la
+entrada `patchTypes` de `meshInfo` y da error con cualquier nombre que no
+reconozca.
+
+Patches: `inlet` `outlet` `symm` `box` `cone` `walls` `tail` `fins`. La cantidad
+de caras en patches tiene que dar exactamente igual a la de caras de borde —
+`build.py` lo chequea y se niega a escribir si no — así que nada cae en
+`defaultFaces`.
+
+`Aref` referencia **la sección transversal del cuerpo**, no la semi-envergadura
+de la aleta, por la fracción de 360° presente en la malla: 0.0044770 m² para el
+cuadrante, `lRef` = 0.1510 m. Los dos, y la lista de patches de pared, los
+escribe `build.py` en el sidecar `.meshInfo` que incluye `controlDict`:
+`forceCoeffs` aborta con un nombre de patch que no encuentra, y una lista
+mantenida a mano ya se desincronizó de la malla más de una vez.
+
+---
+
+## 5. Calidad
+
+### Contra el snappyHexMesh que reemplazó
+
+| | snappyHexMesh | esta malla (cuadrante) |
+|---|---|---|
+| hexaedros | 96.9 % | **100 %** |
+| poliedros / prismas | 67,047 / 10,045 | **0 / 0** |
+| celdas cóncavas | 6,026 | **0** |
+| caras ilegales | 11 | **0** |
+| celdas con volumen ≤ 0 | — | **0** |
+| celdas dentro de δ | 12–20 | **31** |
+| residuo en la pared | — | **0.00 nm** |
+| no-ortogonalidad media | 6.81° | **5.35°** |
+| máx aspect ratio | 24.7 | 3,026 (3,030 celdas en el farfield; 63 en el resto) |
+
+### Auditoría vs checkMesh
+
+`meshQuality.py` usa las definiciones de skewness de OpenFOAM (caras internas
+normalizadas por la extensión de la cara en la dirección del sesgo, caras de
+borde contra la proyección normal del owner). La no-ortogonalidad sí difiere,
+porque acá los centros de celda son promedios de vértices y en checkMesh son
+centroides pesados por volumen: ~76° acá contra ~87° en checkMesh sobre la misma
+malla. **Los números de checkMesh son los que cuentan.**
+
+### Lo que queda abierto
+
+Con `-allGeometry`, checkMesh marca celdas de aspect ratio alto, todas en el
+farfield (r > 2 m) justo detrás de la base, donde la primera celda axial de
+0.5 mm contra la base se encuentra con celdas radiales de 1.6 m: un bloque
+transfinito lleva una sola distribución axial a todos los radios. Es inofensivo
+ahí, y sacarlo pediría una distribución axial que varíe con el radio, o sea otra
+topología. `fvSchemes` lleva `limited corrected 0.33` y
 `nNonOrthogonalCorrectors 1`.
 
-### Toolchain constraints the code depends on
+**Dos defectos diagnosticados y sin arreglar todavía.** Los dos se ven en el
+render y los dos están medidos; el trabajo no está hecho.
 
-Each of these forces something in `blockTools.py` or `buildHexBody.py`. Changing that
-code without honouring them produces a mesh that builds and is wrong.
+*(a) El tamaño de celda se invierte al cruzar r = FIN_TIP_R sobre la nariz.*
+Sólo el shell 0 se re-ajusta por estación (`buildHexBody._counts`); los shells
+de afuera conservan su ratio global. El borde interior del shell 0 es la pared y
+el exterior un cilindro fijo, así que hacia la nariz el span crece de 160 a
+228 mm con las mismas 49 celdas y la misma primera celda de 303 µm:
 
-| Constraint | What it forces |
+| x [m] | r pared | span sh0 | ratio sh0 | última celda sh0 | 1ª celda sh1 | salto |
+|---|---|---|---|---|---|---|
+| 0.0263 (cap) | 0.0075 | 0.2279 | 1.0902 | 19.13 mm | 12.00 mm | **1.59** |
+| 0.10 | 0.0203 | 0.2152 | 1.0885 | 17.78 mm | 12.00 mm | 1.48 |
+| 0.40 | 0.0534 | 0.1821 | 1.0836 | 14.34 mm | 12.00 mm | 1.19 |
+| 0.80 (cilindro) | 0.0755 | 0.1600 | 1.0798 | 12.11 mm | 12.00 mm | 1.01 |
+
+No es que el ratio cambie mucho, es que **se invierte el signo**: las celdas
+crecen, se achican 1.59× y vuelven a crecer, justo donde se para el choque de
+proa a M ≥ 1.2.
+
+Lo correcto es que el borde del shell 0 sea un **offset constante desde la
+pared** (160 mm, que en el cilindro da exactamente 0.2355 y conserva la línea de
+nodos de la punta de aleta). `zone_r_out(k, x)` ya es función de x, así que la
+maquinaria está. La trampa: moviendo sólo ese borde, el span del shell 1 cambia
+y el salto se muda a su borde exterior. Para que no cascadee tienen que seguir
+la pared **todos** los bordes de zona, y ahí el farfield deja de ser un cilindro
+— lo que toca el patch `box`, el blend del inlet y la apertura de la estela.
+
+*(b) La distribución azimutal de las aletas se aplica a todo el cuerpo.*
+`AZ_BLOCK_GROWTH` y `AZ_FIN_H` agrupan celdas contra los dos planos de simetría
+en TODA estación axial, con max/min = 14.4 en el arco de celda:
+
+```
+anchos de bloque [deg]: 2.17 3.25 4.87 7.31 10.96 16.44 16.44 10.96 7.31 4.87 3.25 2.17
+```
+
+En la nariz a x = 0.10 eso da un arco de 0.134 mm contra 1.94 mm en el medio,
+conviviendo con una celda radial de 303 µm: relación de aspecto pésima donde a
+α = 0 el flujo es axisimétrico y la resolución azimutal no aporta nada. Las
+aletas ocupan x ∈ [2.53, 2.93], el **13.5 %** del cuerpo.
+
+No cuesta celdas — son 36 por cuadrante de cualquier manera — es sólo cómo están
+repartidas. El arreglo es del mismo tipo que `finEdge`: que `th` sea función de
+x, uniforme en la nariz y mezclando hacia la distribución agrupada antes de las
+aletas. Lo único invasivo es que `az_coefs()` hoy da un coeficiente por bloque
+compartido entre estaciones y habría que hacerlo por estación.
+
+Mitigación de una línea mientras tanto: `AZ_BLOCK_GROWTH = 1.0` uniformiza los
+anchos de bloque y se lleva la parte 7.6:1 de esos 14.4, sin tocar `AZ_FIN_H` ni
+la resolución normal a la aleta. Sin medir.
+
+### Calidad azimutal
+
+Dos cosas la producen, y las dos hacen falta.
+
+**Las curvas radiales se canonicalizan de adentro hacia afuera antes de
+crearlas.** Una curva radial es la arista 0 de un bloque anular y la arista 2 de
+su vecino, así que los dos la piden en direcciones opuestas y la primera llamada
+que llega al memo fija en qué sentido corre la progresión. Sin canonicalizar,
+una columna azimutal recibe la pila agrupada contra la pared y todas las demás
+reciben su recíproca: primera celda radial de 11.5 mm contra 30.5 mm en la misma
+estación, con las celdas achicándose hacia afuera en vez de crecer.
+
+**Spans angulares chicos.** Un cuadrilátero transfinito interpola el radio lineal
+en índice, así que el error escala con la sagita arco-cuerda del bloque. El
+sector más ancho es de 16.4° (sagita 0.0103) contra los 45° (0.0761) de antes.
+
+### Restricciones del toolchain de las que depende el código
+
+Cada una obliga algo en `blockTools.py` o `buildHexBody.py`. Cambiar ese código
+sin respetarlas produce una malla que se construye y está mal.
+
+| Restricción | Qué obliga |
 |---|---|
-| a memoised shared entity is created once, in whichever direction the first caller asks | canonicalise direction before creating any curve — radial, azimuthal, axial |
-| gmsh spaces transfinite points on a spline by **arc length, not parameter** | control points cannot dictate node positions; sample densely for curve accuracy and pass the real progression |
-| a power blend `ξ^q` with 1 < q < 2 has **unbounded curvature** at ξ = 0 | the upstream blend is tangent-matched, `Rᵢ² = r_cap² + 2 r_cap s_cap t + λt²` |
-| a transfinite quad drifts off a **curved** meridian by (linear blend of end radii − true radius) × (arc − chord) | the nose is 14 blocks with stations equidistributing \|r″\|^½; error falls as 1/n² |
-| every gmsh model Point carries a mesh node | `meshIO.extract()` keeps only the nodes a hexahedron references, so spline control points never reach the file |
-| a gmsh physical group is **per-surface**, but one block face carries both fin and symm | the fin patch is split at element level in the `.msh` |
-| `c ** n` overflows once n·ln c passes ~709 | `stack_sum` is log-guarded |
-| `gmshToFoam` types **every** patch `patch` | `fixPatchTypes.py` must list every patch and skip the `FoamFile` header |
-
-`Aref` references **the body cross-section**, not the fin semi-span, times the
-fraction of 360° in the mesh: `0.0044770 m²` for the quadrant, `lRef = 0.1510 m`.
-Both, and the wall patch list, are written by `build.py` into the `.meshInfo`
-sidecar that `controlDict` includes — `forceCoeffs` aborts on a patch name it
-cannot find, and a hand-maintained list drifted from the mesh more than once.
-
-## Current quality
-
-checkMesh -allGeometry -allTopology on the fine quadrant (OpenFOAM v2412), against
-the snappyHexMesh mesh it replaced:
-
-| | snappyHexMesh | this mesh (quadrant) |
-|---|---|---|
-| cells | 2,475,822 | 3,538,188 |
-| hexahedra | 96.9 % | **100 %** |
-| polyhedra / prisms | 67,047 / 10,045 | **0 / 0** |
-| concave cells | 6,026 | **0** |
-| illegal faces | 11 | **0** |
-| cells with volume ≤ 0 | — | **0** |
-| cells inside δ | 12–20 | **31** |
-| wall residual | — | **0.00 nm** |
-| max skewness | 2.51 | 2.75 |
-| max aspect ratio | 24.7 | 3,026 (3,030 farfield cells; 63 elsewhere) |
-| non-orth mean | 6.81° | **5.35°** |
-| non-orth max | — | 86.7° |
-| non-orth > 70° | 496 | 7,563 |
-| checkMesh | — | passes the default checks; fails 3 of `-allGeometry` (aspect ratio, determinant, interpolation weight) |
-| y⁺ on the fins | — | ~53 |
-
-The half and full meshes reproduce these numbers exactly, per copy.
+| una entidad memoizada se crea una sola vez, en la dirección del primero que la pide | canonicalizar la dirección antes de crear cualquier curva |
+| gmsh espacia los puntos transfinitos de un spline por **longitud de arco, no por parámetro** | los puntos de control no pueden dictar posiciones de nodo; muestrear denso y pasar la progresión real |
+| un blend potencia `ξ^q` con 1 < q < 2 tiene **curvatura no acotada** en ξ = 0 | el blend de aguas arriba se ajusta por tangente: `Rᵢ² = r_cap² + 2 r_cap s_cap t + λt²` |
+| un cuadrilátero transfinito se despega de un meridiano **curvo** | la ojiva se parte en 14 bloques con estaciones que equidistribuyen \|r″\|^½; el error cae como 1/n² |
+| cada Point del modelo gmsh carga un nodo de malla | `meshIO.extract()` se queda sólo con los nodos que referencia algún hexaedro |
+| un grupo físico de gmsh es **por superficie**, pero una cara de bloque lleva aleta y simetría a la vez | el parche de aleta se parte a nivel de elemento en el `.msh` |
+| `c ** n` desborda cuando n·ln c pasa ~709 | `stack_sum` está protegido en logaritmos |
+| `gmshToFoam` tipa **todos** los patches como `patch` | `fixPatchTypes.py` tiene que listarlos todos y saltear el header `FoamFile` |
+| las entidades embebidas de gmsh sólo andan con Delaunay y HXT | un borde no se puede embeber en un bloque transfinito: tiene que ser frontera de bloque |
