@@ -1,0 +1,50 @@
+#!/bin/sh
+# ./Allmesh [surface.stl]        default: Aconcagua.stl
+# Builds constant/polyMesh here.  Sizes are in system/meshDict.
+set -e
+cd "${0%/*}" || exit 1
+. "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
+
+check() {
+    grep -q "FOAM FATAL" "log.$1" 2>/dev/null && {
+        echo "!! $1 failed:"; grep -A4 "FOAM FATAL" "log.$1" | head -8; exit 1; }
+    return 0
+}
+
+SRC="${1:-Aconcagua.stl}"
+[ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
+
+rm -rf constant/polyMesh 0
+rm -f log.* surface.stl geometry.stl geometry.fms
+
+# STL solid names become patch names; the cases expect these four.
+sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
+    -e 's/^\( *\(end\)\?solid \)body\b/\1walls/' \
+    -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
+    "$SRC" > surface.stl
+
+# Metres out from the model bounding box, not multiples of it.
+runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
+    17.73 38.415 11.5395 11.5395 11.5395 11.5395
+check surfaceGenerateBoundingBox
+
+runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
+check surfaceFeatureEdges
+
+runApplication cartesianMesh
+check cartesianMesh
+
+runApplication createPatch -overwrite
+check createPatch
+
+runApplication checkMesh -allTopology -allGeometry
+check checkMesh
+
+N=$(awk '/^    cells:/{print $2; exit}' log.checkMesh)
+foamDictionary -entry nCells -set "$N" meshInfo > /dev/null
+
+echo
+grep -E "cells:|hexahedra:|prisms:|polyhedra:|negative cell volume|non-orthogonality Max|Max skewness|Failed|Mesh OK" \
+     log.checkMesh | sed 's/^/   /'
+echo
+echo "next: ../newCase.sh <run> --regime sub --Minf 0.2"

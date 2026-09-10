@@ -1,0 +1,18 @@
+/*--------------------------------*- C++ -*----------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// ============================================================================
+// cfMesh and createPatch need these to exist; nothing here solves anything.
+ddtSchemes           {}
+gradSchemes          {}
+divSchemes           {}
+laplacianSchemes     {}
+interpolationSchemes {}
+snGradSchemes        {}
+// ************************************************************************* //

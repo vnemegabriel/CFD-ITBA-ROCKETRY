@@ -82,3 +82,11 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# mesh build products
+mesh/constant/
+mesh/log.*
+mesh/case.foam
+mesh/surface.stl
+mesh/geometry.stl
+mesh/geometry.fms

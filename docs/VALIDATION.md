@@ -14,7 +14,7 @@ analíticas confiables, y recién después los compresibles.
 |---|---|---|
 | `Cl` a α = 0 en malla `half` o `full` | ≈ 0 | la costura entre cuadrantes o la deformación de la aleta no son simétricas |
 | `CmRoll` a α = 0 | ≈ 0 | idem |
-| y+ por patch | grueso de la distribución en 20 a 100 | la malla se construyó para otra velocidad, ver [PARAMETERS.md](PARAMETROS.md#flujo-la-malla-se-dimensiona-para-una-velocidad) |
+| y+ por patch | grueso de la distribución en 20 a 100 | ajustar `nLayers`, ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md#y) |
 | balance de `Cd` cuarto contra mitad | igual dentro de 1 % | `Aref` mal escalado, o el sector no es equivalente |
 | linealidad de `CN` entre α = 2° y 6° | pendiente constante | no convergió, o y+ fuera de rango en las aletas |
 
@@ -121,14 +121,13 @@ está haciendo efecto, o la malla es demasiado gruesa donde se forma el choque.
 
 Independiente del régimen, y necesaria para poder citar cualquier número:
 
-```bash
-for s in 3 2 1.4 1; do
-    python build.py --scale $s --set H_SCALE_WALL=False --sector half
-done
-```
+Cambiá `maxCellSize` en `mesh/system/meshDict` por factores de 2 y dejá los
+niveles quietos: eso escala todo el campo sin tocar la resolución relativa
+entre zonas. Una malla por valor, el mismo punto de Mach en todas.
 
-`H_SCALE_WALL = False` mantiene fija la primera celda de cada pared, así que
-y+ no se mueve y lo único que cambia es la resolución del campo. Graficá `Cd`
+Ojo con y+: el espesor de la primera capa sigue a la celda de superficie, así
+que se mueve con `maxCellSize`. Compensá con `nLayers` para que y+ quede en la
+misma banda en las cuatro mallas, o el estudio mezcla dos efectos. Graficá `Cd`
 contra `N^(-2/3)` y extrapolá; la pendiente te dice el orden observado y la
 ordenada al origen el valor extrapolado. El método está en Roache (1994),
 "Perspective: A Method for Uniform Reporting of Grid Refinement Studies",

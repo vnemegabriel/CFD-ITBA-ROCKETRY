@@ -5,7 +5,7 @@
 #     ./Allrefine tip        the same
 #     ./Allrefine fins       the whole fin, root to tip, reaching the body wall
 #
-# Runs BETWEEN ./Allmesh and ./Allrun, on a mesh with no fields yet.  The
+# Runs BEFORE ./Allrun, on a mesh with no fields yet.  The
 # region comes from system/topoSetDict, which reads the fin geometry from
 # constant/meshInfo, so it follows the fins if the geometry changes.
 #
@@ -35,7 +35,7 @@ case "${1:-tip}" in
 esac
 
 [ -d constant/polyMesh ] || {
-    echo "no mesh: run ./Allmesh <file.msh> first"; exit 1; }
+    echo "no mesh: run mesh/Allmesh first"; exit 1; }
 
 # refineMesh maps any fields it finds; running it on a case that already has
 # fields silently refines those instead of starting from a clean mesh.  Test

@@ -1,0 +1,136 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+|  cfMesh (cartesianMesh) settings for the Aconcagua.                         |
+|                                                                             |
+|  THE POINT OF THIS FILE IS THAT IT IS SHORT.  The structured generator it    |
+|  replaces carried 49 coupled parameters -- FIN_X_LEAD tied to the sweep,     |
+|  FIN_H_R setting both the tip cell and the chamfer, four AZ_RELAX anchors    |
+|  shaping a blend -- and getting one wrong produced a different mesh with no  |
+|  error.  Everything here is a LEVEL: an integer that halves a cell size,     |
+|  local to one patch or one box, with no coupling to anything else.  Get one  |
+|  wrong and the cells are visibly too big or too small, right there.          |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      meshDict;
+}
+// ============================================================================
+
+surfaceFile "geometry.fms";
+
+// The ONE size everything else is derived from.  Every `additionalRefinement-
+// Levels N` below means maxCellSize / 2^N:
+//
+//      level  4 -> 100    mm        level  9 ->  3.13 mm
+//      level  6 ->  25    mm        level 10 ->  1.56 mm
+//      level  8 ->   6.25 mm        level 11 ->  0.78 mm
+maxCellSize 1.6;
+
+// ---------------------------------------------------------------- surfaces --
+// One entry per patch of the .fms, which are the solids of Aconcagua.stl.
+// `refinementThickness` is how far the level is carried off the wall; below
+// that the octree grades back to maxCellSize on its own.
+localRefinement
+{
+    nosecone
+    {
+        // the bow shock stands off the tip: this is the band it lives in
+        additionalRefinementLevels 8;
+        refinementThickness 0.060;
+    }
+
+    body
+    {
+        additionalRefinementLevels 8;
+        refinementThickness 0.050;
+    }
+
+    boattail
+    {
+        // the expansion over the boattail sets the base pressure, and base
+        // drag is a large share of the Cd this mesh exists to produce
+        additionalRefinementLevels 8;
+        refinementThickness 0.050;
+    }
+
+    fins
+    {
+        // 3.13 mm against the 5 mm the structured mesh put on the chord, and
+        // the leading edge is a FEATURE EDGE, so it is meshed to rather than
+        // quantised to the cell.  Level 10 (1.56 mm) is affordable once the
+        // first run has shown what the levels below cost.
+        additionalRefinementLevels 9;
+        refinementThickness 0.020;
+    }
+}
+
+// ------------------------------------------------------------------ boxes --
+// Volume refinement, which is the thing the structured mesher could not do
+// locally: its radial zone was a cylinder running the whole 59 m of domain.
+objectRefinements
+{
+    nearField
+    {
+        type        box;
+        additionalRefinementLevels 5;      // 50 mm
+        centre      (1.500 0 0);
+        lengthX     3.400;
+        lengthY     1.000;
+        lengthZ     1.000;
+    }
+
+    wake
+    {
+        type        box;
+        additionalRefinementLevels 4;      // 100 mm
+        centre      (5.000 0 0);
+        lengthX     8.000;
+        lengthY     1.600;
+        lengthZ     1.600;
+    }
+
+    farWake
+    {
+        type        box;
+        additionalRefinementLevels 2;      // 400 mm
+        centre      (14.00 0 0);
+        lengthX     26.00;
+        lengthY     4.000;
+        lengthZ     4.000;
+    }
+}
+
+// ------------------------------------------------------------------ layers --
+// The boundary layer is EXTRUDED, not octree-refined, so y1 is set by nLayers
+// and thicknessRatio against the local surface cell rather than solved for.
+// Check y+ on the first run and tune nLayers; that is the one place where the
+// structured generator was more direct (it solved y1 from YPLUS_TARGET).
+boundaryLayers
+{
+    nLayers         10;
+    thicknessRatio  1.2;
+
+    patchBoundaryLayers
+    {
+        nosecone { nLayers 10; }
+        body     { nLayers 10; }
+        boattail { nLayers 10; }
+        fins     { nLayers 3; }
+    }
+
+    optimiseLayer 1;
+    untangleLayers 1;
+    optimisationParameters
+    {
+        nSmoothNormals   5;
+        maxNumIterations 5;
+        featureSizeFactor 0.3;
+        reCalculateNormals 1;
+        relThicknessTol  0.03;
+    }
+}
+
+// ************************************************************************* //

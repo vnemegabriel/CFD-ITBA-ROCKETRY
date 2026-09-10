@@ -1,5 +1,5 @@
 #!/bin/sh
-# Allrun -- run the case on the mesh brought in by ./Allmesh.
+# Allrun -- run the case on the mesh newCase.sh brought in.
 #
 #     ./Allrun            parallel, numberOfSubdomains from decomposeParDict
 #     ./Allrun 16         parallel on 16 cores (updates decomposeParDict)
@@ -10,7 +10,7 @@
 cd "${0%/*}" || exit 1
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
 
-[ -d constant/polyMesh ] || { echo "no mesh: run ./Allmesh <file.msh> first"; exit 1; }
+[ -d constant/polyMesh ] || { echo "no mesh: run mesh/Allmesh first"; exit 1; }
 
 # ---- consistency: angles vs sector -----------------------------------------
 SECTOR=$(foamDictionary -entry sector -value constant/meshInfo)

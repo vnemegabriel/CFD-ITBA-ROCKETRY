@@ -2,106 +2,65 @@
 
 Qué significa cada error y qué hacer. Los mensajes están citados como salen.
 
-## Construcción de la malla
+## La malla (`mesh/Allmesh`)
 
-**`refinement zones are inconsistent:` seguido de una lista**
-`validate_params()` encontró parámetros incompatibles antes de construir.
-Cada línea dice qué regla se rompió y con qué valores; la tabla de reglas
-está en [PARAMETERS.md](PARAMETROS.md#validación). El caso típico es agregar
-una zona a `ZONE_R` y olvidarse de `WAKE_ZONE_K`:
-`ZONE0_R_WAKE 0.7 >= ZONE_R[1] 0.35: zone 0 would swallow zone 1 at the outlet`.
+**`checkMesh` reporta volúmenes negativos**
+Casi siempre son las capas límite de las aletas. El borde de ataque es un filo
+y la aleta tiene 12 mm de espesor: la extrusión se enreda contra sí misma.
+Medido, mismo `meshDict` salvo `fins { nLayers }`:
 
-**`KeyError: presets/x.py: not a mesh parameter: ['ZONE_RR']`**
-Un nombre mal escrito en un preset o en `--set`. Antes era un no-op
-silencioso (la malla se construía con los defaults). La lista de nombres
-válidos está en el mismo mensaje y en `meshParams.OVERRIDABLE`.
+| `nLayers` en `fins` | celdas | vol ≤ 0 | no-ortog máx | skew máx | arista mín |
+|---|---|---|---|---|---|
+| 10 | 1,211,476 | **58** | 174.8° | 229.6 | 2.15 µm |
+| **3** | 862,462 | **0** | 78.6° | 14.6 | 12.2 µm |
+| 0 | 762,714 | 0 | 72.9° | 13.6 | 31.4 µm |
 
-**`cell size (...) is not smaller than the segment it has to fill`**
-Un `h_start`/`h_end` de `SEGMENTS` o un `ZONE_H` mayor que el tramo que tiene
-que llenar, casi siempre por un `H_SCALE` grande sobre un tramo corto (`tail`
-mide 125 mm). Bajar el tamaño o el `H_SCALE`.
+Con 3 alcanza. Si tocás la geometría de la aleta y vuelven a aparecer, bajá a
+2 antes de tocar cualquier otra cosa.
 
-**`interface nodes have no partner`** o **`interface planes carry N and M nodes`**
-El ensamblado de sectores necesita que el cuadrante sea simétrico respecto de
-45°. Aparece sólo tras editar `az_angles()`/`az_coefs()`/`az_relax()` en
-`meshParams.py` o `_counts()` en `buildHexBody.py` de forma asimétrica (la
-relajación azimutal es simétrica porque combina dos distribuciones que lo son,
-y `th[0] = 0` / `th[N] = 90°` valen para cualquier `lam`). Si `scipy` no está
-instalado el emparejamiento cae a redondeo exacto y puede fallar por ruido de
-punto flotante: `pip install scipy`.
+**`checkMesh` falla 6 chequeos pero sin volúmenes negativos**
+Es lo normal en esta malla: skewness 14.6, determinante chico en ~18 k celdas,
+caras con peso de interpolación bajo. Son chequeos de `-allGeometry`. Lo que
+hace inservible una malla son los volúmenes negativos y las caras compartidas
+por tres celdas; eso está en cero.
 
-**`!! boundary faces and patch faces disagree -- refusing to write`**
-Una cara de borde sin patch (iría a `defaultFaces` en OpenFOAM). En el
-cuadrante no debería pasar nunca; en un ensamblado indica que un par de caras
-de interfaz no se fusionó. Reportar con el `.params.py`.
+**Un paso falla pero `Allmesh` sigue**
+Ya no: `runApplication` devuelve 0 aunque la aplicación muera con
+`FOAM FATAL ERROR`, así que `Allmesh` revisa cada log. Si ves un paso que
+"pasó" y el siguiente se queja de un archivo que no existe, mirá el `log.` del
+anterior.
 
-**`ImportError: libGLU.so.1`** al importar gmsh en Linux/WSL:
-`sudo apt install libglu1-mesa`.
+**`FOAM FATAL IO ERROR: problem while reading header`**
+Un `*/` dentro del banner de comentario de un dict cierra el comentario antes
+de tiempo y OpenFOAM lee basura. Pasa al escribir rutas tipo `case-*/algo` en
+el encabezado.
 
-**`MemoryError` o el proceso muere en la auditoría de la malla completa**
-La auditoría de 14 M celdas necesita ~10 GB. `--no-audit` (el cuadrante se
-audita igual y las copias tienen su misma calidad).
+**La malla sale con el dominio equivocado**
+Los seis números de `surfaceGenerateBoundingBox` son **metros medidos desde la
+bounding box del modelo**, no múltiplos de ella. El utilitario imprime las dos
+cajas: mirá `log.surfaceGenerateBoundingBox`.
 
-**El build tarda mucho más que lo tabulado**
-`build.py` corre en serie. Con `mesh/output` en OneDrive, escribir 500 MB
-mientras OneDrive los sube puede duplicar el tiempo: `--out` a un directorio
-no sincronizado o excluir `output/` en OneDrive.
+**Quiero otra geometría**
+`./Allmesh mi_cohete.stl`. El STL tiene que traer los solids `nosecone`,
+`body`, `boattail` y `fins`; `Allmesh` los renombra a `cone`, `walls`, `tail`
+y `fins`.
 
-## Conversión y caso
+## El caso
 
-**`gmshToFoam`: `Can only read ascii msh files`** o falla en `$MeshFormat`
-El `.msh` no lo escribió `build.py` (que emite v2.2 ASCII). `gmsh` por
-defecto escribe v4.1, que `gmshToFoam` no lee.
+**`newCase.sh` dice `no mesh: run mesh/Allmesh first`**
+No existe `mesh/constant/polyMesh`. No se versiona: reconstruilo.
 
-**`fixPatchTypes.py`: `!! UNRECOGNISED PATCHES: ['defaultFaces']`**
-Caras sin grupo físico en el `.msh`. No seguir: reconstruir la malla.
+**`newCase.sh` se niega a arrancar**
+Nunca pisa un directorio existente. Elegí otro nombre o borralo.
 
-**`fixPatchTypes.py`: `!! EXPECTED BUT ABSENT: ['symm']`** o `UNRECOGNISED PATCHES: ['symm']`
-El `constant/meshInfo` no corresponde a esa malla (por ejemplo, un `meshInfo`
-de un cuarto con un `.msh` completo). `Allmesh` copia el sidecar que está
-**junto al `.msh`**; si se movió el `.msh` sin su `.meshInfo`, copiarlo a mano.
-
-**`Allrun`: `!! quarter mesh: two symmetry planes, alpha and beta must be 0`**
-Lo que dice. `--sector half` para `alpha`, `--sector full` para `beta`.
-Ver [SECTORS_AND_AOA.md](SECTORES_Y_AOA.md).
-
-**`forceCoeffs`: `Unknown patch name fins`** o `Cannot find patchField entry for symm`
-`constant/meshInfo` y la malla no coinciden (ver arriba), o alguien editó
-`wallPatches` a mano. En los campos de `0.orig/` la entrada `symm` puede
-sobrar sin problema (OpenFOAM ignora entradas de patches que no existen),
-pero **faltar** un patch en un campo sí es error.
-
-**Cambié `alpha` y la corrida sigue con `U = (100 0 0)`**
-Se usó `foamDictionary -set` sobre un archivo con `#eval` o `#include`
-(`controlDict`, un campo, o `flowDerived`). `foamDictionary` reescribe el
-archivo con todo evaluado y expandido, congelando los valores. Sólo
-`system/flowConditions` (números planos) se edita con `foamDictionary`; el
-resto con un editor o `sed`. Restaurar el archivo desde la plantilla (`case-subsonic/`, `case-transonic/` o `case-supersonic/`) o desde `git`.
-
-**`checkMesh`: `Failed 3 mesh checks`**
-Con `-allGeometry` es lo esperado en esta malla: aspect ratio > 1000 en
-~3 000 celdas del farfield detrás de la base, determinante < 0.001 en las
-celdas estiradas, y ~500 caras con peso de interpolación < 0.05. Ninguno
-afecta a `simpleFoam`. Lo que sí debe cumplirse: 100 % hexaedros,
-`Boundary openness OK`, no-ortogonalidad máx < 90°, skewness < 4. Detalle en
-[WORKFLOW.md](WORKFLOW.md#qué-es-normal-en-checkmesh).
-
-**`potentialFoam` o `simpleFoam` mueren en la primera iteración con `Phi` / `p`**
-Casi siempre un patch de pared que quedó `type patch` (se saltó
-`fixPatchTypes.py`) o el `symm` con `type patch`. `grep -A3 -E "^\s+(symm|cone|walls|tail|fins)" constant/polyMesh/boundary`.
-
-**Diverge o la continuidad crece**
-Bajar `relaxationFactors` (0.9 → 0.7 para `U`, 0.5 para `p` si se saca
-`consistent`), o correr 200 iteraciones con `div(phi,U) bounded Gauss upwind`
-antes de volver a `linearUpwind`. Con `alpha` grande (> 10°) el `potentialFoam`
-inicial con `-initialiseUBCs` es importante; verificar que corrió (`log.potentialFoam`).
+**`!! <plantilla> has no flowConditions entry 'X'`**
+Le pasaste una condición que esa plantilla no usa: `sub` toma
+`Uinf`/`nu`/`rhoInf`, `trans` y `super` toman `Minf`/`pInf`/`Tinf`.
 
 ## Refinado local (`./Allrefine`)
 
 **`!! constant/meshInfo carries no fin geometry (finTipR, finX0, ...)`**
-El `.meshInfo` es anterior al soporte de refinado. Reconstruí la malla con
-`mesh/build.py` para que el sidecar se escriba de nuevo; no hace falta cambiar
-ningún parámetro.
+El `constant/meshInfo` del caso es viejo. Copiá `mesh/meshInfo` encima.
 
 **`!! there is a 0/ directory: refine BEFORE running`**
 `refineMesh` mapea los campos que encuentra, así que corriendo después de
@@ -150,13 +109,11 @@ valor ignorado en silencio.
 
 ## Lo que se ve en ParaView
 
-**La aleta se ve como un bulto borroso / escalonada (preset `coarse` o `--scale` > 1)**
-Antes del 2026-09-06 los presets escalaban también la aleta: a `H_SCALE 3`
-quedaba con 15 mm sobre la cuerda, una celda de espesor y 40 mm radiales en
-la punta. Ahora `coarse` y `medium` llevan `H_SCALE_FIN = False` y
-`FIN_H_R = 0.012`, que mantienen la aleta a la resolución de `fine` mientras
-el resto se engrosa. Con `--scale` a mano, agregar `--set H_SCALE_FIN=False
---set FIN_H_R=0.012`. Ver [PARAMETERS.md](PARAMETROS.md#grosor-global).
+**La aleta se ve gruesa o escalonada**
+Subí el nivel de `fins` en `localRefinement` del `meshDict`. El borde de
+ataque lo sostiene la extracción de aristas de feature
+(`surfaceFeatureEdges -angle 30`), no el nivel: si el borde se ve redondeado,
+el problema es el ángulo, no el refinamiento.
 
 **Celdas en "X" (moño) en un Clip con plano**
 Aparecen cuando el plano del `Clip` pasa exactamente por nodos de la malla,
@@ -171,23 +128,23 @@ el origen del plano fuera de una capa de nodos.
 
 ## y+
 
-**y+ alto o bajo en TODAS las paredes por igual**
-La malla se construyó para otra velocidad. `U` en `meshParams.py` solo sirve
-para resolver `y1`; si corrés a otra `Uinf`, la primera celda no cambia y el
-y+ escala como `(U/nu)^0.9`. Con la malla de 100 m/s corrida a 272 m/s el y+
-pasa de 32 a 79. Reconstruí con `--set U=<la velocidad de la corrida>`. El
-aviso que imprime `Allrun` al arrancar te da el y+ estimado.
+**y+ no lo fijás vos**
+En cfMesh la capa límite se extruye: el primer espesor sale de `nLayers` y
+`thicknessRatio` contra la celda de superficie local, no de un y+ objetivo.
+Medilo en cada corrida con la función `yPlus` y ajustá `nLayers` o el nivel de
+refinamiento del patch.
 
-**y+ muy alto en `cone`/`walls`/`tail` con un preset**
-`smoke` escala la pared también (`H_SCALE_WALL = True`): y+ ≈ 200. Es un
-preset de prueba de pipeline, no de resultados. `coarse` y `medium` mantienen
-`y1`.
+**y+ distinto en cada punto de Mach**
+Esperable, y es la razón por la que el barrido usa una malla por punto: el
+primer espesor es geométrico y el y+ escala con la velocidad. Si el barrido
+tiene que comparar fricción entre puntos, ajustá `nLayers` por punto hasta que
+el y+ quede en la misma banda.
 
-**y+ muy alto en `fins` y razonable en el cuerpo**
-En las aletas el primer espaciamiento normal lo fija `AZ_FIN_H`, no
-`YPLUS_TARGET`. Con 0.5 mm da y+ ≈ 50 en la malla fina. Con `--scale` a mano
-y `H_SCALE_FIN = True` escala con todo (1 mm y ~100 a `H_SCALE 2`); los
-presets `coarse`/`medium` lo mantienen. Bajar `AZ_FIN_H` o subir `N_AZ_CELLS`.
+**y+ alto en `fins` y razonable en el cuerpo**
+Las aletas van con `nLayers 3` y el cuerpo con 10, así que el primer espesor
+ahí es mayor. Subir las aletas por encima de 3 enreda la extrusión: subí en su
+lugar el nivel de `fins` en `localRefinement`, que achica la celda de
+superficie y con ella la primera capa.
 
 ## Entorno
 

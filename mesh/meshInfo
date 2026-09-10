@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2412                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          meshInfo;
+}
+
+sector          full;
+
+symmetryFraction 1;
+
+fins            true;
+
+nCells          862340;
+
+Aref            0.0179081;
+
+lRef            0.151;
+
+rBody           0.0755;
+
+lBody           2.955;
+
+Uref            100;
+
+nuRef           1.5e-05;
+
+yPlusTarget     32;
+
+finRootR        0.075;
+
+finTipR         0.2355;
+
+finTipSmear     0.004;
+
+finX0           2.52922;
+
+finX1           2.93;
+
+wallPatches     ( cone walls tail fins );
+
+
+// ************************************************************************* //

@@ -1,0 +1,7 @@
+# One run per line:  <name> <newCase.sh options>
+# Blank lines and # are ignored.  ./run.sh runs them in series.
+m02  --regime sub    --Uinf 68
+m04  --regime sub    --Uinf 136
+m08  --regime trans  --Minf 0.8
+m12  --regime super  --Minf 1.2
+m18  --regime super  --Minf 1.8

@@ -5,9 +5,9 @@
 Qué resuelve cada plantilla, con qué modelo, y de dónde sale cada cosa. El objetivo de este documento es que puedas **rehacer las cuentas a mano** y verificar que el caso hace lo que dice.
 
 ```bash
-./newCase.sh ~/runs/x <malla.msh> --regime sub     # M < 0.3    simpleFoam
-./newCase.sh ~/runs/x <malla.msh> --regime trans   # 0.3 - 1.2  rhoSimpleFoam
-./newCase.sh ~/runs/x <malla.msh> --regime super   # M > 1.2    rhoCentralFoam
+./newCase.sh ~/runs/x --regime sub     # M < 0.3    simpleFoam
+./newCase.sh ~/runs/x --regime trans   # 0.3 - 1.2  rhoSimpleFoam
+./newCase.sh ~/runs/x --regime super   # M > 1.2    rhoCentralFoam
 ```
 
 ## 1. Panorama
@@ -107,7 +107,7 @@ con `νt = a₁k / max(a₁ω, S F₂)`. Ese denominador es el **limitador de te
 
 El objetivo es y+ ≈ 32 en el centro de la primera celda. **La malla se
 dimensiona para una velocidad**: ver
-[PARAMETERS.md](PARAMETROS.md#flujo-la-malla-se-dimensiona-para-una-velocidad).
+[WORKFLOW.md](WORKFLOW.md#3-el-barrido).
 `Allrun` estima el y+ que te va a quedar y avisa si se fue de banda.
 
 ## 4. Propiedades termofísicas (solo `trans` y `super`)
@@ -202,7 +202,7 @@ temperatura.
 
 `nNonOrthogonalCorrectors 1` acompaña a esos limitadores. Esta malla tiene
 7563 caras arriba de 70° de un total de 10.7 M, ver
-[MESH_DESIGN.md](MESH_DESIGN.md#current-quality).
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#la-malla-meshallmesh).
 
 ### Propios de `super`
 
