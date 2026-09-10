@@ -43,7 +43,7 @@ python build.py --preset medium --sector full     # 4.9 M celdas, ~4 min
 
 1. **Copias.** La copia k es el cuadrante rotado −90°·k alrededor de x (rotación propia: la orientación de los hexaedros se conserva).
 2. **Correspondencia de nodos.** El plano B (y = 0) de la copia k cae sobre el plano A (z = 0) de la copia k+1. Dos nodos de esos planos son el mismo nodo cuando tienen la misma (x, r), y la tienen exactamente porque el cuadrante es simétrico especularmente respecto de 45° (los anchos y las gradaciones azimutales están construidos así; `AZ_BLOCK_GROWTH` y `AZ_FIN_H` se
-   aplican desde ambos planos). El emparejamiento usa un KD-tree con tolerancia 1e-7 m y exige que sea uno a uno.
+   aplican desde ambos planos, y la relajación `AZ_RELAX` conserva la simetría porque interpola entre dos distribuciones que la tienen). El emparejamiento usa un KD-tree con tolerancia 1e-7 m y exige que sea uno a uno.
 3. **Las aletas.** Un nodo que la deformación de la aleta movió fuera del plano **no se fusiona**: queda como dos nodos, uno a +t/2 y otro a −t/2, que son las dos caras de la aleta de espesor completo. Las caras del plano cuyos cuatro nodos se fusionaron pasan a ser interiores y se descartan de ambos lados; las caras con algún nodo sobre la aleta son pared `fins` de ambos
    lados. Misma regla que clasifica las caras `symm`/`fins` del cuadrante `finPatch.split_symm`.
 4. **Auditoría.** La malla ensamblada se pasa por la misma auditoría que el cuadrante: si algún par de caras no se fusionó, aparece como cara de borde sin patch y `build.py` no escribe. Con `--no-audit` se salta este paso.

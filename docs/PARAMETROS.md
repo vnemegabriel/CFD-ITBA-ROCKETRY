@@ -81,6 +81,10 @@ Para la punta de las aletas hay un atajo: `FIN_H_R` (tabla de aletas) inserta la
 | `AZ_BLOCK_GROWTH` | 1.50 | relación de anchos entre bloques sucesivos, desde los planos de simetría hacia 45° |
 | `AZ_FIN_H` | 5e-4 m | primera celda azimutal en r = R_BODY en el bloque que toca cada plano: **es el espaciamiento normal a la aleta** (y+ ≈ 50 en la aleta). `None` = uniforme |
 | `N_RING` | 10 | celdas a través del anillo del butterfly |
+| `AZ_RELAX` | `True` | relaja las dos de arriba hacia la distribución uniforme lejos de las aletas: `th_j(x,r) = th_fin_j + lam·(th_uni_j − th_fin_j)` con `lam = (1 − A(x))·min(1, AZ_RELAX_R/r)`. `False` deja la distribución de la aleta en toda la malla |
+| `AZ_RELAX_X0` | `None` → `X_BODY_1` (0.80) | m, hasta acá `A = 0`: azimutal **uniforme**. Cubre la nariz, donde a α = 0 el flujo es axisimétrico |
+| `AZ_RELAX_X1` | `None` → `fin_x_start()` (2.029) | m, desde acá `A = 1`: la distribución de la aleta, intacta. Tiene que quedar aguas arriba de `FIN_ROOT_LE` y `validate_params()` lo chequea |
+| `AZ_RELAX_R` | `None` → `ZONE_R[0]` (0.35) | m, radio hasta el que la relajación es completa; afuera decae como 1/r. **No lo bajes a `R_BODY` sin leer** `MESH_DESIGN.md` § *La distribución azimutal se relaja*: el 1/r es lo que evita 64° de no-ortogonalidad en el farfield, y anclarlo en el radio del cuerpo mete la banda de 12° de inclinación radial adentro de la capa límite |
 | `CAP_R_FRAC` | 0.10 | radio del casquete butterfly sobre el cono / R_BODY |
 | `CORE_FRAC` | 0.45 | semiancho del núcleo cuadrado / radio interior local; < 0.707 |
 
@@ -120,13 +124,15 @@ La planform, el espesor y los biseles están en `aconcaguaGeom.py` ([GEOMETRY.md
 | `FIN_X_LEAD` deja el inicio del bloque de aletas sobre el cilindro | nombra la x resultante y el rango válido |
 | `0 < F_INLET, F_WAKE_OUT < 1`; `H_SCALE > 0`; `CORE_FRAC < 1/√2`; `N_AZ_BLOCKS` par | fuera de rango |
 | la zona de `FIN_H_R` no cae a menos de dos celdas de una entrada de `ZONE_R` | `FIN_H_R puts a zone boundary at r = ... within two cells of ZONE_R entry ...` |
+| `AZ_RELAX_X0 < AZ_RELAX_X1 ≤ FIN_ROOT_LE` | `the azimuthal relaxation has nowhere to happen` / `is inside the fin planform` |
+| `AZ_RELAX_R ≥ R_BODY` | `is inside the body ... the wall would keep part of the fin clustering` |
 | `SECTOR`, `FIN_SECTION` conocidos | |
 
 ### Derivados (no se editan)
 
 `shell_spec()`, `derived()` (Re, u_τ, y1, δ, celdas por shell),
-`axial_plan()`, `az_angles()`, `predicted_cells()`. `python meshParams.py`
-o `build.py --plan` los imprimen.
+`axial_plan()`, `az_angles(lam)` / `az_coefs(lam)` / `az_relax(x, r)`,
+`predicted_cells()`. `python meshParams.py` o `build.py --plan` los imprimen.
 
 ## Caso — `system/flowConditions`
 

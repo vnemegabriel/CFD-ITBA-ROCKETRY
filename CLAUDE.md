@@ -128,12 +128,17 @@ de malla.** No las toques sin preguntar, ni siquiera por micrones.
 - El refinamiento **de volumen** alrededor de la aleta no es trabajo del
   generador: es `case-*/Allrefine` (`topoSet` + `refineMesh` 2:1), que lee la
   geometría de `constant/meshInfo`.
+- **La distribución azimutal ya se relaja** (`AZ_RELAX*` en `meshParams.py`):
+  `th` es función de x **y de r**, uniforme sobre la nariz y agrupada desde
+  `fin_x_start()` en adelante. El `min(1, AZ_RELAX_R/r)` no se toca: relajar
+  sólo en x mete 64° de no-ortogonalidad en el farfield. Está explicado en
+  `docs/MESH_DESIGN.md` § *La distribución azimutal se relaja lejos de las
+  aletas*.
 
-**Dos defectos abiertos, diagnosticados y medidos**, en
-`docs/MESH_DESIGN.md` § *Lo que queda abierto*: el tamaño de celda se invierte
-al cruzar `FIN_TIP_R` sobre la nariz (salto 1.59 en el cap), y la distribución
-azimutal de las aletas se aplica a todo el cuerpo (arco max/min = 14.4). Los
-números ya están: no hace falta volver a medirlos.
+**Un defecto abierto, diagnosticado y medido**, en `docs/MESH_DESIGN.md`
+§ *Lo que queda abierto*: el tamaño de celda se invierte al cruzar `FIN_TIP_R`
+sobre la nariz (salto 1.59 en el cap). Los números ya están: no hace falta
+volver a medirlos.
 
 ---
 

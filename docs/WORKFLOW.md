@@ -211,7 +211,7 @@ conviene saber **qué ya está refinado y qué no**:
 |---|---|---|
 | cuerda (axial) | `FIN_H_X`, que parte `cyl` en `cyl` + `cylfin` | **sí**, sólo sobre la aleta |
 | bordes de ataque y de fuga | `FIN_EDGE_FIT`, que corre las estaciones axiales para que caigan sobre `x_LE(r)` y `x_TE(r)` | **sí**, y no agrega ni una celda |
-| normal a la aleta (azimutal) | `AZ_FIN_H` y los bloques que tocan los planos | **sí**, sólo cerca de la aleta |
+| normal a la aleta (azimutal) | `AZ_FIN_H` y los bloques que tocan los planos, con `AZ_RELAX` soltándolos aguas arriba | **sí**: agrupado desde `fin_x_start()` (x = 2.029) y uniforme sobre la nariz |
 | envergadura (radial) | `FIN_H_R`, una zona radial | **no**: es un cilindro que va del inlet al outlet |
 
 Las dos primeras ya son locales y no cuestan nada de más. La radial no puede

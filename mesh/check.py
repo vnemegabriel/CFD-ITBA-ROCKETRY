@@ -42,6 +42,9 @@ Chosen to exercise the paths that broke at least once each:
     half            sectorAssembly: nodes merged, faces made interior, the fin
                     faces NOT merged
     nofins          the FINS_ON = False path, which no preset covers
+    norelax         AZ_RELAX = False.  Freezes the mesh as it was before the
+                    azimuthal relaxation existed, so the relaxation can always
+                    be told apart from whatever else moved
     presets         every preset still validates
     roundtrip       a .params.py sidecar rebuilds the mesh it describes
     fine            the reference resolution
@@ -67,10 +70,11 @@ BUILDS = {
     'coarse+fintip': (['coarse', 'fintip'], {}, 'quarter'),
     'half':          (['coarse', 'fintip'], {}, 'half'),
     'nofins':        (['coarse'], dict(FINS_ON=False), 'quarter'),
+    'norelax':       (['coarse'], dict(AZ_RELAX=False), 'quarter'),
     'fine':          (['fine', 'fintip'], {}, 'quarter'),
 }
 FAST = ['smoke', 'coarse']
-FULL = ['smoke', 'coarse', 'coarse+fintip', 'half', 'nofins', 'fine']
+FULL = ['smoke', 'coarse', 'coarse+fintip', 'half', 'nofins', 'norelax', 'fine']
 
 PRESETS = ['coarse', 'medium', 'fine', 'fintip', 'wake_unsteady', 'smoke']
 

@@ -97,6 +97,46 @@ AZ_FIN_H        = 0.5e-3     # m, first azimuthal cell AT r = R_BODY inside the
                              # block is uniform too.
 N_RING  = 10                 # cells across the butterfly ring
 
+# --- where that clustering is allowed to exist ------------------------------
+# The grading above is FOR THE FINS, and the fins are 13.5 % of the body.
+# Applied at every station it put a 0.134 mm arc against a 1.94 mm one on the
+# nose (max/min = 14.4) next to a 303 um radial cell, at alpha = 0, where the
+# flow is axisymmetric and azimuthal resolution buys nothing.  So the block
+# boundaries RELAX toward the uniform distribution away from the fins:
+#
+#     theta_j(x, r) = theta_fin_j + lam(x, r) (theta_uni_j - theta_fin_j)
+#     lam(x, r)     = (1 - A(x)) min(1, AZ_RELAX_R / r)
+#
+# A(x) smoothsteps from 0 at AZ_RELAX_X0 to 1 at AZ_RELAX_X1, so the fin band
+# and everything downstream of it keeps exactly the distribution it had.
+#
+# THE 1/r IS NOT COSMETIC, IT IS THE WHOLE REASON THIS IS AFFORDABLE.  A
+# relaxation in x alone -- the obvious reading of the defect note -- moves
+# every node sitting at theta_j, and at the farfield that move is
+# r dtheta = 11.775 x 12.4 deg = 2.55 m of arc, released over the 1.23 m of
+# cylinder there is room for: 64 deg of non-orthogonality on the average
+# slope, 72 at the smoothstep peak, through the whole outer field.  It is
+# not a tuning problem; no length of cylinder available fixes it.
+#
+# With the 1/r the node moves by r lam dtheta = AZ_RELAX_R dtheta, THE SAME
+# ARC AT EVERY RADIUS.  Two things follow.  The streamwise shear stops
+# depending on r -- 76 mm over 1.23 m, 5.3 deg at the peak.  And the pattern
+# outside AZ_RELAX_R is the fin pattern TRANSLATED, not fanned out, which is
+# the cheapest way to move it: the cost is the tilt of the radial lines,
+# atan(AZ_RELAX_R dtheta / r) -- 12.2 deg just outside AZ_RELAX_R, 4.3 at
+# r = 1 m, 0.4 at the farfield.  Inside AZ_RELAX_R there is no tilt at all,
+# because there the relaxation is a pure rotation.  That is why AZ_RELAX_R is
+# the OUTER edge of the fine radial band and not the body radius: it puts the
+# whole boundary layer, and the fin span, inside the tilt-free part and leaves
+# the 12 deg band out in the coarse field.  Anchored at the body radius the
+# mean non-orthogonality is 7.97 deg; at ZONE_R[0] it is 7.65, from 7.56 in
+# the unrelaxed mesh (coarse).
+AZ_RELAX    = True           # False restores the fin distribution everywhere
+AZ_RELAX_X0 = None           # m, fully relaxed at and below this x.  None = X_BODY_1
+AZ_RELAX_X1 = None           # m, fin distribution from here on.  None = fin_x_start()
+AZ_RELAX_R  = None           # m, radius the relaxation is complete out to, and
+                             # from which it decays as 1/r.  None = ZONE_R[0]
+
 
 def n_az_cells():
     return _n(N_AZ_CELLS, 1)
@@ -626,34 +666,94 @@ def r_wake_out():
 
 
 # ---------------------------------------------------------------- azimuthal --
-def az_angles():
-    """Azimuthal BLOCK boundaries, 0 .. 90 deg, in radians.
+_AZ_ENDS = {}
 
-    Widths grow from both symmetry planes inward by AZ_BLOCK_GROWTH, mirrored
-    about 45 deg, so the finest blocks sit where the fins are.
-    """
+
+def _az_cum(q):
+    """Cumulative block boundaries for a width ratio q, 0 .. 90 deg."""
     n = N_AZ_BLOCKS
     if n % 2:
         raise ValueError(f'N_AZ_BLOCKS must be even, got {n}')
     half = n // 2
-    q = float(AZ_BLOCK_GROWTH)
-    w = np.array([q ** k for k in range(half)], dtype=float)
+    w = np.array([float(q) ** k for k in range(half)], dtype=float)
     w = np.concatenate([w, w[::-1]])
     w *= (np.pi / 2.0) / w.sum()
     return np.concatenate([[0.0], np.cumsum(w)])
 
 
-def az_coefs():
+def az_ends():
+    """The two distributions everything azimuthal interpolates between:
+    (uniform, fin-clustered).  Memoised -- a spline sampler calls this per
+    control point.  Both start at 0 and end at 90 deg exactly, which is what
+    keeps the two symmetry planes where the sector stitch needs them."""
+    key = (N_AZ_BLOCKS, float(AZ_BLOCK_GROWTH))
+    if key not in _AZ_ENDS:
+        _AZ_ENDS[key] = (_az_cum(1.0), _az_cum(AZ_BLOCK_GROWTH))
+    return _AZ_ENDS[key]
+
+
+def az_blend(x):
+    """A(x): 0 where the azimuthal grading is fully relaxed, 1 where it is the
+    fin distribution.  Smoothstep, so there is no kink at either anchor."""
+    if not AZ_RELAX:
+        return 1.0
+    x0 = G.X_BODY_1 if AZ_RELAX_X0 is None else float(AZ_RELAX_X0)
+    x1 = fin_x_start() if AZ_RELAX_X1 is None else float(AZ_RELAX_X1)
+    t = min(max((float(x) - x0) / (x1 - x0), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def az_relax(x, r):
+    """lam(x, r): how far the azimuthal distribution is relaxed toward uniform
+    at this station and radius.  1 = uniform, 0 = the fin distribution.
+
+    min(1, R/r) rather than a window in r, so that OUTSIDE r = R every node
+    carries the same tangential offset R dtheta instead of the same angle.
+    A constant offset translates a radial line; a constant angle fans it out,
+    and the fanning is what would cost skew.  Inside r = R the offset is r
+    dtheta, i.e. a plain rotation, which costs nothing either -- the two meet
+    with a kink at r = R and nowhere else."""
+    if not AZ_RELAX:
+        return 0.0
+    R = float(ZONE_R[0] if AZ_RELAX_R is None else AZ_RELAX_R)
+    return (1.0 - az_blend(x)) * min(1.0, R / max(float(r), 1e-12))
+
+
+def az_angles(lam=0.0):
+    """Azimuthal BLOCK boundaries, 0 .. 90 deg, in radians, relaxed by `lam`.
+
+    Widths grow from both symmetry planes inward by AZ_BLOCK_GROWTH, mirrored
+    about 45 deg, so the finest blocks sit where the fins are.  lam = 0 is that
+    distribution; lam = 1 is the uniform one; anything between is a convex
+    combination of the two, hence still monotone and still mirror-symmetric
+    about 45 deg.  az_relax() supplies lam.
+    """
+    thu, thf = az_ends()          # az_ends() memoises: hand back a copy, not it
+    return thf.copy() if lam <= 0.0 else thf + float(lam) * (thu - thf)
+
+
+def az_angle(j, lam=0.0):
+    """One block boundary.  Scalar form, for the axial spline samplers."""
+    thu, thf = az_ends()
+    return float(thf[j] + float(lam) * (thu[j] - thf[j]))
+
+
+def az_coefs(lam=0.0):
     """Progression coefficient for each azimuthal block, in canonical
     (increasing theta) direction.  Only the two blocks touching a symmetry
-    plane are graded; the rest are uniform."""
-    th = az_angles()
+    plane are graded; the rest are uniform.
+
+    Relaxed GEOMETRICALLY, k -> k^(1-lam), so lam = 1 lands on exactly 1.0 and
+    lam = 0 on exactly the coefficient AZ_FIN_H asks for.  Blending the
+    coefficient this way keeps the interior nodes of the block moving by the
+    same constant tangential offset as its boundaries."""
     c = [1.0] * N_AZ_BLOCKS
     nc = n_az_cells_block(0)
     if AZ_FIN_H is not None:
-        arc0 = G.R_BODY * (th[1] - th[0])
+        _, thf = az_ends()
+        arc0 = G.R_BODY * (thf[1] - thf[0])
         if _hf(AZ_FIN_H) < arc0 / nc:
-            k = refit(arc0, nc, _hf(AZ_FIN_H))
+            k = refit(arc0, nc, _hf(AZ_FIN_H)) ** (1.0 - float(lam))
             c[0] = k                       # cluster at theta = 0
             c[-1] = 1.0 / k                # cluster at theta = 90
     return c
@@ -749,6 +849,21 @@ def validate_params():
                  f'pokes through its own ring; got {CORE_FRAC}')
     if N_AZ_BLOCKS % 2 or N_AZ_BLOCKS < 2:
         e.append(f'N_AZ_BLOCKS must be even and >= 2, got {N_AZ_BLOCKS}')
+    if AZ_RELAX:
+        x0 = G.X_BODY_1 if AZ_RELAX_X0 is None else float(AZ_RELAX_X0)
+        x1 = fin_x_start() if AZ_RELAX_X1 is None else float(AZ_RELAX_X1)
+        if x1 <= x0:
+            e.append(f'AZ_RELAX_X1 ({x1:.4f}) must be downstream of AZ_RELAX_X0 '
+                     f'({x0:.4f}): the azimuthal relaxation has nowhere to happen')
+        if FINS_ON and x1 > G.FIN_ROOT_LE + 1e-9:
+            e.append(f'AZ_RELAX_X1 = {x1:.4f} is inside the fin planform '
+                     f'(root LE at {G.FIN_ROOT_LE:.4f}): the fin would be meshed '
+                     f'with a partly relaxed azimuthal distribution')
+        R = float(ZONE_R[0] if AZ_RELAX_R is None else AZ_RELAX_R)
+        if R < G.R_BODY:
+            e.append(f'AZ_RELAX_R = {R} is inside the body (R_BODY = {G.R_BODY}): '
+                     f'the wall would keep part of the fin clustering it is '
+                     f'meant to be relieved of')
     if not e:
         r_prev = G.R_BODY
         for z in shell_spec():
@@ -764,6 +879,16 @@ def validate_params():
     return True
 
 
+def az_relax_report():
+    """One line saying where the fin clustering has been relaxed away."""
+    if not AZ_RELAX:
+        return 'off -- fin distribution everywhere'
+    x0 = G.X_BODY_1 if AZ_RELAX_X0 is None else float(AZ_RELAX_X0)
+    x1 = fin_x_start() if AZ_RELAX_X1 is None else float(AZ_RELAX_X1)
+    R = float(ZONE_R[0] if AZ_RELAX_R is None else AZ_RELAX_R)
+    return f'uniform to x = {x0:.3f}, fin from {x1:.3f}, full out to r = {R:.3f} m'
+
+
 def report():
     d = derived()
     ax = axial_plan(d)
@@ -777,6 +902,7 @@ def report():
                  ('CELLS INSIDE THE BL', f"{d['n_delta']}"),
                  ('surface cell, circumferential', f"{d['ds']*1e3:.2f} mm"),
                  ('cells around full circumference', f"{d['n_circ']}"),
+                 ('azimuthal relaxation', az_relax_report()),
                  ('butterfly cap rim', f"{d['r_cap']*1e3:.2f} mm at x = {d['x_cap']*1e3:.1f} mm"),
                  ('wall slope at the handover', f"{d['cap_angle']:.1f} deg")]:
         print(f'  {k:<34}{v}')
@@ -835,6 +961,7 @@ def predicted_cells(d=None, ax=None):
 OVERRIDABLE = {
     'H_SCALE', 'H_SCALE_WALL', 'H_SCALE_FIN', 'FIN_H_R', 'U', 'NU', 'RHO', 'YPLUS_TARGET',
     'N_AZ_BLOCKS', 'N_AZ_CELLS', 'AZ_BLOCK_GROWTH', 'AZ_FIN_H', 'N_RING',
+    'AZ_RELAX', 'AZ_RELAX_X0', 'AZ_RELAX_X1', 'AZ_RELAX_R',
     'FINS_ON', 'FIN_SECTION', 'FIN_TIP_SMEAR', 'FIN_H_X', 'FIN_X_LEAD',
     'FIN_EDGE_FIT', 'FIN_EDGE_R_BLEND', 'FIN_EDGE_TAIL_RELIEF',
     'FIN_LEAD_MAX_STRETCH',

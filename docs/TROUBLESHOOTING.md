@@ -23,8 +23,10 @@ mide 125 mm). Bajar el tamaño o el `H_SCALE`.
 
 **`interface nodes have no partner`** o **`interface planes carry N and M nodes`**
 El ensamblado de sectores necesita que el cuadrante sea simétrico respecto de
-45°. Aparece sólo tras editar `az_angles()`/`az_coefs()` en `meshParams.py`
-o `_counts()` en `buildHexBody.py` de forma asimétrica. Si `scipy` no está
+45°. Aparece sólo tras editar `az_angles()`/`az_coefs()`/`az_relax()` en
+`meshParams.py` o `_counts()` en `buildHexBody.py` de forma asimétrica (la
+relajación azimutal es simétrica porque combina dos distribuciones que lo son,
+y `th[0] = 0` / `th[N] = 90°` valen para cualquier `lam`). Si `scipy` no está
 instalado el emparejamiento cae a redondeo exacto y puede fallar por ruido de
 punto flotante: `pip install scipy`.
 
