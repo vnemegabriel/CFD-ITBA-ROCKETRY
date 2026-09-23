@@ -40,11 +40,11 @@ Tres grupos de perillas y nada más:
 - `boundaryLayers` — `nLayers` y `thicknessRatio`, y `nLayers` por patch.
 
 **Las aletas van con `nLayers 3`, no más.** El borde de ataque es un filo y la
-aleta tiene 12 mm de espesor: con 10 capas la extrusión se enreda y aparecen
+aleta tiene 6 mm de espesor: con 10 capas la extrusión se enreda y aparecen
 volúmenes negativos. Está medido en `docs/TROUBLESHOOTING.md`.
 
-La malla actual son 862 k celdas, 95 % hexaedros, sin volúmenes negativos,
-no-ortogonalidad máxima 78.6 y media 5.7.
+La malla actual son 2.3 M celdas, 97 % hexaedros. Todavía no es estable: el
+mismo `meshDict` dio 0 volúmenes negativos en una corrida y 168 en otra.
 
 Para mallar otra geometría: `./Allmesh mi_cohete.stl`. El STL tiene que traer
 los solids nombrados `nosecone`, `body`, `boattail` y `fins` — `Allmesh` los

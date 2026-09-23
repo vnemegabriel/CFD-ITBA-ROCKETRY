@@ -53,10 +53,10 @@ a una caja, sin acoplarse a nada más.
   negativos, no-ortogonalidad y skewness en unos minutos. Un cambio sin número
   al lado no está terminado.
 - **`checkMesh` con volúmenes negativos = malla inservible.** Los otros
-  chequeos de `-allGeometry` que fallan hoy (skewness 14.6, determinante chico
-  en ~18 k celdas) son de otra categoría y no bloquean.
+  chequeos de `-allGeometry` que fallan hoy (skewness ~15, determinante chico
+  en ~490 k celdas de capa) son de otra categoría y no bloquean.
 - **Las aletas van con `nLayers 3`.** Más enreda la extrusión: el borde de
-  ataque es un filo y la aleta tiene 12 mm de espesor. Está medido en
+  ataque es un filo y la aleta tiene 6 mm de espesor. Está medido en
   `docs/TROUBLESHOOTING.md`.
 - Antes de cortar o cambiar algo, grepeá `docs/` además del código.
 - Una tarea por sesión. Un commit por tarea.

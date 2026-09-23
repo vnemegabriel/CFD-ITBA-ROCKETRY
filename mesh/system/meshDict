@@ -30,25 +30,26 @@ surfaceFile "geometry.fms";
 maxCellSize 1.6;
 
 // ---------------------------------------------------------------- surfaces --
-// One entry per patch of the .fms, which are the solids of Aconcagua.stl.
+// One entry per patch of the .fms: the solids of Aconcagua.stl AFTER the
+// rename in Allmesh.  A name that matches nothing is only a warning.
 // `refinementThickness` is how far the level is carried off the wall; below
 // that the octree grades back to maxCellSize on its own.
 localRefinement
 {
-    nosecone
+    cone
     {
         // the bow shock stands off the tip: this is the band it lives in
         additionalRefinementLevels 8;
         refinementThickness 0.060;
     }
 
-    body
+    walls
     {
         additionalRefinementLevels 8;
         refinementThickness 0.050;
     }
 
-    boattail
+    tail
     {
         // the expansion over the boattail sets the base pressure, and base
         // drag is a large share of the Cd this mesh exists to produce
@@ -115,9 +116,9 @@ boundaryLayers
 
     patchBoundaryLayers
     {
-        nosecone { nLayers 10; }
-        body     { nLayers 10; }
-        boattail { nLayers 10; }
+        cone     { nLayers 10; }
+        walls    { nLayers 10; }
+        tail     { nLayers 10; }
         fins     { nLayers 3; }
     }
 

@@ -18,7 +18,7 @@ docs/         cómo se usa y por qué
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
-cd mesh && ./Allmesh && cd ..                 # ~5 min, 862 k celdas
+cd mesh && ./Allmesh && cd ..                 # ~2 min, 2.3 M celdas
 ./newCase.sh ~/runs/prueba --regime sub --Uinf 68 --np 8
 cd ~/runs/prueba && ./Allrun 8
 ```
@@ -56,8 +56,9 @@ en WSL. Nada de Python.
 
 ## Estado
 
-La malla actual: 862 k celdas, 95 % hexaedros, sin volúmenes negativos,
-no-ortogonalidad máxima 78.6 y media 5.7.
+La malla actual: 2.3 M celdas, 97 % hexaedros. **No es estable**: dos corridas
+de `Allmesh` con el mismo `meshDict` dieron 0 y 168 volúmenes negativos (cfMesh
+no es determinista en paralelo). Ver TROUBLESHOOTING.
 
 Pendiente: medir y+ en cada punto del barrido y ajustar `nLayers`. Las aletas
 van con 3 capas porque el borde de ataque es un filo y más capas enredan la

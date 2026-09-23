@@ -6,7 +6,7 @@ Qué significa cada error y qué hacer. Los mensajes están citados como salen.
 
 **`checkMesh` reporta volúmenes negativos**
 Casi siempre son las capas límite de las aletas. El borde de ataque es un filo
-y la aleta tiene 12 mm de espesor: la extrusión se enreda contra sí misma.
+y la aleta tiene 6 mm de espesor: la extrusión se enreda contra sí misma.
 Medido, mismo `meshDict` salvo `fins { nLayers }`:
 
 | `nLayers` en `fins` | celdas | vol ≤ 0 | no-ortog máx | skew máx | arista mín |
@@ -18,8 +18,25 @@ Medido, mismo `meshDict` salvo `fins { nLayers }`:
 Con 3 alcanza. Si tocás la geometría de la aleta y vuelven a aparecer, bajá a
 2 antes de tocar cualquier otra cosa.
 
+**Esta tabla está vieja.** Se midió cuando el `meshDict` nombraba los patches
+`nosecone/body/boattail` y cfMesh no los encontraba, así que ojiva, cuerpo y
+cola no tenían ni refinamiento ni capas. Con los nombres corregidos (2.3 M
+celdas):
+
+| `nLayers` en `fins` | celdas | vol ≤ 0 | no-ortog máx | skew máx |
+|---|---|---|---|---|
+| 10 | 2,299,408 | 0 | 75.6° | 14.9 |
+| 3 | 2,299,408 | 0 | 75.6° | 14.9 |
+| 3, otra corrida | 2,299,313 | **168** | 178.6° | 313.7 |
+| 0 | 2,299,313 | **132** | 169.2° | 851.9 |
+
+Que 3 y 10 den las mismas celdas sugiere que cfMesh unifica `nLayers` entre
+patches vecinos y las aletas heredan las 10 del cuerpo. Que el mismo diccionario
+dé 0 o 168 volúmenes negativos dice que la malla está en el límite. Sin
+resolver.
+
 **`checkMesh` falla 6 chequeos pero sin volúmenes negativos**
-Es lo normal en esta malla: skewness 14.6, determinante chico en ~18 k celdas,
+Es lo normal en esta malla: skewness ~15, determinante chico en ~490 k celdas,
 caras con peso de interpolación bajo. Son chequeos de `-allGeometry`. Lo que
 hace inservible una malla son los volúmenes negativos y las caras compartidas
 por tres celdas; eso está en cero.

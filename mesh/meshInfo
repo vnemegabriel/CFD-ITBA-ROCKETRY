@@ -20,7 +20,7 @@ symmetryFraction 1;
 
 fins            true;
 
-nCells          862340;
+nCells          2299313;
 
 Aref            0.0179081;
 
