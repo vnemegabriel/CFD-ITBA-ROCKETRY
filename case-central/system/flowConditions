@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowConditions;
+}
+// ============================================================================
+//  THE ONE FILE YOU EDIT TO SET A RUN.  One template for the whole sweep,
+//  M 0.2 to 1.8: a Mach number plus the ambient state, with system/flowDerived
+//  doing the algebra.  The p boundary conditions switch at Minf = 1 on their
+//  own (0.orig/p).
+//
+//      foamDictionary system/flowConditions -entry Minf -set 1.5
+//
+//  Never run foamDictionary -set on a file containing #eval.
+//  The mesh is built for ONE speed: read Uinf off the ./Allrun banner and
+//  check y+ (docs/SOLVERS.md).
+// ============================================================================
+
+Minf            1.80;       // -     free-stream Mach number
+alpha           0;          // deg   angle of attack   (needs half or full)
+beta            0;          // deg   sideslip          (needs full)
+
+pInf            101325;     // Pa    ambient static pressure (ISA sea level)
+Tinf            288.15;     // K     ambient static temperature (ISA sea level)
+
+Ti              0.005;      // -     free-stream turbulence intensity (0.5 %)
+nuRatio         5;          // -     nut / nu in the free stream
+
+// ************************************************************************* //

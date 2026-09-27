@@ -21,26 +21,23 @@ case "$SECTOR" in
     quarter)
         if [ "$(echo "$ALPHA $BETA" | awk '{print ($1 != 0 || $2 != 0)}')" = 1 ]; then
             echo "!! quarter mesh: two symmetry planes, alpha and beta must be 0."
-            echo "   Build with  python3 build.py --sector half  (alpha) or  --sector full  (alpha, beta)."
+            echo "   Needs a half (alpha) or full (alpha, beta) mesh."
             exit 1
         fi ;;
     half)
         if [ "$(echo "$BETA" | awk '{print ($1 != 0)}')" = 1 ]; then
-            echo "!! half mesh: symmetry plane z = 0, beta must be 0.  Build with --sector full."
+            echo "!! half mesh: symmetry plane z = 0, beta must be 0.  Needs a full mesh."
             exit 1
         fi ;;
 esac
 
 # ---- consistency: run speed vs the wall spacing the mesh was built for ------
-# mesh/build.py resolves the first cell height y1 from ONE velocity and records
-# it in constant/meshInfo.  Running at a different Uinf leaves y1 alone, so y+
+# The layers fix y1 for ONE velocity, recorded as Uref in constant/meshInfo.  Running at a different Uinf leaves y1 alone, so y+
 # drifts with no error anywhere.  For a fixed y1, y+ scales as (U/nu)^0.9.
 UREF=$(foamDictionary -entry Uref        -value constant/meshInfo 2>/dev/null)
 NUREF=$(foamDictionary -entry nuRef      -value constant/meshInfo 2>/dev/null)
 YPREF=$(foamDictionary -entry yPlusTarget -value constant/meshInfo 2>/dev/null)
-# read from flowDerived, not flowConditions: in the compressible templates the
-# velocity is DERIVED from Minf and the ambient state.  flowDerived includes
-# flowConditions, so both names resolve whichever regime this is.
+# Uinf is DERIVED from Minf, so it is read from flowDerived.
 UINF=$(foamDictionary -entry Uinf  -value system/flowDerived 2>/dev/null)
 NURUN=$(foamDictionary -entry nuInf -value system/flowDerived 2>/dev/null)
 if [ -n "$UREF" ] && [ -n "$NUREF" ] && [ -n "$YPREF" ]    && [ -n "$UINF" ] && [ -n "$NURUN" ]; then
@@ -51,7 +48,7 @@ if [ -n "$UREF" ] && [ -n "$NUREF" ] && [ -n "$YPREF" ]    && [ -n "$UINF" ] && 
         echo "      nutUSpaldingWallFunction will not fall over, but the near-wall"
         echo "      resolution no longer matches the target and the friction drag"
         echo "      carries that bias.  For a clean run rebuild the mesh with"
-        echo "      the run speed:   python3 build.py --preset <p> --set U=$UINF"
+        echo "      the run speed (Uinf above), see docs/TROUBLESHOOTING.md"
     fi
 fi
 
@@ -65,26 +62,15 @@ restore0Dir
 
 APP=$(getApplication)
 
-# potentialFoam solves an INCOMPRESSIBLE potential flow and writes a kinematic
-# pressure, so it is a valid initialiser only for simpleFoam.  The compressible
-# templates start from the uniform free stream instead; that is why their first
-# few hundred iterations are the expensive ones.
-case "$APP" in
-    simpleFoam) INIT=potentialFoam ;;
-    *)          INIT= ;;
-esac
-
 if [ "$NP" -gt 1 ]; then
     runApplication decomposePar -force
-    if [ -n "$INIT" ]; then runParallel -np "$NP" "$INIT" -initialiseUBCs; fi
     runParallel -np "$NP" "$APP"
     runApplication reconstructPar -latestTime
 else
-    if [ -n "$INIT" ]; then runApplication "$INIT" -initialiseUBCs; fi
     runApplication "$APP"
 fi
 
 echo
 echo "coefficients: postProcessing/forceCoeffs1/0/coefficient.dat"
 tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null
-echo "y+ per patch: grep -A6 'yPlus' log.simpleFoam | tail -12"
+echo "y+ per patch: grep -A6 'yPlus' log.$APP | tail -12"

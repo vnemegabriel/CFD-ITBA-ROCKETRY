@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [1 -1 -2 0 0 0 0];      // Pa
+
+internalField   uniform $pInf;
+
+boundaryField
+{
+    // Subsonic: p is fixed where the flow leaves and extrapolated where it
+    // enters.  Supersonic: every characteristic enters at the inlet and
+    // leaves at the outlet, so p is fixed at one and extrapolated at the
+    // other.  freestreamPressure only does the first.
+#if ${{ $Minf > 1 }}
+    inlet
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    // non-reflecting: the Mach cone crosses this boundary inside the domain
+    box
+    {
+        type            waveTransmissive;
+        field           p;
+        phi             phi;
+        rho             rho;
+        psi             thermo:psi;
+        gamma           1.4;
+        fieldInf        $pInf;
+        lInf            10;
+        value           $internalField;
+    }
+#else
+    "(inlet|outlet|box)"
+    {
+        type            freestreamPressure;
+        freestreamValue $internalField;
+        value           $internalField;
+    }
+#endif
+    symm
+    {
+        type            symmetry;
+    }
+    "(cone|walls|tail|fins)"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

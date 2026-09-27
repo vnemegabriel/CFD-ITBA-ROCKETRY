@@ -1,7 +1,7 @@
 # CLAUDE.md — Aconcagua CFD
 
-Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, tres
-plantillas de caso, barrido de Mach en serie.
+Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, una
+plantilla de caso con `rhoCentralFoam`, barrido de Mach en serie.
 
 Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
 queda en inglés (mesh, solver, y+, wall function, skewness). Los `docs/` están
@@ -36,7 +36,7 @@ real se mueve con la velocidad. Medilo en cada corrida.
 ```
 mesh/         Aconcagua.stl, Allmesh, meshInfo, system/
 common/       Allrun, Allrefine
-case-*/       plantillas sub / trans / super
+case-central/ la plantilla, rhoCentralFoam para todo Mach
 newCase.sh    plantilla + malla + condiciones -> una corrida
 run.sh        sweep.txt en serie
 ```

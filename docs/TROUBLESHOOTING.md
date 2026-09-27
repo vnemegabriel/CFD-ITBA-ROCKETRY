@@ -71,8 +71,8 @@ No existe `mesh/constant/polyMesh`. No se versiona: reconstruilo.
 Nunca pisa un directorio existente. Elegí otro nombre o borralo.
 
 **`!! <plantilla> has no flowConditions entry 'X'`**
-Le pasaste una condición que esa plantilla no usa: `sub` toma
-`Uinf`/`nu`/`rhoInf`, `trans` y `super` toman `Minf`/`pInf`/`Tinf`.
+Le pasaste una condición que la plantilla no usa. La velocidad es derivada:
+se pasa `--Minf`, no `--Uinf`.
 
 ## Refinado local (`./Allrefine`)
 
@@ -113,16 +113,14 @@ Entonces el resultado lo está fijando ese archivo y no la física. Ampliá los
 límites y volvé a correr; si la solución se sigue apoyando en ellos, hay algo
 más mal.
 
-**El número de Courant del log supersónico es absurdo, del orden de 10⁵**
-Es esperado y no es un síntoma. Con `ddtSchemes localEuler` cada celda avanza
-con su propio paso, y el Courant que imprime el log se calcula con el paso
-global, que ya no gobierna nada.
+**Con `ddtSchemes localEuler`, el Courant del log es absurdo, del orden de 10⁵**
+Es esperado y no es un síntoma. Con paso local cada celda avanza con su propio
+paso, y el Courant que imprime el log se calcula con el paso global, que ya no
+gobierna nada. La plantilla viene con `Euler`.
 
-**`newCase.sh`: `system/flowConditions has no entry 'Uinf'`**
-Pasaste una condición que no corresponde al régimen. La subsónica toma
-`--Uinf --nu --rhoInf`; las compresibles toman `--Minf --pInf --Tinf`, porque
-ahí la velocidad es derivada. Es un error a propósito: antes habría sido un
-valor ignorado en silencio.
+**`rhoCentralFoam` muere con `sigFpe` en el primer paso**
+El primer paso se da a `1.2 · deltaT` sin mirar `maxCo`. `deltaT` sale de
+`tauCo` en `config.json`: medilo en esta malla ([SOLVERS.md §2.3](SOLVERS.md)).
 
 ## Lo que se ve en ParaView
 
@@ -165,9 +163,8 @@ superficie y con ella la primera capa.
 
 ## Entorno
 
-**Windows: `python` vs `python3`**
-En Windows el Python nativo es `python`; en WSL es `python3`. Los scripts de
-shell (`Allmesh`, `newCase.sh`) llaman `python3` porque corren en WSL.
+**`newCase.sh`: `!! needs jinja2`**
+La plantilla renderiza sus `*.j2` con `jinja2-cli`: `pip install jinja2-cli`.
 
 **Scripts con `\r`: `bad interpreter` o `syntax error near unexpected token`**
 Finales de línea CRLF. El repo lleva `.gitattributes` con `eol=lf`; si un

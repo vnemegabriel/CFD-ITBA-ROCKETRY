@@ -1,12 +1,13 @@
 # Validación
 
-Ninguna de las tres plantillas está validada. Este documento dice **contra qué
-compararlas y con qué cuentas**, para que el resultado sea verificable y no una
+La plantilla no está validada. Este documento dice **contra qué compararla
+y con qué cuentas**, para que el resultado sea verificable y no una
 opinión. Las fórmulas de referencia están escritas con sus constantes para que
 puedas evaluarlas a mano.
 
-Orden recomendado: primero el subsónico, que es donde hay referencias
-analíticas confiables, y recién después los compresibles.
+Orden recomendado: primero el bajo Mach, que es donde hay referencias
+analíticas confiables y donde `rhoCentralFoam` es más sospechoso
+([SOLVERS.md §2.2](SOLVERS.md)), y recién después transónico y supersónico.
 
 ## 1. Chequeos que no cuestan nada y hay que hacer siempre
 
@@ -88,7 +89,6 @@ tutorial del que sale la plantilla y reproducí su resultado. Es la forma más
 barata de separar un problema de configuración de uno de malla:
 
 ```
-$FOAM_TUTORIALS/compressible/rhoSimpleFoam/aerofoilNACA0012
 $FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35
 ```
 
@@ -114,8 +114,8 @@ de un factor 2, no para justificar un 5 %.
 
 Lo que hay que reproducir cualitativamente es la subida de `Cd` entre M 0.8 y
 M 1.2, que para un cuerpo esbelto con aletas es del orden de un factor 2 a 3
-respecto del valor subsónico. Si tu curva no lo tiene, o el `transonic yes` no
-está haciendo efecto, o la malla es demasiado gruesa donde se forma el choque.
+respecto del valor subsónico. Si tu curva no lo tiene, la malla es demasiado
+gruesa donde se forma el choque.
 
 ## 4. Convergencia de malla
 
