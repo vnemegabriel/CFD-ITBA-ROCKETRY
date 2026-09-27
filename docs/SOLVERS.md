@@ -2,13 +2,13 @@
 > **Estado.** HAY QUE VALIDAR TODO!!!!
 # Solver y modelos
 
-Un solo solver para todo el barrido, M 0.2 a 1.8: `rhoCentralFoam`, en la
+Un solo solver para todo el barrido, M 0.3 a 1.8: `rhoCentralFoam`, en la
 plantilla `case-central/`. Este documento dice qué resuelve, con qué modelo y
 de dónde sale cada cosa, para que puedas **rehacer las cuentas a mano** y
 verificar que el caso hace lo que dice.
 
 ```bash
-./newCase.sh ~/runs/m02 --Minf 0.2
+./newCase.sh ~/runs/m03 --Minf 0.3
 ./newCase.sh ~/runs/m18 --Minf 1.8
 ```
 
@@ -64,12 +64,18 @@ que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.*
 
 ### 2.2 El precio a bajo Mach
 
-`rhoCentralFoam` está hecho para choques, y a M 0.2 y 0.4 se paga de dos
+**Por qué el barrido arranca en M 0.3.** Es la hipótesis de compresibilidad:
+el error de despreciarla en la presión es del orden de M²/4, 2.3 % a M 0.3
+(Anderson, *Fundamentals of Aerodynamics*, 6ª ed., §8.3, del desarrollo
+`p₀/p = 1 + M²/4 + ...`). Abajo de eso el Cd casi no cambia con el Mach, y
+correrlo con un solver compresible sólo compra rigidez.
+
+`rhoCentralFoam` está hecho para choques, y a M 0.3 y 0.6 se paga de dos
 maneras. Hay que saberlo antes de mirar esos dos puntos de la curva.
 
 **Rigidez.** El paso explícito lo fija la onda más rápida, `|U| + c`; lo que
-interesa es el transporte a `|U|`. A M 0.2 cada paso avanza el flujo un
-M/(1+M) ≈ 17 % de lo que avanzaría con un paso convectivo, y llegar al
+interesa es el transporte a `|U|`. A M 0.3 cada paso avanza el flujo un
+M/(1+M) ≈ 23 % de lo que avanzaría con un paso convectivo, y llegar al
 estacionario cuesta del orden de 1/M veces más pasos que a M 1.
 
 **Disipación.** Un esquema upwind o central-upwind sin precondicionar mete una
@@ -79,7 +85,7 @@ M². El resultado es un campo de presión suavizado de más. Guillard y Viozat
 (1999), "On the behaviour of upwind schemes in the low Mach number limit",
 *Computers & Fluids* **28**, 63-86.
 
-En la práctica: los Cd a M 0.2 y 0.4 se validan contra datos o contra una
+En la práctica: los Cd a M 0.3 y 0.6 se validan contra datos o contra una
 corrida de `rhoSimpleFoam` antes de confiar en ellos
 ([VALIDATION.md](VALIDATION.md)). Si la diferencia no es aceptable, lo
 indicado es volver a un solver basado en presión sólo en ese tramo, con la
@@ -122,7 +128,7 @@ el Co: con un `1e-8` fijo, esta malla arrancaba con Co = 61 y moría con
 
 | clave | valor | qué hace |
 |---|---|---|
-| `tauCo` | `2e-10` | s. Medido en la malla completa de 2.3 M a M 1.8. `c` domina `|U| + c`, así que a M 0.2 es del mismo orden |
+| `tauCo` | `2e-10` | s. Medido en la malla completa de 2.3 M a M 1.8. `c` domina `|U| + c`, así que a M 0.3 es del mismo orden |
 | `vanLeer` | `2000` | iteración del cambio a van Leer; `-1` se queda en upwind |
 | `minIter` | `3000` | iteración de `controlDict_final` |
 | `final_Co` | `0.3` | techo de toda la rampa |
@@ -171,7 +177,7 @@ con `νt = a₁k / max(a₁ω, S F₂)`. Ese denominador es el **limitador de te
 | `alphat` | `compressible::alphatWallFunction`, `Prt 0.85` | difusividad térmica turbulenta a partir de νt |
 
 El objetivo es y+ ≈ 32 en el centro de la primera celda. **La malla se
-dimensiona para una velocidad**, y entre M 0.2 y 1.8 la velocidad cambia 9
+dimensiona para una velocidad**, y entre M 0.3 y 1.8 la velocidad cambia 6
 veces: ver [WORKFLOW.md](WORKFLOW.md#3-el-barrido). `Allrun` estima el y+ que
 te va a quedar y avisa si se fue de banda.
 
@@ -218,7 +224,7 @@ OpenFOAM es algebraicamente la misma: `As √T/(1+Ts/T) = As T^1.5/(T+Ts)`.
 
 | M | T₀ | error de Cp |
 |---|---|---|
-| 0.2 | 290 K | despreciable |
+| 0.3 | 293 K | despreciable |
 | 0.8 | 325 K | < 0.5 % |
 | 1.2 | 371 K | ~0.8 % |
 | 1.8 | 475 K | ~1.8 % |

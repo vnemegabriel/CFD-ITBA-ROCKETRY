@@ -1,15 +1,15 @@
-# case-central/ — la plantilla, M 0.2 a 1.8
+# case-central/ — la plantilla, M 0.3 a 1.8
 
 `rhoCentralFoam` con flujo central-upwind de Kurganov, `kOmegaSST` con wall
 functions, aire como gas perfecto con viscosidad de Sutherland. Una sola
 plantilla para todo el barrido; se copia con `../newCase.sh`.
 
 **No está validada.** Los números no tienen respaldo hasta que se haga
-[../docs/VALIDATION.md](../docs/VALIDATION.md), y los de M 0.2 y 0.4 son los
+[../docs/VALIDATION.md](../docs/VALIDATION.md), y los de M 0.3 y 0.6 son los
 más sospechosos: ver [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.2.
 
 ```bash
-../newCase.sh ~/runs/m02 --Minf 0.2
+../newCase.sh ~/runs/m03 --Minf 0.3
 ../newCase.sh ~/runs/m18 --Minf 1.8
 ```
 
@@ -24,5 +24,5 @@ más sospechosos: ver [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.2.
   acústico de la celda más chica. Con la malla actual eso son ~2e-10 s por
   unidad de Courant.
 - **La malla se dimensiona para una velocidad**, y del punto más lento al más
-  rápido el barrido cambia 9 veces. Leé `Uinf` y el y+ esperado del banner de
+  rápido el barrido cambia 6 veces. Leé `Uinf` y el y+ esperado del banner de
   `./Allrun`.

@@ -56,7 +56,7 @@ renombra a los patches que esperan los casos.
 vuelo que le pases.
 
 ```bash
-./newCase.sh ~/runs/m02 --Minf 0.2
+./newCase.sh ~/runs/m03 --Minf 0.3
 ./newCase.sh ~/runs/m12 --Minf 1.2 --np 16
 ./newCase.sh ~/runs/a05 --Minf 0.8 --alpha 5 --refine tip
 ```
@@ -79,7 +79,7 @@ Si la plantilla trae archivos `*.j2`, `newCase.sh` los renderiza con
 `sweep.txt` es una línea por corrida:
 
 ```
-m02  --Minf 0.2
+m03  --Minf 0.3
 m08  --Minf 0.8
 m18  --Minf 1.8
 ```

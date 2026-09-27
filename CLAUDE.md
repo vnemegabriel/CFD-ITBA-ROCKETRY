@@ -16,7 +16,7 @@ bounding box.
 
 ## El objetivo
 
-**Curva de Cd contra Mach: 0.2, 0.4, 0.8, 1.2, 1.8.** Lo que tiene que
+**Curva de Cd contra Mach: 0.3, 0.6, 0.8, 1.2, 1.8.** Lo que tiene que
 resolver bien la malla, en orden:
 
 1. El choque, para M ≥ 0.8.

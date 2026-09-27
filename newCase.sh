@@ -1,7 +1,7 @@
 #!/bin/bash
 # ./newCase.sh <run-dir> [options]
 #
-#     ./newCase.sh ~/runs/m02 --Minf 0.2
+#     ./newCase.sh ~/runs/m03 --Minf 0.3
 #     ./newCase.sh ~/runs/m12 --Minf 1.2 --np 16
 #     ./newCase.sh ~/runs/a05 --Minf 0.8 --alpha 5 --refine tip
 #

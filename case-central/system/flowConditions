@@ -15,7 +15,7 @@ FoamFile
 }
 // ============================================================================
 //  THE ONE FILE YOU EDIT TO SET A RUN.  One template for the whole sweep,
-//  M 0.2 to 1.8: a Mach number plus the ambient state, with system/flowDerived
+//  M 0.3 to 1.8: a Mach number plus the ambient state, with system/flowDerived
 //  doing the algebra.  The p boundary conditions switch at Minf = 1 on their
 //  own (0.orig/p).
 //

@@ -1,7 +1,7 @@
 # One run per line:  <name> <newCase.sh options>
 # Blank lines and # are ignored.  ./run.sh runs them in series.
-m02  --Minf 0.2
-m04  --Minf 0.4
+m03  --Minf 0.3
+m06  --Minf 0.6
 m08  --Minf 0.8
 m12  --Minf 1.2
 m18  --Minf 1.8
