@@ -5,8 +5,6 @@ mesh/output/
 *.msh4
 *.med
 *.unv
-*.stl
-!mesh/stl/Aconcagua.stl
 *.step
 *.stp
 *.brep
