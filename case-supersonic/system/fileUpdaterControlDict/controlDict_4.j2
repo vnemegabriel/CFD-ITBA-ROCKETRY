@@ -11,17 +11,10 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSchemes;
+    object      controlDict;
 }
-#include "${FOAM_CASE}/system/fvSchemesVanLeer"
+#include "${FOAM_CASE}/system/controlDictBase"
 
-// first order while the free stream settles; system/fileUpdater switches to
-// fvSchemesVanLeer once the Courant ramp is through
-interpolationSchemes
-{
-    reconstruct(rho)    upwind;
-    reconstruct(U)      upwind;
-    reconstruct(T)      upwind;
-}
+maxCo           {{ [0.08, final_Co]|min }};
 
 // ************************************************************************* //

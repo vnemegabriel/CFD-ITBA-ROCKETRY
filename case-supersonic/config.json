@@ -1,0 +1,9 @@
+{
+    "tauCo": 2e-10,
+    "vanLeer": 2000,
+    "minIter": 3000,
+    "final_Co": 0.3,
+    "coeffs_fields": ["Cd"],
+    "coeffs_variation": [0.001],
+    "coeffs_range": [300]
+}

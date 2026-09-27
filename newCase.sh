@@ -52,6 +52,16 @@ chmod +x "$RUN"/Allrun "$RUN"/Allrefine
 cd "$RUN"
 touch case.foam
 
+TEMPLATES=$(find . -name '*.j2')
+if [ -n "$TEMPLATES" ]; then
+    command -v jinja2 > /dev/null || { echo "!! $TEMPLATE needs jinja2:  pip install jinja2-cli"; exit 1; }
+    for f in $TEMPLATES; do
+        jinja2 --strict "$f" config.json --format=json -o "${f%.j2}"
+        rm "$f"
+    done
+    echo "rendered $(echo "$TEMPLATES" | wc -l) templates from config.json"
+fi
+
 echo "template: $TEMPLATE  ($(foamDictionary -entry application -value system/controlDict))"
 for k in "${!SET[@]}"; do
     foamDictionary -entry "$k" -value system/flowConditions > /dev/null 2>&1 || {

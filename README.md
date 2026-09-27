@@ -44,7 +44,9 @@ dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
 ## Requisitos
 
 OpenFOAM v2412 de ESI, que ya trae cfMesh (`cartesianMesh`). Bajo Windows,
-en WSL. Nada de Python.
+en WSL. La plantilla supersónica necesita `jinja2-cli`
+(`pip install jinja2-cli`) para renderizar sus `*.j2`; ver
+[SOLVERS.md §2.4](docs/SOLVERS.md).
 
 ## Régimen
 

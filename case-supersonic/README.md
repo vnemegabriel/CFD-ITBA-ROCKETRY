@@ -28,6 +28,10 @@ Por eso `system/fvSolution` no tiene ni `SIMPLE` ni factores de relajación, y
 > `python3 build.py --preset coarse --sector half --set U=612`. El detalle
 > está en [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.4.
 
+**Arranca con rampa de Courant**, calcada del OpenFOAM ToolChain: `maxCo`
+de 0.01 a `final_Co` y upwind → van Leer, con los parámetros en `config.json`.
+Ver [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.4.
+
 **Es cara, y hay que saberlo antes de lanzarla.** Se entrega con `Euler` y
 paso global adaptativo: una marcha transitoria hacia el estacionario. El paso
 lo fija el límite acústico de la celda más chica, y llegar al estacionario
