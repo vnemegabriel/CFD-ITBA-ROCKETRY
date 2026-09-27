@@ -1,5 +1,5 @@
 #!/bin/sh
-# ./Allmesh [surface.stl]        default: Aconcagua.stl
+# ./Allmesh [source.stl]         default: stl/Aconcagua.stl, the base geometry
 # Builds constant/polyMesh here.  Sizes are in system/meshDict.
 set -e
 cd "${0%/*}" || exit 1
@@ -11,24 +11,24 @@ check() {
     return 0
 }
 
-SRC="${1:-Aconcagua.stl}"
+SRC="${1:-stl/Aconcagua.stl}"
 [ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
 
 rm -rf constant/polyMesh 0
-rm -f log.* surface.stl geometry.stl geometry.fms
+rm -f log.* stl/surface.stl stl/geometry.stl geometry.fms
 
 # STL solid names become patch names; the cases expect these four.
 sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
     -e 's/^\( *\(end\)\?solid \)body\b/\1walls/' \
     -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
-    "$SRC" > surface.stl
+    "$SRC" > stl/surface.stl
 
 # Metres out from the model bounding box, not multiples of it.
-runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
+runApplication surfaceGenerateBoundingBox stl/surface.stl stl/geometry.stl \
     17.73 38.415 11.5395 11.5395 11.5395 11.5395
 check surfaceGenerateBoundingBox
 
-runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
+runApplication surfaceFeatureEdges -angle 30 stl/geometry.stl geometry.fms
 check surfaceFeatureEdges
 
 runApplication cartesianMesh
