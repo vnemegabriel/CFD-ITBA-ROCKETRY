@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - supersonic external aero   |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+{#- Courant ramp from the OpenFOAM ToolChain (templates/rhoCentralFoam).
+    The schedule is in ITERATIONS, as there; this case marches in real
+    seconds, so each switch is placed at t = sum(n_i maxCo_i tauCo). -#}
+{%- set ns = namespace(ev=[], t=0.0, it=0, co=0.01, tvl=-1) %}
+{%- for it, f, co in [(0,'1',0.01),(20,'2',0.02),(35,'3',0.04),(50,'4',0.08),(65,'5',0.16),(80,'6',0.32),(100,'7',0.5)] if it < minIter %}
+{%- set ns.ev = ns.ev + [(it, f, co)] %}
+{%- endfor %}
+{%- if vanLeer != -1 %}
+{%- for di, f, co in [(0,'1',0.01),(20,'2',0.02),(35,'3',0.04),(150,'4',0.08),(300,'5',0.16),(800,'6',0.32),(2000,'7',0.5)] if vanLeer + di < minIter %}
+{%- set ns.ev = ns.ev + [(vanLeer + di, f, co)] %}
+{%- endfor %}
+{%- endif %}
+{%- set ns.ev = ns.ev|sort(attribute='0') + [(minIter, 'final', final_Co)] %}
+
+fileUpdate1
+{
+    type            timeActivatedFileUpdate;
+    libs            (utilityFunctionObjects);
+    writeControl    timeStep;
+    writeInterval   1;
+    fileToUpdate    "$FOAM_CASE/system/controlDict";
+    timeVsFile
+    (
+{%- for it, f, co in ns.ev %}
+{%- set ns.t = ns.t + (it - ns.it)*([ns.co, final_Co]|min)*tauCo %}
+{%- if vanLeer != -1 and it == vanLeer %}{% set ns.tvl = ns.t %}{% endif %}
+        ({{ -1 if loop.first else '%.6g'|format(ns.t) }}  "$FOAM_CASE/system/fileUpdaterControlDict/controlDict_{{ f }}")   // iter {{ it }}
+{%- set ns.it = it %}{% set ns.co = co %}
+{%- endfor %}
+    );
+}
+
+fileUpdate2
+{
+    type            timeActivatedFileUpdate;
+    libs            (utilityFunctionObjects);
+    writeControl    timeStep;
+    writeInterval   1;
+    fileToUpdate    "$FOAM_CASE/system/fvSchemes";
+    timeVsFile
+    (
+        (-1  "$FOAM_CASE/system/fvSchemesUpwind")
+{%- if vanLeer != -1 %}
+        ({{ '%.6g'|format(ns.tvl) }}  "$FOAM_CASE/system/fvSchemesVanLeer")   // iter {{ vanLeer }}
+{%- endif %}
+    );
+}
+
+// ************************************************************************* //

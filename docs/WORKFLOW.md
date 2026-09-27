@@ -71,6 +71,10 @@ vuelo que le pases.
 El caso nunca se corre en la plantilla: `newCase.sh` se niega a pisar un
 directorio que ya existe.
 
+Si la plantilla trae archivos `*.j2`, `newCase.sh` los renderiza con
+`jinja2` contra su `config.json`. Hoy sólo la supersónica, para la rampa de
+Courant: [SOLVERS.md §2.4](SOLVERS.md).
+
 ## 3. El barrido
 
 `sweep.txt` es una línea por corrida:

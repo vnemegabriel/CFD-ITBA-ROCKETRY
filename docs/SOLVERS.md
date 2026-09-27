@@ -70,6 +70,56 @@ Con eso la ecuación de presión gana un término convectivo, `div(phid,p)`, y c
 - La implementación en OpenFOAM y su validación: Greenshields, Weller, Gasparini y Reese (2010), "Implicit and explicit schemes for flows of aerodynamic and turbomachinery fluids", *Int. J. Numer. Meth. Fluids* **63**, 1-21.
 
 **Reconstrucción:** las variables primitivas se llevan a las caras con limitador van Leer (`reconstruct(rho) vanLeer`, `reconstruct(U) vanLeerV`, `reconstruct(T) vanLeer`). El limitador baja el esquema a primer orden en la discontinuidad y lo mantiene de segundo orden en las zonas suaves, que es lo que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.* **32**, 101-136.
+
+### 2.4 Arranque del supersónico: rampa de Courant
+
+Calcada del OpenFOAM ToolChain (`templates/rhoCentralFoam`): arrancar con
+`maxCo` muy bajo y esquemas de primer orden, y subir de a pasos. La corriente
+uniforme contra una pared no-slip es un transitorio violento, y es ahí donde
+explota.
+
+La hace el functionObject `timeActivatedFileUpdate`, en `system/fileUpdater`.
+En cada paso mira el tiempo y, al cruzar un umbral, copia otro archivo encima
+de `system/controlDict` o de `system/fvSchemes`; `runTimeModifiable` lo relee.
+
+| archivo | qué es |
+|---|---|
+| `config.json` | los parámetros de la rampa; `newCase.sh` renderiza con él todos los `*.j2` |
+| `system/controlDictBase.j2` | el `controlDict` de siempre, sin `maxCo` |
+| `system/controlDict`, `fileUpdaterControlDict/controlDict_{1..7,final}.j2` | incluyen la base y agregan su `maxCo`: 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5, recortados a `final_Co` |
+| `system/fileUpdater.j2` | el calendario: qué archivo entra a qué tiempo |
+| `system/fvSchemesUpwind`, `fvSchemesVanLeer` | reconstrucción de primer orden y la de van Leer |
+| `system/FOs/FOrunTimeControl.j2` | corte por convergencia del promedio de `Cd`, sólo en `controlDict_final` |
+
+El calendario es el del ToolChain, en **iteraciones**: rampa en 0, 20, 35, 50,
+65, 80, 100; a `vanLeer` pasa a van Leer y repite la rampa desde 0.01 (en
++0, 20, 35, 150, 300, 800, 2000); a `minIter` entra `controlDict_final` con
+`final_Co` y el `runTimeControl`.
+
+**La diferencia con el ToolChain.** Allá corren `localEuler`, donde el tiempo
+es la iteración. Acá es `Euler` en segundos reales (§6), así que el template
+convierte cada iteración en tiempo con `t = Σ nᵢ · maxCoᵢ · tauCo`. `tauCo` es
+el paso que da Co = 1 en la peor celda; se lee del log como `deltaT / maxCo`
+una vez que el Co se estabiliza. Si está mal, la rampa se corre en el tiempo,
+pero el Co sigue acotado por `maxCo`. Con `tauCo` también se fija el `deltaT`
+inicial, porque `rhoCentralFoam` da el primer paso a `1.2 · deltaT` sin mirar
+el Co: con el `1e-8` que tenía antes la plantilla, esta malla arrancaba con
+Co = 61 y moría con `sigFpe` en el paso 1.
+
+| clave | valor | qué hace |
+|---|---|---|
+| `tauCo` | `2e-10` | s. Medido en la malla completa de 2.3 M a M 1.8 |
+| `vanLeer` | `2000` | iteración del cambio a van Leer; `-1` se queda en upwind |
+| `minIter` | `3000` | iteración de `controlDict_final` |
+| `final_Co` | `0.3` | techo de toda la rampa |
+| `coeffs_fields`, `coeffs_variation`, `coeffs_range` | `Cd`, `0.001`, `300` | condición del `runTimeControl`. A α ≠ 0 se pueden sumar `Cl` y `CmPitch`; a α = 0 no, porque su promedio es ~0 y el criterio relativo no cierra nunca |
+
+Medido: el Co queda clavado en 0.0100 y a las 20 iteraciones pasa a 0.0200.
+El mismo log muestra el problema de fondo: **Co medio 5e-9 contra máximo
+0.02**. Una sola región de celdas diminutas fija el paso de 2.3 M celdas;
+con `tauCo = 2e-10` s, llegar al estacionario son ~10⁹ pasos. La rampa evita
+la explosión, pero no hace barata la corrida: eso es de la malla.
+
 ## 3. Turbulencia: idéntica en los tres
 
 ```
@@ -206,9 +256,10 @@ temperatura.
 
 ### Propios de `super`
 
-Ver §2.3. `fluxScheme`, las `reconstruct(...)` y `localEuler` son las entradas
-que hacen el trabajo; `divSchemes` casi no se usa porque el esquema es
-basado en densidad.
+Ver §2.3. `fluxScheme` y las `reconstruct(...)` son las entradas que hacen el
+trabajo; `divSchemes` casi no se usa porque el esquema es basado en densidad.
+`system/fvSchemes` no se edita: la rampa (§2.4) lo pisa con
+`fvSchemesUpwind` al arrancar y con `fvSchemesVanLeer` después.
 
 ## 7. Condiciones de borde
 
