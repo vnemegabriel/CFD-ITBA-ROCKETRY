@@ -49,17 +49,5 @@ en WSL. Nada de Python.
 ## Régimen
 
 | régimen | Mach | solver |
-|---|---|---|
-| `sub` | < 0.3 | `simpleFoam` |
 | `trans` | 0.3 – 1.2 | `rhoSimpleFoam` |
 | `super` | > 1.2 | `rhoCentralFoam` |
-
-## Estado
-
-La malla actual: 2.3 M celdas, 97 % hexaedros. **No es estable**: dos corridas
-de `Allmesh` con el mismo `meshDict` dieron 0 y 168 volúmenes negativos (cfMesh
-no es determinista en paralelo). Ver TROUBLESHOOTING.
-
-Pendiente: medir y+ en cada punto del barrido y ajustar `nLayers`. Las aletas
-van con 3 capas porque el borde de ataque es un filo y más capas enredan la
-extrusión — está medido en TROUBLESHOOTING.
