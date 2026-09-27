@@ -6,7 +6,7 @@ De la geometría al Cd, en tres comandos.
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
 cd mesh && ./Allmesh && cd ..        # malla, ~5 min
-./newCase.sh ~/runs/m08 --regime trans --Minf 0.8
+./newCase.sh ~/runs/m08 --Minf 0.8
 cd ~/runs/m08 && ./Allrun 8
 ```
 
@@ -56,33 +56,32 @@ renombra a los patches que esperan los casos.
 vuelo que le pases.
 
 ```bash
-./newCase.sh ~/runs/m02 --regime sub   --Uinf 68
-./newCase.sh ~/runs/m12 --regime super --Minf 1.2 --np 16
-./newCase.sh ~/runs/a05 --regime sub   --Uinf 68 --alpha 5 --refine tip
+./newCase.sh ~/runs/m03 --Minf 0.3
+./newCase.sh ~/runs/m12 --Minf 1.2 --np 16
+./newCase.sh ~/runs/a05 --Minf 0.8 --alpha 5 --refine tip
 ```
 
 | opción | qué hace |
 |---|---|
-| `--regime sub\|trans\|super` | qué plantilla. Ver [SOLVERS.md](SOLVERS.md) |
 | `--np N` | descomposición |
 | `--refine tip\|fins` | refinamiento local en las aletas, ver sección 3 |
-| condiciones | `--alpha --beta --Ti --nuRatio`; `sub`: `--Uinf --nu --rhoInf`; `trans`/`super`: `--Minf --pInf --Tinf` |
+| condiciones | `--Minf --pInf --Tinf --alpha --beta --Ti --nuRatio` |
 
 El caso nunca se corre en la plantilla: `newCase.sh` se niega a pisar un
 directorio que ya existe.
 
 Si la plantilla trae archivos `*.j2`, `newCase.sh` los renderiza con
-`jinja2` contra su `config.json`. Hoy sólo la supersónica, para la rampa de
-Courant: [SOLVERS.md §2.4](SOLVERS.md).
+`jinja2` contra su `config.json`. Es la rampa de Courant: [SOLVERS.md
+§2.3](SOLVERS.md).
 
 ## 3. El barrido
 
 `sweep.txt` es una línea por corrida:
 
 ```
-m02  --regime sub    --Uinf 68
-m08  --regime trans  --Minf 0.8
-m18  --regime super  --Minf 1.8
+m03  --Minf 0.3
+m08  --Minf 0.8
+m18  --Minf 1.8
 ```
 
 `./run.sh` las arma y corre en serie bajo `runs/`. Saltea las que ya existen,
@@ -128,18 +127,17 @@ niega a arrancar si la malla no puede representar ese ángulo.
 ./Allrun 1        # serie
 ```
 
-Secuencia: `restore0Dir` → `decomposePar -force` → `potentialFoam` (campo
-inicial, ayuda mucho a la convergencia) → `simpleFoam` → `reconstructPar
--latestTime`. Logs en `log.<aplicación>`.
+Secuencia: `restore0Dir` → `decomposePar -force` → `rhoCentralFoam` →
+`reconstructPar -latestTime`. Logs en `log.<aplicación>`.
 
-`controlDict`: `endTime 3000` iteraciones, `residualControl` en `fvSolution`
-corta antes (p 1e-5, U/k/omega 1e-6). `startFrom latestTime`, así `./Allrun`
-sobre una corrida existente continúa en vez de empezar de cero (borrar `[1-9]*`
-y `processor*` para reiniciar, o `./Allclean` para volver a la plantilla).
+`endTime` es tiempo físico; el corte real es el `runTimeControl` sobre el
+promedio de `Cd`, que se activa en `minIter` ([SOLVERS.md §2.3](SOLVERS.md)).
+`startFrom latestTime`, así `./Allrun` sobre una corrida existente continúa en
+vez de empezar de cero (borrar `[1-9]*` y `processor*` para reiniciar, o
+`./Allclean` para volver a la plantilla).
 
-Orden de magnitud: la malla fina de un cuarto (3.5 M) a 8 procesos hace
-~1 iteración/s; 2000 iteraciones son ~40 min. La completa fina (14 M) es
-4× eso y necesita ~30 GB de RAM entre solver y reconstrucción.
+Orden de magnitud: la malla completa de 2.3 M a 8 procesos hace ~2.3 s por
+paso.
 
 ## 6. Resultados
 
@@ -147,7 +145,7 @@ Orden de magnitud: la malla fina de un cuarto (3.5 M) a 8 procesos hace
 |---|---|
 | `Cd`, `Cl`, `Cm` por iteración | `postProcessing/forceCoeffs1/0/coefficient.dat` |
 | fuerzas en N (presión, viscosa) | `postProcessing/forces1/0/force.dat`, `moment.dat` |
-| y+ por patch | `log.simpleFoam` (`grep -A5 "yPlus yPlus write"`) y campo `yPlus` en cada tiempo escrito |
+| y+ por patch | `log.rhoCentralFoam` (`grep -A5 "yPlus yPlus write"`) y campo `yPlus` en cada tiempo escrito |
 | `Cp`, `wallShearStress` | campos en los tiempos escritos |
 | residuales | `postProcessing/residuals/0/solverInfo.dat` |
 | ParaView | `touch caso.foam; paraview caso.foam` (o `paraFoam`) |
@@ -169,7 +167,7 @@ graficá Cd contra el tamaño de celda.
 
 ```bash
 for a in 0 2 4 6 8; do
-    ./newCase.sh ~/runs/a$a --regime sub --Uinf 68 --alpha $a --np 8
+    ./newCase.sh ~/runs/a$a --Minf 0.8 --alpha $a --np 8
     ( cd ~/runs/a$a && ./Allrun 8 )
 done
 ```
@@ -197,7 +195,7 @@ la punta sin volver a mallar.
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
 cd mesh && ./Allmesh && cd ..              # malla
-./newCase.sh ~/runs/NOMBRE --regime sub --Uinf 68 --np 8
+./newCase.sh ~/runs/NOMBRE --Minf 0.8 --np 8
 cd ~/runs/NOMBRE && ./Allrun 8
 
 ./run.sh                                   # el barrido entero de sweep.txt

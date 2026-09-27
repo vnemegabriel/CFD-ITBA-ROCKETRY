@@ -51,8 +51,7 @@ esac
 
 foamDictionary -entry finTipR -value constant/meshInfo > /dev/null 2>&1 || {
     echo "!! constant/meshInfo carries no fin geometry (finTipR, finX0, ...)."
-    echo "   It predates the refinement support: rebuild the mesh with"
-    echo "   mesh/build.py so the sidecar is written again."
+    echo "   Copy mesh/meshInfo over it."
     exit 1; }
 
 rm -f log.topoSet log.refineMesh log.checkMesh.refine log.renumberMesh.refine

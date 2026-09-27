@@ -47,4 +47,4 @@ echo
 grep -E "cells:|hexahedra:|prisms:|polyhedra:|negative cell volume|non-orthogonality Max|Max skewness|Failed|Mesh OK" \
      log.checkMesh | sed 's/^/   /'
 echo
-echo "next: ../newCase.sh <run> --regime sub --Minf 0.2"
+echo "next: ../newCase.sh <run> --Minf 0.3"

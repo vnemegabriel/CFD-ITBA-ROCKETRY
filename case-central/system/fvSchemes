@@ -1,0 +1,27 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+#include "${FOAM_CASE}/system/fvSchemesVanLeer"
+
+// first order while the free stream settles; system/fileUpdater switches to
+// fvSchemesVanLeer once the Courant ramp is through
+interpolationSchemes
+{
+    reconstruct(rho)    upwind;
+    reconstruct(U)      upwind;
+    reconstruct(T)      upwind;
+}
+
+// ************************************************************************* //
