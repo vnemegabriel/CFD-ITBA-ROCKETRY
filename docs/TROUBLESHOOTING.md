@@ -58,7 +58,7 @@ bounding box del modelo**, no múltiplos de ella. El utilitario imprime las dos
 cajas: mirá `log.surfaceGenerateBoundingBox`.
 
 **Quiero otra geometría**
-`./Allmesh mi_cohete.stl`. El STL tiene que traer los solids `nosecone`,
+Ponela en `mesh/stl/` y `./Allmesh stl/mi_cohete.stl`. El STL tiene que traer los solids `nosecone`,
 `body`, `boattail` y `fins`; `Allmesh` los renombra a `cone`, `walls`, `tail`
 y `fins`.
 

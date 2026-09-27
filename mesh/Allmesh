@@ -1,5 +1,5 @@
 #!/bin/sh
-# ./Allmesh [surface.stl]        default: stl/Aconcagua.stl
+# ./Allmesh [source.stl]         default: stl/Aconcagua.stl, the base geometry
 # Builds constant/polyMesh here.  Sizes are in system/meshDict.
 set -e
 cd "${0%/*}" || exit 1

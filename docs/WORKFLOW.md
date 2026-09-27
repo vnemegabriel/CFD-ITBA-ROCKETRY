@@ -46,7 +46,7 @@ volúmenes negativos. Está medido en `docs/TROUBLESHOOTING.md`.
 La malla actual son 2.3 M celdas, 97 % hexaedros. Todavía no es estable: el
 mismo `meshDict` dio 0 volúmenes negativos en una corrida y 168 en otra.
 
-Para mallar otra geometría: `./Allmesh mi_cohete.stl`. El STL tiene que traer
+Para mallar otra geometría: ponela en `mesh/stl/` y `./Allmesh stl/mi_cohete.stl`. El STL tiene que traer
 los solids nombrados `nosecone`, `body`, `boattail` y `fins` — `Allmesh` los
 renombra a los patches que esperan los casos.
 

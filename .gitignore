@@ -6,6 +6,7 @@ mesh/output/
 *.med
 *.unv
 *.stl
+!mesh/stl/Aconcagua.stl
 *.step
 *.stp
 *.brep
