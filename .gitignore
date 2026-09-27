@@ -87,6 +87,6 @@ desktop.ini
 mesh/constant/
 mesh/log.*
 mesh/case.foam
-mesh/surface.stl
-mesh/geometry.stl
+mesh/stl/surface.stl
+mesh/stl/geometry.stl
 mesh/geometry.fms

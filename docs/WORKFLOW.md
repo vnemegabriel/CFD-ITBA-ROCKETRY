@@ -17,7 +17,7 @@ dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
 
 ## 1. La malla
 
-`mesh/Allmesh` corre cfMesh sobre `mesh/Aconcagua.stl` y deja
+`mesh/Allmesh` corre cfMesh sobre `mesh/stl/Aconcagua.stl` y deja
 `mesh/constant/polyMesh`. Los seis pasos están en el script; los tamaños, en
 `mesh/system/meshDict`.
 

@@ -4,7 +4,7 @@ Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, un solo
 solver (`rhoCentralFoam`) para todo el barrido de Mach, en serie.
 
 ```
-mesh/         Aconcagua.stl, Allmesh, meshDict — la malla
+mesh/         stl/Aconcagua.stl, Allmesh, meshDict — la malla
 common/       Allrun, Allrefine — los scripts que va a usar cada corrida
 case-central/ la plantilla de caso
 newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo

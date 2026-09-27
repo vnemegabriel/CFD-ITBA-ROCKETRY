@@ -34,7 +34,7 @@ real se mueve con la velocidad. Medilo en cada corrida.
 ## La estructura
 
 ```
-mesh/         Aconcagua.stl, Allmesh, meshInfo, system/
+mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
 common/       Allrun, Allrefine
 case-central/ la plantilla, rhoCentralFoam para todo Mach
 newCase.sh    plantilla + malla + condiciones -> una corrida
