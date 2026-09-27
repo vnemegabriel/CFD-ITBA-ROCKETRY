@@ -48,3 +48,4 @@ en WSL. La plantilla necesita `jinja2-cli`
 (`pip install jinja2-cli`) para renderizar sus `*.j2`; ver
 [SOLVERS.md §2.3](docs/SOLVERS.md).
 
+
