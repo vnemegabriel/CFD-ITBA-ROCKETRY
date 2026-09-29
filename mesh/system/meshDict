@@ -119,7 +119,7 @@ boundaryLayers
         cone     { nLayers 10; }
         walls    { nLayers 10; }
         tail     { nLayers 10; }
-        fins     { nLayers 3; }
+        fins     { nLayers 3; allowDiscontinuity 1; }
     }
 
     optimiseLayer 1;

@@ -30,10 +30,19 @@ celdas):
 | 3, otra corrida | 2,299,313 | **168** | 178.6° | 313.7 |
 | 0 | 2,299,313 | **132** | 169.2° | 851.9 |
 
-Que 3 y 10 den las mismas celdas sugiere que cfMesh unifica `nLayers` entre
-patches vecinos y las aletas heredan las 10 del cuerpo. Que el mismo diccionario
-dé 0 o 168 volúmenes negativos dice que la malla está en el límite. Sin
-resolver.
+Que 3 y 10 den las mismas celdas es porque cfMesh unifica `nLayers` entre
+patches vecinos: las aletas heredaban las 10 del cuerpo. Los volúmenes
+negativos estaban todos en el borde de fuga, cerca de la puntera (x 2.88–2.93,
+r 0.19–0.235). Se arregla con `allowDiscontinuity 1` en `fins`, que deja a las
+aletas con sus 3 capas:
+
+| `fins` | celdas | vol ≤ 0 | no-ortog máx | skew máx | caras con tets malos |
+|---|---|---|---|---|---|
+| `nLayers 3` (hereda 10) | 2,299,425 | **102** | 174.5° | 334.5 | 19,058 |
+| `nLayers 3; allowDiscontinuity 1` | 2,075,194 | **0** | 87.5° | 14.6 | 3,492 |
+
+Consecuencia: el primer espesor en las aletas es mayor que antes, y el y+
+también. Ver la sección y+.
 
 **`checkMesh` falla 6 chequeos pero sin volúmenes negativos**
 Es lo normal en esta malla: skewness ~15, determinante chico en ~490 k celdas,
