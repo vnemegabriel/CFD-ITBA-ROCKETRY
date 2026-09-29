@@ -38,7 +38,7 @@ mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
 common/       Allrun, Allrefine
 case-central/ la plantilla, rhoCentralFoam para todo Mach
 newCase.sh    plantilla + malla + condiciones -> una corrida
-run.sh        sweep.txt en serie
+run.sh        sweep.txt en serie, sobre una malla
 ```
 
 No hay Python en la repo. La malla se define en `mesh/system/meshDict` y todo
@@ -49,7 +49,7 @@ a una caja, sin acoplarse a nada más.
 
 ## Reglas
 
-- **Medí antes de proponer.** `cd mesh && ./Allmesh` da celdas, volúmenes
+- **Medí antes de proponer.** `mesh/Allmesh <dir>` da celdas, volúmenes
   negativos, no-ortogonalidad y skewness en unos minutos. Un cambio sin número
   al lado no está terminado.
 - **`checkMesh` con volúmenes negativos = malla inservible.** Los otros

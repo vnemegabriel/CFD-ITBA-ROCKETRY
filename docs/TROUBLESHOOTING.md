@@ -67,14 +67,18 @@ bounding box del modelo**, no múltiplos de ella. El utilitario imprime las dos
 cajas: mirá `log.surfaceGenerateBoundingBox`.
 
 **Quiero otra geometría**
-Ponela en `mesh/stl/` y `./Allmesh stl/mi_cohete.stl`. El STL tiene que traer los solids `nosecone`,
+Ponela en `mesh/stl/` y `mesh/Allmesh ~/meshes/otro mesh/stl/mi_cohete.stl`. El STL tiene que traer los solids `nosecone`,
 `body`, `boattail` y `fins`; `Allmesh` los renombra a `cone`, `walls`, `tail`
 y `fins`.
 
 ## El caso
 
-**`newCase.sh` dice `no mesh: run mesh/Allmesh first`**
-No existe `mesh/constant/polyMesh`. No se versiona: reconstruilo.
+**`newCase.sh` dice `no mesh in <dir>`**
+Ese directorio no tiene `constant/polyMesh`. Las mallas no se versionan:
+`mesh/Allmesh <dir>`.
+
+**`Allmesh` dice `<dir> exists`**
+Nunca pisa una malla. Elegí otro nombre o borrala.
 
 **`newCase.sh` se niega a arrancar**
 Nunca pisa un directorio existente. Elegí otro nombre o borralo.
@@ -173,7 +177,9 @@ superficie y con ella la primera capa.
 ## Entorno
 
 **`newCase.sh`: `!! needs jinja2`**
-La plantilla renderiza sus `*.j2` con `jinja2-cli`: `pip install jinja2-cli`.
+La plantilla renderiza sus `*.j2` con `jinja2-cli`: `pipx install jinja2-cli`
+(con `sudo apt install pipx` antes; Ubuntu no deja usar `pip` sobre el
+Python del sistema, y `jinja2-cli` no está en apt).
 
 **Scripts con `\r`: `bad interpreter` o `syntax error near unexpected token`**
 Finales de línea CRLF. El repo lleva `.gitattributes` con `eol=lf`; si un

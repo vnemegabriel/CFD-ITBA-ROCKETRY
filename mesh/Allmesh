@@ -1,8 +1,15 @@
 #!/bin/sh
-# ./Allmesh [source.stl]         default: stl/Aconcagua.stl, the base geometry
-# Builds constant/polyMesh here.  Sizes are in system/meshDict.
+# ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finLevel n]
+#
+#     ./Allmesh ~/meshes/base
+#     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
+#     ./Allmesh ~/meshes/otro stl/mi_cohete.stl
+#
+# Builds the mesh in <mesh-dir> with a copy of system/ and meshInfo, so every
+# mesh keeps the meshDict that made it.  The options are set on that copy.
+# Never overwrites an existing directory.
 set -e
-cd "${0%/*}" || exit 1
+HERE=$(cd "${0%/*}" && pwd)
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
 
 check() {
@@ -11,24 +18,43 @@ check() {
     return 0
 }
 
-SRC="${1:-stl/Aconcagua.stl}"
+usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+DIR=""; SRC=""; H=""; FIN=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --maxCellSize) H=$2;   shift 2 ;;
+        --finLevel)    FIN=$2; shift 2 ;;
+        -*) echo "unknown option $1"; usage ;;
+        *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
+            shift ;;
+    esac
+done
+[ -n "$DIR" ] || usage
+SRC=${SRC:-$HERE/stl/Aconcagua.stl}
+[ -f "$SRC" ] || SRC=$HERE/$SRC
 [ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
+SRC=$(realpath "$SRC")
+[ -e "$DIR" ] && { echo "!! $DIR exists -- pick a new directory"; exit 1; }
 
-rm -rf constant/polyMesh 0
-rm -f log.* stl/surface.stl stl/geometry.stl geometry.fms
+mkdir -p "$DIR"
+cp -r "$HERE/system" "$HERE/meshInfo" "$DIR/"
+cd "$DIR"
+[ -n "$H" ]   && foamDictionary -entry maxCellSize -set "$H" system/meshDict > /dev/null
+[ -n "$FIN" ] && foamDictionary -entry localRefinement/fins/additionalRefinementLevels \
+                     -set "$FIN" system/meshDict > /dev/null
 
 # STL solid names become patch names; the cases expect these four.
 sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
     -e 's/^\( *\(end\)\?solid \)body\b/\1walls/' \
     -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
-    "$SRC" > stl/surface.stl
+    "$SRC" > surface.stl
 
 # Metres out from the model bounding box, not multiples of it.
-runApplication surfaceGenerateBoundingBox stl/surface.stl stl/geometry.stl \
+runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
     17.73 38.415 11.5395 11.5395 11.5395 11.5395
 check surfaceGenerateBoundingBox
 
-runApplication surfaceFeatureEdges -angle 30 stl/geometry.stl geometry.fms
+runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
 check surfaceFeatureEdges
 
 runApplication cartesianMesh
@@ -42,9 +68,15 @@ check checkMesh
 
 N=$(awk '/^    cells:/{print $2; exit}' log.checkMesh)
 foamDictionary -entry nCells -set "$N" meshInfo > /dev/null
+foamDictionary -entry maxCellSize -add "$(foamDictionary -entry maxCellSize -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry finLevel -add \
+    "$(foamDictionary -entry localRefinement/fins/additionalRefinementLevels -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry meshDir -add "\"$(pwd)\"" meshInfo > /dev/null
 
 echo
 grep -E "cells:|hexahedra:|prisms:|polyhedra:|negative cell volume|non-orthogonality Max|Max skewness|Failed|Mesh OK" \
      log.checkMesh | sed 's/^/   /'
 echo
-echo "next: ../newCase.sh <run> --Minf 0.3"
+grep -q "negative cell volume" log.checkMesh && {
+    echo "!! negative cell volumes: this mesh is unusable"; exit 1; }
+echo "next: ./newCase.sh <run> --mesh $(pwd) --Minf 0.3"

@@ -20,7 +20,7 @@ symmetryFraction 1;
 
 fins            true;
 
-nCells          2299313;
+nCells          0;
 
 Aref            0.0179081;
 
@@ -30,11 +30,8 @@ rBody           0.0755;
 
 lBody           2.955;
 
-Uref            100;
 
-nuRef           1.5e-05;
 
-yPlusTarget     32;
 
 finRootR        0.075;
 

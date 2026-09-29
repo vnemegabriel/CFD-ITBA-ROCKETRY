@@ -10,7 +10,7 @@ FoamFile
     object      meshInfo;
 }
 
-sector              quarter;
+sector              quarter; // quarter, half, full
 symmetryFraction    0.25;
 fins                true;
 nCells              0;
