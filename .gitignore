@@ -1,5 +1,5 @@
 # --- Generated meshes: regenerate from the .params.py sidecar, never commit
-mesh/output/
+flightModel/mesh/output/
 *.msh
 *.msh2
 *.msh4
@@ -83,9 +83,9 @@ Thumbs.db
 desktop.ini
 
 # mesh build products
-mesh/constant/
-mesh/log.*
-mesh/case.foam
-mesh/stl/surface.stl
-mesh/stl/geometry.stl
-mesh/geometry.fms
+flightModel/mesh/constant/
+flightModel/mesh/log.*
+flightModel/mesh/case.foam
+flightModel/mesh/stl/surface.stl
+flightModel/mesh/stl/geometry.stl
+flightModel/mesh/geometry.fms
