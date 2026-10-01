@@ -7,9 +7,9 @@ solver (`rhoCentralFoam`) para todo el barrido de Mach, en serie.
 flightModel/mesh/         stl/Aconcagua.stl, Allmesh, meshDict — la malla
 flightModel/common/       Allrun, Allrefine — los scripts que va a usar cada corrida
 flightModel/case-central/ la plantilla de caso
-newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
-run.sh        corre todo sweep.txt en serie
-sweep.txt     un punto de Mach por línea
+flightModel/newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
+flightModel/run.sh        corre todo sweep.txt en serie
+flightModel/sweep.txt     un punto de Mach por línea
 flightModel/docs/         cómo se usa y por qué
 ```
 
@@ -19,14 +19,14 @@ flightModel/docs/         cómo se usa y por qué
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
 flightModel/mesh/Allmesh ~/meshes/base                    # ~2 min, 2.1 M celdas
-./newCase.sh ~/runs/prueba --mesh ~/meshes/base --Minf 0.8 --np 8
+flightModel/newCase.sh ~/runs/prueba --mesh ~/meshes/base --Minf 0.8 --np 8
 cd ~/runs/prueba && ./Allrun 8
 ```
 
 El barrido entero:
 
 ```bash
-./run.sh
+flightModel/run.sh
 ```
 
 Los directorios de corrida van **fuera de OneDrive y fuera de `/mnt/c`**: las
