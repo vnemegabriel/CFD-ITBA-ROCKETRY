@@ -1,0 +1,46 @@
+# OUTPUT
+*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS — macOS metadata & hidden info files
+.DS_Store
+.DS_Store?
+.AppleDouble/
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.apdisk
+cache/.*
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Dependencies
+venv/
+env/
+node_modules/
+
+# Results
+lam*.json
+results*
+
+# Temporary
+*.bak
+*.orig
+Thumbs.db
+*.tmp

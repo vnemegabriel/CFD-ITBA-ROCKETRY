@@ -1,0 +1,12 @@
+Pendientes flutter
+
+5/5/26
+
+Testear validez de factor de correccion del aspect ratio AR de Jones (ver conversacion Debug G_eff...)
+
+Testear diferentes condiciones de borde
+
+8/5/26
+
+Leer paper AEROELASTIC PREDICTION de Meijer y paper de Liu. Complementar con refs. de Meijer
+
