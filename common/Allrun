@@ -31,27 +31,6 @@ case "$SECTOR" in
         fi ;;
 esac
 
-# ---- consistency: run speed vs the wall spacing the mesh was built for ------
-# The layers fix y1 for ONE velocity, recorded as Uref in constant/meshInfo.  Running at a different Uinf leaves y1 alone, so y+
-# drifts with no error anywhere.  For a fixed y1, y+ scales as (U/nu)^0.9.
-UREF=$(foamDictionary -entry Uref        -value constant/meshInfo 2>/dev/null)
-NUREF=$(foamDictionary -entry nuRef      -value constant/meshInfo 2>/dev/null)
-YPREF=$(foamDictionary -entry yPlusTarget -value constant/meshInfo 2>/dev/null)
-# Uinf is DERIVED from Minf, so it is read from flowDerived.
-UINF=$(foamDictionary -entry Uinf  -value system/flowDerived 2>/dev/null)
-NURUN=$(foamDictionary -entry nuInf -value system/flowDerived 2>/dev/null)
-if [ -n "$UREF" ] && [ -n "$NUREF" ] && [ -n "$YPREF" ]    && [ -n "$UINF" ] && [ -n "$NURUN" ]; then
-    YP=$(awk "BEGIN{ printf \"%.0f\", $YPREF * (($UINF/$NURUN)/($UREF/$NUREF))^0.9 }")
-    echo "Uinf $UINF m/s   mesh built for $UREF m/s   expected y+ ~ $YP (target $YPREF)"
-    if [ "$(awk -v y="$YP" 'BEGIN{print (y < 10 || y > 150)}')" = 1 ]; then
-        echo "   !! that is outside the band this mesh was designed for."
-        echo "      nutUSpaldingWallFunction will not fall over, but the near-wall"
-        echo "      resolution no longer matches the target and the friction drag"
-        echo "      carries that bias.  For a clean run rebuild the mesh with"
-        echo "      the run speed (Uinf above), see docs/TROUBLESHOOTING.md"
-    fi
-fi
-
 # ---- processors --------------------------------------------------------------
 if [ -n "$1" ]; then
     foamDictionary -entry numberOfSubdomains -set "$1" system/decomposeParDict > /dev/null
@@ -73,4 +52,4 @@ fi
 echo
 echo "coefficients: postProcessing/forceCoeffs1/0/coefficient.dat"
 tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null
-echo "y+ per patch: grep -A6 'yPlus' log.$APP | tail -12"
+echo "y+ per patch: grep -A6 'yPlus' log.$APP | tail -12   (measure it: the mesh sets no y+ target)"

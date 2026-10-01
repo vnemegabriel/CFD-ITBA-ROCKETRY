@@ -5,8 +5,8 @@ De la geometría al Cd, en tres comandos.
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
-cd mesh && ./Allmesh && cd ..        # malla, ~5 min
-./newCase.sh ~/runs/m08 --Minf 0.8
+mesh/Allmesh ~/meshes/base          # malla, ~2 min
+./newCase.sh ~/runs/m08 --mesh ~/meshes/base --Minf 0.8
 cd ~/runs/m08 && ./Allrun 8
 ```
 
@@ -17,8 +17,11 @@ dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
 
 ## 1. La malla
 
-`mesh/Allmesh` corre cfMesh sobre `mesh/stl/Aconcagua.stl` y deja
-`mesh/constant/polyMesh`. Los seis pasos están en el script; los tamaños, en
+`mesh/Allmesh <dir>` corre cfMesh sobre `mesh/stl/Aconcagua.stl` y deja la
+malla en `<dir>/constant/polyMesh`, junto con una copia de `system/` y
+`meshInfo`: cada malla guarda el `meshDict` que la hizo, así que pueden
+convivir varias (base, fina, otra geometría). Nunca pisa un directorio que
+existe. Los seis pasos están en el script; los tamaños, en
 `mesh/system/meshDict`.
 
 Todo en `meshDict` es un **nivel**: un entero que parte el tamaño de celda al
@@ -43,10 +46,12 @@ Tres grupos de perillas y nada más:
 aleta tiene 6 mm de espesor: con 10 capas la extrusión se enreda y aparecen
 volúmenes negativos. Está medido en `docs/TROUBLESHOOTING.md`.
 
-La malla actual son 2.3 M celdas, 97 % hexaedros. Todavía no es estable: el
-mismo `meshDict` dio 0 volúmenes negativos en una corrida y 168 en otra.
+La malla actual son 2.1 M celdas, 96 % hexaedros, sin volúmenes negativos.
+Detrás de la base la estela baja de a un nivel en tres cilindros coaxiales
+(`baseWake` 6.25 mm, `nearWake` 12.5 mm, `midWake` 25 mm) antes de entrar a
+`wake`.
 
-Para mallar otra geometría: ponela en `mesh/stl/` y `./Allmesh stl/mi_cohete.stl`. El STL tiene que traer
+Para mallar otra geometría: ponela en `mesh/stl/` y `mesh/Allmesh ~/meshes/otro mesh/stl/mi_cohete.stl`. El STL tiene que traer
 los solids nombrados `nosecone`, `body`, `boattail` y `fins` — `Allmesh` los
 renombra a los patches que esperan los casos.
 
@@ -56,15 +61,16 @@ renombra a los patches que esperan los casos.
 vuelo que le pases.
 
 ```bash
-./newCase.sh ~/runs/m03 --Minf 0.3
-./newCase.sh ~/runs/m12 --Minf 1.2 --np 16
-./newCase.sh ~/runs/a05 --Minf 0.8 --alpha 5 --refine tip
+./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
+./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --np 16
+./newCase.sh ~/runs/a05 --mesh ~/meshes/base --Minf 0.8 --alpha 5 --refine tip
 ```
 
 | opción | qué hace |
 |---|---|
 | `--np N` | descomposición |
 | `--refine tip\|fins` | refinamiento local en las aletas, ver sección 3 |
+| malla | `--mesh <dir>`, obligatorio |
 | condiciones | `--Minf --pInf --Tinf --alpha --beta --Ti --nuRatio` |
 
 El caso nunca se corre en la plantilla: `newCase.sh` se niega a pisar un
@@ -79,13 +85,22 @@ Si la plantilla trae archivos `*.j2`, `newCase.sh` los renderiza con
 `sweep.txt` es una línea por corrida:
 
 ```
-m03  --Minf 0.3
-m08  --Minf 0.8
-m18  --Minf 1.8
+m03     --mesh base --Minf 0.3
+m08     --mesh base --Minf 0.8
+m03-h2  --mesh h2 --maxCellSize 0.8 --Minf 0.3
 ```
 
-`./run.sh` las arma y corre en serie bajo `runs/`. Saltea las que ya existen,
-así que si se corta, volvés a lanzarlo y sigue donde estaba.
+`./run.sh [sweep.txt] [runs] [mallas]` las arma y corre en serie bajo `runs/`.
+Saltea las que ya existen, así que si se corta, volvés a lanzarlo y sigue
+donde estaba.
+
+`--mesh` es obligatorio. Un nombre suelto vive en `~/meshes/`. Si la malla no
+existe, `run.sh` la construye antes con `mesh/Allmesh`, aplicando
+`--maxCellSize` y `--finLevel` (nivel de `fins`) a la copia del `meshDict`; las
+líneas siguientes que la nombran la reusan. Si una línea pide una malla que ya
+existe con otro `maxCellSize` o `finLevel`, el barrido se detiene en vez de
+correr sobre la malla equivocada. `Allmesh` también se detiene si la malla sale
+con volúmenes negativos.
 
 **Una malla por punto de Mach.** `y1` sale de la extrusión de capas contra la
 celda de superficie, no de un y+ objetivo, así que el y+ real cambia con la
@@ -158,16 +173,30 @@ paso.
 ./run.sh
 ```
 
-**Convergencia de malla.** Subí o bajá `maxCellSize` en `mesh/system/meshDict`
-por factores de 2, dejando los niveles quietos: eso escala todo el campo sin
-tocar la resolución relativa. Corré el mismo punto de Mach en cada malla y
-graficá Cd contra el tamaño de celda.
+**Convergencia de malla.** Se varía sólo `maxCellSize`, con una razón
+constante, y los niveles quietos: eso escala todo el campo sin tocar la resolución
+relativa, que es lo que pide una extrapolación de Richardson. En `sweep.txt`:
+
+```
+m03-h1  --mesh h1 --maxCellSize 1.6 --Minf 0.3
+m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
+m03-h3  --mesh h3 --maxCellSize 0.8 --Minf 0.3
+```
+
+La razón es √2 (el GCI de Celik et al. 2008 pide más de 1.3): cada paso
+multiplica las celdas por hasta 2√2 ≈ 2.8, así que `h3` queda en ~17 M como
+mucho. Con razón 2 serían ×8 por paso, y la tercera malla pasaría los 100 M.
+El primer espesor de capa se achica con la celda de superficie, así que el y+
+también cambia entre mallas: medilo en las tres. El OpenFOAM ToolChain
+hace sus mallas R1–R6 a mano, cambiando a la vez `maxCellSize` y la cantidad
+de cajas; sirven para elegir una malla, pero la razón de refinamiento no es
+constante y no alcanzan para estimar el error de discretización.
 
 **Barrido de ángulo de ataque.**
 
 ```bash
 for a in 0 2 4 6 8; do
-    ./newCase.sh ~/runs/a$a --Minf 0.8 --alpha $a --np 8
+    ./newCase.sh ~/runs/a$a --mesh ~/meshes/base --Minf 0.8 --alpha $a --np 8
     ( cd ~/runs/a$a && ./Allrun 8 )
 done
 ```
@@ -182,7 +211,8 @@ la punta sin volver a mallar.
 
 ## 8. Convenciones
 
-- `mesh/constant/polyMesh` no se versiona: se reconstruye con `./Allmesh` en
+- Las mallas no se versionan y viven fuera de la repo: se reconstruyen con
+  `mesh/Allmesh <dir>` en
   cinco minutos. Lo que se versiona es el STL y el `meshDict`.
 - Los directorios de corrida van fuera de la repo, fuera de OneDrive y fuera
   de `/mnt/c`.
@@ -194,8 +224,8 @@ la punta sin volver a mallar.
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
-cd mesh && ./Allmesh && cd ..              # malla
-./newCase.sh ~/runs/NOMBRE --Minf 0.8 --np 8
+mesh/Allmesh ~/meshes/base                 # malla
+./newCase.sh ~/runs/NOMBRE --mesh ~/meshes/base --Minf 0.8 --np 8
 cd ~/runs/NOMBRE && ./Allrun 8
 
 ./run.sh                                   # el barrido entero de sweep.txt

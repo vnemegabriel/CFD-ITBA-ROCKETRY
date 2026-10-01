@@ -1,7 +1,14 @@
 # One run per line:  <name> <newCase.sh options>
+# --mesh names the mesh (a bare name lives in ~/meshes).  If it does not exist,
+# run.sh builds it first, with --maxCellSize and --finLevel if given.
 # Blank lines and # are ignored.  ./run.sh runs them in series.
-m03  --Minf 0.3
-m06  --Minf 0.6
-m08  --Minf 0.8
-m12  --Minf 1.2
-m18  --Minf 1.8
+m03  --mesh base --Minf 0.3
+m06  --mesh base --Minf 0.6
+m08  --mesh base --Minf 0.8
+m12  --mesh base --Minf 1.2
+m18  --mesh base --Minf 1.8
+
+# Mesh convergence at M 0.3: ratio sqrt(2), cells up to x2.8 per step.
+# m03-h1  --mesh h1 --maxCellSize 1.6  --Minf 0.3
+# m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
+# m03-h3  --mesh h3 --maxCellSize 0.8  --Minf 0.3

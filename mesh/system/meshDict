@@ -83,6 +83,36 @@ objectRefinements
         lengthZ     1.000;
     }
 
+    baseWake
+    {
+        type        cone;
+        additionalRefinementLevels 8;      // 6.25 mm, same as the tail wall
+        p0          (2.940 0 0);
+        p1          (3.300 0 0);
+        radius0     0.080;
+        radius1     0.080;
+    }
+
+    nearWake
+    {
+        type        cone;
+        additionalRefinementLevels 7;      // 12.5 mm
+        p0          (2.900 0 0);
+        p1          (3.800 0 0);
+        radius0     0.140;
+        radius1     0.140;
+    }
+
+    midWake
+    {
+        type        cone;
+        additionalRefinementLevels 6;      // 25 mm
+        p0          (2.850 0 0);
+        p1          (5.000 0 0);
+        radius0     0.260;
+        radius1     0.260;
+    }
+
     wake
     {
         type        box;
@@ -119,7 +149,7 @@ boundaryLayers
         cone     { nLayers 10; }
         walls    { nLayers 10; }
         tail     { nLayers 10; }
-        fins     { nLayers 3; }
+        fins     { nLayers 3; allowDiscontinuity 1; }
     }
 
     optimiseLayer 1;

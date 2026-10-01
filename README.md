@@ -18,8 +18,8 @@ docs/         cómo se usa y por qué
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
-cd mesh && ./Allmesh && cd ..                 # ~2 min, 2.3 M celdas
-./newCase.sh ~/runs/prueba --Minf 0.8 --np 8
+mesh/Allmesh ~/meshes/base                    # ~2 min, 2.1 M celdas
+./newCase.sh ~/runs/prueba --mesh ~/meshes/base --Minf 0.8 --np 8
 cd ~/runs/prueba && ./Allrun 8
 ```
 

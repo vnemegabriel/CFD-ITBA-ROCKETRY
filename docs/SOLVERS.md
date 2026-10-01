@@ -62,36 +62,8 @@ discontinuidad y lo mantiene de segundo orden en las zonas suaves, que es lo
 que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.*
 **32**, 101-136.
 
-### 2.2 El precio a bajo Mach
 
-**Por qué el barrido arranca en M 0.3.** Es la hipótesis de compresibilidad:
-el error de despreciarla en la presión es del orden de M²/4, 2.3 % a M 0.3
-(Anderson, *Fundamentals of Aerodynamics*, 6ª ed., §8.3, del desarrollo
-`p₀/p = 1 + M²/4 + ...`). Abajo de eso el Cd casi no cambia con el Mach, y
-correrlo con un solver compresible sólo compra rigidez.
-
-`rhoCentralFoam` está hecho para choques, y a M 0.3 y 0.6 se paga de dos
-maneras. Hay que saberlo antes de mirar esos dos puntos de la curva.
-
-**Rigidez.** El paso explícito lo fija la onda más rápida, `|U| + c`; lo que
-interesa es el transporte a `|U|`. A M 0.3 cada paso avanza el flujo un
-M/(1+M) ≈ 23 % de lo que avanzaría con un paso convectivo, y llegar al
-estacionario cuesta del orden de 1/M veces más pasos que a M 1.
-
-**Disipación.** Un esquema upwind o central-upwind sin precondicionar mete una
-disipación que escala con `c` y no con `|U|`. Cuando M → 0, las fluctuaciones
-de presión que genera son de orden M, mientras que las físicas son de orden
-M². El resultado es un campo de presión suavizado de más. Guillard y Viozat
-(1999), "On the behaviour of upwind schemes in the low Mach number limit",
-*Computers & Fluids* **28**, 63-86.
-
-En la práctica: los Cd a M 0.3 y 0.6 se validan contra datos o contra una
-corrida de `rhoSimpleFoam` antes de confiar en ellos
-([VALIDATION.md](VALIDATION.md)). Si la diferencia no es aceptable, lo
-indicado es volver a un solver basado en presión sólo en ese tramo, con la
-discontinuidad numérica que eso trae.
-
-### 2.3 Arranque: rampa de Courant
+### 2.2 Arranque: rampa de Courant
 
 Calcada del OpenFOAM ToolChain (`templates/rhoCentralFoam`): arrancar con
 `maxCo` muy bajo y esquemas de primer orden, y subir de a pasos. La corriente
