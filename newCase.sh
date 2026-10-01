@@ -38,10 +38,10 @@ mkdir -p "$RUN"
 
 rsync -a --exclude 'constant/polyMesh' --exclude 'log.*' --exclude '/0' \
       --exclude 'processor*' --exclude 'postProcessing' --exclude '[1-9]*' \
-      "$ROOT/$TEMPLATE/" "$RUN/"
+      "$ROOT/flightModel/$TEMPLATE/" "$RUN/"
 cp -r "$MESH/constant/polyMesh" "$RUN/constant/"
 cp "$MESH/meshInfo" "$RUN/constant/meshInfo"
-cp "$ROOT/common/Allrun" "$ROOT/common/Allrefine" "$RUN/"
+cp "$ROOT/flightModel/common/Allrun" "$ROOT/flightModel/common/Allrefine" "$RUN/"
 chmod +x "$RUN"/Allrun "$RUN"/Allrefine
 
 cd "$RUN"

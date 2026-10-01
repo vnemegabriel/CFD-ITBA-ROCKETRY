@@ -52,7 +52,7 @@ while read -r NAME REST; do
         exit 1
     else
         echo "== mesh $MESH"
-        if ! "$ROOT/mesh/Allmesh" "$MESH" ${H:+--maxCellSize "$H"} ${FIN:+--finLevel "$FIN"} < /dev/null; then
+        if ! "$ROOT/flightModel/mesh/Allmesh" "$MESH" ${H:+--maxCellSize "$H"} ${FIN:+--finLevel "$FIN"} < /dev/null; then
             echo "!! $MESH failed to build, stopping"
             exit 1
         fi
