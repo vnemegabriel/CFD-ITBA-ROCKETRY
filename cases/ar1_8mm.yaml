@@ -1,0 +1,9 @@
+geometry: {cr: 0.300, ct: 0.150, span: 0.160, sweep_deg: 57.4}
+mesh: {nx: 30, ny: 16}
+laminate: {layup: ar1, thickness_mm: 8.0, vf: 0.5, beta_deg: 5.0}
+clamp_x: [[0.0, 0.300]]   # root x-intervals [m] fully clamped
+modes: 10
+g: 0.02                   # structural loss factor
+aero: {theory: ackeret, sides: 2}
+flight: {csv: data/flight_data.csv, mach_min: 1.05}
+q_factor: 20              # search q up to q_factor * q_flight
