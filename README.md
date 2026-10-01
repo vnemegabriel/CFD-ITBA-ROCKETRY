@@ -23,8 +23,6 @@ The run is configured entirely by the case YAML: geometry, mesh, laminate (`layu
 | `finflutter/flight.py` | ISA, flight CSV (time, altitude ft, Vz m/s) |
 | `tests/test_physics.py` | Leissa CFFF frequencies, Dowell SSSS panel flutter (λ ≈ 512), aero-damping sign, GAF fit, CLT regression |
 
-`v1/`, `v2/` (MATLAB) and `core/` are superseded by this package.
-
 ## Model
 
 Pressure jump across the fin (flow +x, both faces): Δp = sides · c₀ q (∂w/∂x + (c₁/c₀) ẇ/U), with
