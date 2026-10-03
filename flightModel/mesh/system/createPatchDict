@@ -1,9 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-|  The wall patches already come out of cfMesh with the names the cases        |
-|  expect, because Allmesh renames the solids of the STL before meshing.       |
-|  All this file does is turn the six faces of the bounding box into the       |
-|  three patches the cases know: inlet, outlet, and one `box` farfield.        |
-|  Types are set afterwards by fixPatchTypes.py in the case, from meshInfo.    |
+|  Turns the six faces of the bounding box into inlet, outlet and one box     |
+|  farfield.  The wall patches come out of cartesianMesh already named and    |
+|  typed wall, and Allmesh checks it.                                         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -31,8 +29,6 @@ patches
         patches (xMax);
     }
     {
-        // the four lateral faces become one farfield, so the cases see the
-        // same patch list a quarter/half/full structured mesh gave them
         name box;
         patchInfo { type patch; }
         constructFrom patches;

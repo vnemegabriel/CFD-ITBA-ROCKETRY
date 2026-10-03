@@ -219,37 +219,14 @@ patches with fixed names. `createPatch` merges them:
 
 ### 6.1 Type of the wall patches
 
-> **CAUTION** No step in the procedure sets the type `wall` on `cone`,
-> `walls`, `tail` and `fins`. They get the type from the `.fms` file. The
-> header of `createPatchDict` refers to a script `fixPatchTypes.py`. This
-> script is not in the repository.
->
-> The wall functions in `0.orig/` (`nutUSpaldingWallFunction`,
-> `kLowReWallFunction`, `omegaWallFunction`, `alphatWallFunction`) and the
-> `yPlus` function object need patches of type `wall`. On a patch of type
-> `patch`, the solver stops with an error.
+The `.fms` file gives no type to its patches. `cartesianMesh` makes all of
+them `wall`. `createPatch` makes `inlet`, `outlet` and `box` as new patches
+of type `patch`, so only `cone`, `walls`, `tail` and `fins` stay `wall`.
 
-Procedure to examine the types:
-
-```bash
-grep -A2 -E '^ *(cone|walls|tail|fins)$' <mesh-dir>/constant/polyMesh/boundary
-```
-
-If the type is `patch`, one possible correction is the cfMesh entry
-`renameBoundary` in `meshDict` [not tested in this repository]:
-
-```
-renameBoundary
-{
-    newPatchNames
-    {
-        cone  { newName cone;  type wall; }
-        walls { newName walls; type wall; }
-        tail  { newName tail;  type wall; }
-        fins  { newName fins;  type wall; }
-    }
-}
-```
+The wall functions in `0.orig/` and the `yPlus` function object need type
+`wall`. After `createPatch`, `Allmesh` reads the type of each patch in
+`wallPatches` of `meshInfo` from `constant/polyMesh/boundary`. If a type is
+not `wall`, `Allmesh` stops.
 
 ## 7. meshInfo
 

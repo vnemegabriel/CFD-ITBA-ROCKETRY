@@ -63,6 +63,11 @@ check cartesianMesh
 runApplication createPatch -overwrite
 check createPatch
 
+for P in $(foamDictionary -entry wallPatches -value meshInfo | tr -d '()'); do
+    T=$(foamDictionary -entry "entry0/$P/type" -value constant/polyMesh/boundary 2>/dev/null) || T=missing
+    [ "$T" = wall ] || { echo "!! patch $P is $T, the wall functions need wall"; exit 1; }
+done
+
 runApplication checkMesh -allTopology -allGeometry
 check checkMesh
 
