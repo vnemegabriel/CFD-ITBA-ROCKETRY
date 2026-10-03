@@ -1,198 +1,315 @@
-# Flujo de trabajo
+# Workflow
 
-De la geometría al Cd, en tres comandos.
+This document gives the procedures that change the STL geometry into force
+coefficients. Each procedure gives the command, the steps that the script
+does, and the result.
+
+- [MESH.md](MESH.md) gives the mesh dictionaries.
+- [SOLVERS.md](SOLVERS.md) gives the case dictionaries and the models.
+- [VALIDATION.md](VALIDATION.md) gives the validation procedures.
+
+## 1. Directory structure
+
+| Path | Contents |
+|---|---|
+| `mesh/Allmesh` | Script that makes one mesh. |
+| `mesh/stl/Aconcagua.stl` | Geometry of the rocket. |
+| `mesh/system/` | `meshDict`, `createPatchDict`, and the `controlDict`, `fvSchemes`, `fvSolution` that the mesh applications need. |
+| `mesh/meshInfo` | Reference values and fin geometry of the mesh. |
+| `case-central/` | Case template for `rhoCentralFoam`. |
+| `common/Allrun`, `common/Allrefine` | Scripts that `newCase.sh` copies into each case. |
+| `newCase.sh` | Script that makes one case from the template and one mesh. |
+| `run.sh`, `sweep.txt` | Script and input file for a sweep of cases. |
+
+## 2. Requirements
+
+| Item | Requirement |
+|---|---|
+| OpenFOAM | ESI v2412, with cfMesh (`cartesianMesh`). |
+| `jinja2` | `jinja2-cli`. Install it with `pipx install jinja2-cli`. |
+| Shell tools | `bash`, `rsync`, `awk`, GNU `sed`. |
+
+Do this step before you use a script:
 
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
-
-mesh/Allmesh ~/meshes/base          # malla, ~2 min
-./newCase.sh ~/runs/m08 --mesh ~/meshes/base --Minf 0.8
-cd ~/runs/m08 && ./Allrun 8
 ```
 
-O el barrido entero de una: editá `sweep.txt` y corré `./run.sh`.
+All scripts stop with the message `source the OpenFOAM bashrc first` if you
+do not do this step.
 
-Poné los directorios de corrida **fuera de OneDrive y fuera de `/mnt/c`**: las
-dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
+> **CAUTION** Put the mesh directories and the case directories outside
+> OneDrive and outside `/mnt/c`. These file systems make the OpenFOAM input
+> and output several times slower.
 
-## 1. La malla
+## 3. Make a mesh
 
-`mesh/Allmesh <dir>` corre cfMesh sobre `mesh/stl/Aconcagua.stl` y deja la
-malla en `<dir>/constant/polyMesh`, junto con una copia de `system/` y
-`meshInfo`: cada malla guarda el `meshDict` que la hizo, así que pueden
-convivir varias (base, fina, otra geometría). Nunca pisa un directorio que
-existe. Los seis pasos están en el script; los tamaños, en
-`mesh/system/meshDict`.
-
-Todo en `meshDict` es un **nivel**: un entero que parte el tamaño de celda al
-medio, a partir de un único `maxCellSize`.
-
-| nivel | tamaño |
-|---|---|
-| 4 | 100 mm |
-| 6 | 25 mm |
-| 8 | 6.25 mm |
-| 9 | 3.13 mm |
-| 10 | 1.56 mm |
-
-Tres grupos de perillas y nada más:
-
-- `localRefinement` — un nivel y un espesor de banda por patch
-  (`cone`, `walls`, `tail`, `fins`).
-- `objectRefinements` — cajas de refinamiento de volumen.
-- `boundaryLayers` — `nLayers` y `thicknessRatio`, y `nLayers` por patch.
-
-**Las aletas van con `nLayers 3`, no más.** El borde de ataque es un filo y la
-aleta tiene 6 mm de espesor: con 10 capas la extrusión se enreda y aparecen
-volúmenes negativos. Está medido en `docs/TROUBLESHOOTING.md`.
-
-La malla actual son 2.1 M celdas, 96 % hexaedros, sin volúmenes negativos.
-Detrás de la base la estela baja de a un nivel en tres cilindros coaxiales
-(`baseWake` 6.25 mm, `nearWake` 12.5 mm, `midWake` 25 mm) antes de entrar a
-`wake`.
-
-Para mallar otra geometría: ponela en `mesh/stl/` y `mesh/Allmesh ~/meshes/otro mesh/stl/mi_cohete.stl`. El STL tiene que traer
-los solids nombrados `nosecone`, `body`, `boattail` y `fins` — `Allmesh` los
-renombra a los patches que esperan los casos.
-
-## 2. El caso
-
-`newCase.sh` copia una plantilla más la malla, y escribe las condiciones de
-vuelo que le pases.
+### 3.1 Command
 
 ```bash
-./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
-./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --np 16
-./newCase.sh ~/runs/a05 --mesh ~/meshes/base --Minf 0.8 --alpha 5 --refine tip
+mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
 ```
 
-| opción | qué hace |
+| Argument | Default | Function |
+|---|---|---|
+| `<mesh-dir>` | none, mandatory | Directory for the new mesh. It must not exist. |
+| `[stl-file]` | `mesh/stl/Aconcagua.stl` | Geometry. MESH.md §3 gives the requirements. |
+| `--maxCellSize <m>` | value in `meshDict` (1.6 m) | Sets `maxCellSize` in the copy of `meshDict`. |
+| `--finLevel <n>` | value in `meshDict` (9) | Sets the refinement level of the `fins` patch in the copy of `meshDict`. |
+
+### 3.2 Procedure
+
+1. Run `mesh/Allmesh <mesh-dir>`.
+2. Read the summary at the end of the output. It gives the number of cells,
+   the cell types, the maximum non-orthogonality, the maximum skewness and
+   the failed checks.
+3. If the output shows `negative cell volumes`, do not use the mesh. Change
+   `meshDict` and make a new mesh in a new directory.
+4. Open `<mesh-dir>/constant/polyMesh/boundary`. Make sure that the patches
+   `cone`, `walls`, `tail` and `fins` have the type `wall`. Refer to MESH.md
+   §6.
+
+### 3.3 Result
+
+| Item | Contents |
 |---|---|
-| `--np N` | descomposición |
-| `--refine tip\|fins` | refinamiento local en las aletas, ver sección 3 |
-| malla | `--mesh <dir>`, obligatorio |
-| condiciones | `--Minf --pInf --Tinf --alpha --beta --Ti --nuRatio` |
+| `<mesh-dir>/constant/polyMesh/` | The mesh. |
+| `<mesh-dir>/system/` | A copy of `mesh/system/`, with the options applied. Each mesh keeps the `meshDict` that made it. |
+| `<mesh-dir>/meshInfo` | A copy of `mesh/meshInfo`. `Allmesh` adds `nCells`, `maxCellSize`, `finLevel` and `meshDir`. |
+| `<mesh-dir>/log.*` | One log for each application. |
 
-El caso nunca se corre en la plantilla: `newCase.sh` se niega a pisar un
-directorio que ya existe.
+`Allmesh` does not write into a directory that exists. To make the mesh
+again, remove the directory or use a new name.
 
-Si la plantilla trae archivos `*.j2`, `newCase.sh` los renderiza con
-`jinja2` contra su `config.json`. Es la rampa de Courant: [SOLVERS.md
-§2.3](SOLVERS.md).
+## 4. Make a case
 
-## 3. El barrido
+### 4.1 Command
 
-`sweep.txt` es una línea por corrida:
+```bash
+./newCase.sh <run-dir> --mesh <mesh-dir> [options]
+```
+
+| Option | Function |
+|---|---|
+| `--mesh <mesh-dir>` | Mandatory. The path of a mesh that `Allmesh` made. |
+| `--Minf <M>` | Free-stream Mach number. |
+| `--pInf <Pa>` | Free-stream static pressure. |
+| `--Tinf <K>` | Free-stream static temperature. |
+| `--alpha <deg>` | Angle of attack. |
+| `--beta <deg>` | Angle of sideslip. |
+| `--Ti <->` | Free-stream turbulence intensity. |
+| `--nuRatio <->` | Ratio `nut/nu` in the free stream. |
+| `--np <N>` | Number of subdomains in `system/decomposeParDict`. |
+| `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
+
+The flow options change entries in `system/flowConditions`. The options that
+you do not give keep the template values.
+
+### 4.2 Steps that newCase.sh does
+
+1. It stops if `--mesh` is missing, if the mesh directory has no
+   `constant/polyMesh`, or if `<run-dir>` exists.
+2. It copies `case-central/` into `<run-dir>`. It does not copy the mesh,
+   the logs, `0/`, `processor*`, `postProcessing/` or the time directories.
+3. It copies `<mesh-dir>/constant/polyMesh/` into `<run-dir>/constant/`.
+4. It copies `<mesh-dir>/meshInfo` to `<run-dir>/constant/meshInfo`. This
+   file replaces the `meshInfo` of the template.
+5. It copies `common/Allrun` and `common/Allrefine` into `<run-dir>`.
+6. It renders each `*.j2` file with the values in `config.json`, and then
+   removes the `*.j2` file. Refer to SOLVERS.md §5.
+7. It writes each flow option into `system/flowConditions`. It stops if the
+   entry does not exist in the file.
+8. It writes `--np` into `system/decomposeParDict`.
+9. It runs `./Allrefine` if you give `--refine`.
+
+> **NOTE** In `newCase.sh`, `--mesh` is a path. Only `run.sh` accepts a mesh
+> name without a path.
+
+## 5. Run a case
+
+### 5.1 Command
+
+```bash
+cd <run-dir>
+./Allrun        # parallel, numberOfSubdomains from system/decomposeParDict
+./Allrun 16     # parallel on 16 processes; writes 16 into decomposeParDict
+./Allrun 1      # serial
+```
+
+### 5.2 Steps that Allrun does
+
+1. It stops if `constant/polyMesh` does not exist.
+2. It compares `alpha` and `beta` in `system/flowConditions` with `sector`
+   in `constant/meshInfo`. It stops if the mesh cannot show the flow angle.
+3. It copies `0.orig/` to `0/` (`restore0Dir`).
+4. In parallel: it runs `decomposePar -force`, then `rhoCentralFoam`, then
+   `reconstructPar -latestTime`. In serial: it runs `rhoCentralFoam`.
+5. It shows the last line of the force coefficients.
+
+| `sector` in `meshInfo` | Permitted angles |
+|---|---|
+| `quarter` | `alpha = 0` and `beta = 0` |
+| `half` | `beta = 0` |
+| `full` | All angles |
+
+The mesh that `Allmesh` makes is `full`.
+
+### 5.3 End of a run
+
+The run stops at `endTime` or when the `runTimeControl` function object finds
+that the average of `Cd` is constant. SOLVERS.md §5 gives the criterion and
+its limits.
+
+### 5.4 Continue a run
+
+`controlDict` has `startFrom latestTime`. Run `./Allrun` again in the same
+directory to continue from the last time directory.
+
+> **CAUTION** `Allrun` runs `decomposePar -force`, which removes the
+> `processor*` directories. If the solver stopped before `reconstructPar`,
+> run `reconstructPar -latestTime` before you run `./Allrun` again. If you do
+> not, the data after the last reconstructed time is lost.
+
+On the first continuation, read the start time in `log.rhoCentralFoam`. Make
+sure that it is the last time and not 0.
+
+### 5.5 Start a run again from zero
+
+1. Remove the time directories and the processor directories:
+   `rm -rf [1-9]* processor*`.
+2. Run `./Allrun`.
+
+`./Allclean` also removes `constant/polyMesh`. After `./Allclean`, make a new
+case with `newCase.sh`.
+
+## 6. Run a sweep
+
+### 6.1 Input file
+
+`sweep.txt` has one case on each line: a case name, then the options of
+`newCase.sh`.
 
 ```
 m03     --mesh base --Minf 0.3
 m08     --mesh base --Minf 0.8
-m03-h2  --mesh h2 --maxCellSize 0.8 --Minf 0.3
-```
-
-`./run.sh [sweep.txt] [runs] [mallas]` las arma y corre en serie bajo `runs/`.
-Saltea las que ya existen, así que si se corta, volvés a lanzarlo y sigue
-donde estaba.
-
-`--mesh` es obligatorio. Un nombre suelto vive en `~/meshes/`. Si la malla no
-existe, `run.sh` la construye antes con `mesh/Allmesh`, aplicando
-`--maxCellSize` y `--finLevel` (nivel de `fins`) a la copia del `meshDict`; las
-líneas siguientes que la nombran la reusan. Si una línea pide una malla que ya
-existe con otro `maxCellSize` o `finLevel`, el barrido se detiene en vez de
-correr sobre la malla equivocada. `Allmesh` también se detiene si la malla sale
-con volúmenes negativos.
-
-**Una malla por punto de Mach.** `y1` sale de la extrusión de capas contra la
-celda de superficie, no de un y+ objetivo, así que el y+ real cambia con la
-velocidad. Medilo en cada corrida (`docs/TROUBLESHOOTING.md`, sección y+) y
-ajustá `nLayers` si hace falta.
-
-## 4. Condiciones de vuelo
-
-Un archivo: `system/flowConditions`. Números planos.
-
-```
-Uinf   100;    // m/s
-alpha  0;      // deg, ángulo de ataque: U rota de +x hacia +y. Requiere half o full
-beta   0;      // deg, deslizamiento: hacia +z. Requiere full
-nu     1.5e-05;
-rhoInf 1.225;
-Ti     0.005;  // intensidad de turbulencia
-nuRatio 5;     // nut/nu en la corriente libre
-```
-
-`system/flowDerived` convierte eso en `(Ux Uy Uz)`, direcciones de drag y
-lift, `k`, `omega`, `nut` con `#eval`; los campos de `0.orig/`,
-`transportProperties` y `controlDict` incluyen `flowDerived`. No hace falta
-tocar ningún campo para cambiar la velocidad o el ángulo.
-
-Editarlo con `foamDictionary system/flowConditions -entry alpha -set 5` o con
-un editor. **No** usar `foamDictionary -set` sobre `controlDict` ni sobre los
-campos: reescribe el archivo con los `#include` expandidos y los `#eval`
-evaluados, y las condiciones dejan de seguir a `flowConditions`.
-
-`Allrun` comprueba `alpha`/`beta` contra el `sector` del `meshInfo` y se
-niega a arrancar si la malla no puede representar ese ángulo.
-
-## 5. Correr
-
-```bash
-./Allrun          # paralelo, numberOfSubdomains de decomposeParDict (8)
-./Allrun 16       # 16 procesos (actualiza decomposeParDict)
-./Allrun 1        # serie
-```
-
-Secuencia: `restore0Dir` → `decomposePar -force` → `rhoCentralFoam` →
-`reconstructPar -latestTime`. Logs en `log.<aplicación>`.
-
-`endTime` es tiempo físico; el corte real es el `runTimeControl` sobre el
-promedio de `Cd`, que se activa en `minIter` ([SOLVERS.md §2.3](SOLVERS.md)).
-`startFrom latestTime`, así `./Allrun` sobre una corrida existente continúa en
-vez de empezar de cero (borrar `[1-9]*` y `processor*` para reiniciar, o
-`./Allclean` para volver a la plantilla).
-
-Orden de magnitud: la malla completa de 2.3 M a 8 procesos hace ~2.3 s por
-paso.
-
-## 6. Resultados
-
-| Qué | Dónde |
-|---|---|
-| `Cd`, `Cl`, `Cm` por iteración | `postProcessing/forceCoeffs1/0/coefficient.dat` |
-| fuerzas en N (presión, viscosa) | `postProcessing/forces1/0/force.dat`, `moment.dat` |
-| y+ por patch | `log.rhoCentralFoam` (`grep -A5 "yPlus yPlus write"`) y campo `yPlus` en cada tiempo escrito |
-| `Cp`, `wallShearStress` | campos en los tiempos escritos |
-| residuales | `postProcessing/residuals/0/solverInfo.dat` |
-| ParaView | `touch caso.foam; paraview caso.foam` (o `paraFoam`) |
-
-## 7. Estudios típicos
-
-**Barrido de Mach.** Es para lo que existe `sweep.txt`. Una malla por punto:
-
-```bash
-./run.sh
-```
-
-**Convergencia de malla.** Se varía sólo `maxCellSize`, con una razón
-constante, y los niveles quietos: eso escala todo el campo sin tocar la resolución
-relativa, que es lo que pide una extrapolación de Richardson. En `sweep.txt`:
-
-```
-m03-h1  --mesh h1 --maxCellSize 1.6 --Minf 0.3
 m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
-m03-h3  --mesh h3 --maxCellSize 0.8 --Minf 0.3
 ```
 
-La razón es √2 (el GCI de Celik et al. 2008 pide más de 1.3): cada paso
-multiplica las celdas por hasta 2√2 ≈ 2.8, así que `h3` queda en ~17 M como
-mucho. Con razón 2 serían ×8 por paso, y la tercera malla pasaría los 100 M.
-El primer espesor de capa se achica con la celda de superficie, así que el y+
-también cambia entre mallas: medilo en las tres. El OpenFOAM ToolChain
-hace sus mallas R1–R6 a mano, cambiando a la vez `maxCellSize` y la cantidad
-de cajas; sirven para elegir una malla, pero la razón de refinamiento no es
-constante y no alcanzan para estimar el error de discretización.
+- Lines that start with `#`, and empty lines, have no effect.
+- `--mesh` is mandatory on each line.
+- A mesh name without `/` is a directory in `<meshes-dir>`.
+- `--maxCellSize` and `--finLevel` apply only when `run.sh` makes the mesh.
 
-**Barrido de ángulo de ataque.**
+### 6.2 Command
+
+```bash
+./run.sh [sweep-file] [runs-dir] [meshes-dir]
+```
+
+| Argument | Default |
+|---|---|
+| `sweep-file` | `flightModel/sweep.txt` |
+| `runs-dir` | `flightModel/runs` |
+| `meshes-dir` | `~/meshes` |
+
+> **CAUTION** The default `runs-dir` is in the repository. Give a
+> `runs-dir` outside the repository, outside OneDrive and outside `/mnt/c`.
+
+### 6.3 Steps that run.sh does for each line
+
+1. If `<runs-dir>/<name>` exists, it goes to the next line. Thus, if you run
+   `run.sh` again after a stop, it continues from the first case that does
+   not exist.
+2. If the mesh exists, it compares `maxCellSize` and the `fins` level of the
+   mesh with the options of the line. It stops if they are different.
+3. If the mesh directory exists but has no mesh, it stops.
+4. If the mesh does not exist, it runs `mesh/Allmesh` with the options of
+   the line. It stops if `Allmesh` stops with an error. The next lines that
+   name this mesh use it again.
+5. It runs `newCase.sh`. It stops if `newCase.sh` stops with an error.
+6. It runs `./Allrun` with the default number of processes. If `Allrun`
+   stops with an error, it shows a message and goes to the next line.
+
+The cases run one after the other.
+
+## 7. Refine the mesh near the fins (optional)
+
+### 7.1 Command
+
+```bash
+./Allrefine          # same as ./Allrefine tip
+./Allrefine tip      # cell set finTip: a band around the fin tip
+./Allrefine fins     # cell set finBox: the full fin, from root to tip
+```
+
+Do this procedure in the case directory, before `./Allrun`. Alternatively,
+give `--refine` to `newCase.sh`.
+
+### 7.2 Steps that Allrefine does
+
+1. It stops if `0/U` exists. `refineMesh` maps the fields, so a refinement
+   after a run changes the results and not a clean mesh.
+2. It stops if `constant/meshInfo` does not have `fins true` and `finTipR`.
+3. It runs `topoSet`. `system/topoSetDict` makes the cell sets from the fin
+   geometry in `constant/meshInfo`.
+4. It runs `refineMesh`. Each cell in the set becomes 8 cells.
+5. It removes `0/polyMesh`, which `refineMesh` writes.
+6. It runs `checkMesh` and `renumberMesh`.
+7. It writes the new number of cells into `nCells` in `constant/meshInfo`.
+
+| Set | Region | Effect on y+ |
+|---|---|---|
+| `finTip` | Annulus from `finTipR − tipBand` to `finTipR + margin` | None. The region does not touch the body. |
+| `finBox` | Cylinder of radius `finTipR + margin` | The first cell on the body below the fins is half as thick, so y+ there is approximately half. |
+
+> **NOTE** The cell counts in the header of `common/Allrefine` are from the
+> previous structured mesh. Record the counts again on the cfMesh mesh.
+
+## 8. Results
+
+| Data | Location |
+|---|---|
+| `Cd`, `Cl`, `Cm` for each 50 time steps | `postProcessing/forceCoeffs1/<start-time>/coefficient.dat` |
+| Forces and moments in N, pressure and viscous parts | `postProcessing/forces1/<start-time>/force.dat`, `moment.dat` |
+| Residuals of `U`, `e`, `k`, `omega` | `postProcessing/residuals/<start-time>/solverInfo.dat` |
+| y+ for each wall patch | `log.rhoCentralFoam`, and the field `yPlus` in each written time |
+| Mach number, pressure coefficient, wall shear stress | Fields in each written time |
+| ParaView | `paraview case.foam`. `newCase.sh` makes `case.foam`. |
+
+`<start-time>` is `0` for a new run. A continued run writes a new directory
+with its start time.
+
+`purgeWrite 2` keeps only the last two time directories.
+
+## 9. Typical studies
+
+### 9.1 Mach sweep
+
+1. Write one line for each Mach number in `sweep.txt`.
+2. Run `./run.sh`.
+3. Measure y+ in each case. The mesh does not set y+, and the velocity
+   changes by a factor of 6 from M 0.3 to M 1.8.
+
+### 9.2 Mesh convergence
+
+1. Change only `maxCellSize`, with a constant ratio. Do not change the
+   levels. All cell sizes then change by the same ratio.
+2. Use the ratio √2. The method of Celik et al. (2008) requires a ratio
+   larger than 1.3. Each step multiplies the number of cells by up to
+   2√2 ≈ 2.8.
+3. Use the same Mach number for all meshes.
+
+```
+m03-h1  --mesh h1 --maxCellSize 1.6  --Minf 0.3
+m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
+m03-h3  --mesh h3 --maxCellSize 0.8  --Minf 0.3
+```
+
+The first layer thickness changes with the surface cell size, so y+ changes
+between the meshes. Measure y+ on each mesh. VALIDATION.md §4 gives the
+analysis.
+
+### 9.3 Angle-of-attack sweep
 
 ```bash
 for a in 0 2 4 6 8; do
@@ -201,35 +318,33 @@ for a in 0 2 4 6 8; do
 done
 ```
 
-**Refinar más las aletas.** Subí `fins` a nivel 10 en `localRefinement`, o usá
-`./Allrefine tip` en el caso ya armado, que refina 2:1 una banda alrededor de
-la punta sin volver a mallar.
+### 9.4 Finer fins
 
-**Estela transitoria.** Cambiá el solver a `pimpleFoam` (`ddtSchemes backward`,
-`deltaT` para Co ≈ 1 en la estela cercana: con celdas de 6 mm y 100 m/s,
-~5e-5 s), y agrandá la caja `wake` del `meshDict`.
+Use one of these two methods:
 
-## 8. Convenciones
+- Make a new mesh with `--finLevel 10`.
+- Run `./Allrefine tip` in the case, before `./Allrun`.
 
-- Las mallas no se versionan y viven fuera de la repo: se reconstruyen con
-  `mesh/Allmesh <dir>` en
-  cinco minutos. Lo que se versiona es el STL y el `meshDict`.
-- Los directorios de corrida van fuera de la repo, fuera de OneDrive y fuera
-  de `/mnt/c`.
-- Un cambio en el `meshDict` que mueva la malla se commitea junto con el
-  número de celdas y la salida de `checkMesh` que produjo.
+## 10. Rules
 
-## Chuleta
+- Do not put meshes in the repository. `mesh/Allmesh` makes them again.
+  Put the STL and `meshDict` in the repository.
+- When a change to `meshDict` changes the mesh, commit it with the number
+  of cells and the `checkMesh` output of the new mesh.
+- Put case directories outside the repository, outside OneDrive and outside
+  `/mnt/c`.
+
+## 11. Quick reference
 
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 
-mesh/Allmesh ~/meshes/base                 # malla
-./newCase.sh ~/runs/NOMBRE --mesh ~/meshes/base --Minf 0.8 --np 8
-cd ~/runs/NOMBRE && ./Allrun 8
+mesh/Allmesh ~/meshes/base                                   # mesh
+./newCase.sh ~/runs/NAME --mesh ~/meshes/base --Minf 0.8 --np 8
+cd ~/runs/NAME && ./Allrun 8                                 # run
 
-./run.sh                                   # el barrido entero de sweep.txt
+./run.sh sweep.txt ~/runs ~/meshes                           # sweep
 
-./Allrefine tip                            # refinamiento local, antes de Allrun
-./Allclean                                 # volver a la plantilla
+./Allrefine tip                                              # before Allrun
+./Allclean                                                   # removes mesh and results
 ```

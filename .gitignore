@@ -82,10 +82,3 @@ env/
 Thumbs.db
 desktop.ini
 
-# mesh build products
-flightModel/mesh/constant/
-flightModel/mesh/log.*
-flightModel/mesh/case.foam
-flightModel/mesh/stl/surface.stl
-flightModel/mesh/stl/geometry.stl
-flightModel/mesh/geometry.fms

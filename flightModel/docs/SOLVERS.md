@@ -1,335 +1,477 @@
+# Solver and models
 
-> **Estado.** HAY QUE VALIDAR TODO!!!!
-# Solver y modelos
+This document gives the dictionaries of the case template `case-central/`,
+the models that they select, and the references. Use it to calculate the
+case values by hand and to compare them with the case.
 
-Un solo solver para todo el barrido, M 0.3 a 1.8: `rhoCentralFoam`, en la
-plantilla `case-central/`. Este documento dice qué resuelve, con qué modelo y
-de dónde sale cada cosa, para que puedas **rehacer las cuentas a mano** y
-verificar que el caso hace lo que dice.
+> **CAUTION** The template is not validated. Do not use the results before
+> you do the procedures in [VALIDATION.md](VALIDATION.md).
+
+## 1. Summary
+
+| Item | Value |
+|---|---|
+| Template | `case-central/` |
+| Solver | `rhoCentralFoam` |
+| Formulation | Compressible, density-based, explicit |
+| Range | M 0.3 to M 1.8, one template |
+| Time | `Euler`, global time step from `maxCo`, Courant ramp (§5) |
+| Fields in `0.orig/` | `U`, `p`, `T`, `k`, `omega`, `nut`, `alphat` |
+| Turbulence | k-ω SST with wall functions |
+| Gas | Air, perfect gas, constant Cp, Sutherland viscosity |
+| Input | `Minf`, `pInf`, `Tinf`, `alpha`, `beta`, `Ti`, `nuRatio` |
+| Initial condition | Uniform free stream |
+
+One solver for all Mach numbers. With three solvers, the discretization
+changes between flow regimes. A step in the Cd–Mach curve is then not
+separable from the physics.
+
+## 2. Files of the template
+
+| File | Edit | Function |
+|---|---|---|
+| `system/flowConditions` | yes | Flight condition. §3. |
+| `config.json` | yes | Parameters of the Courant ramp and of the stop criterion. §5. |
+| `system/flowDerived` | no | Values calculated from `flowConditions`. §3. |
+| `0.orig/*` | no | Initial and boundary conditions. §9. |
+| `constant/thermophysicalProperties` | no | Gas model. §7. |
+| `constant/turbulenceProperties` | no | Turbulence model. §6. |
+| `constant/fvOptions` | no | Temperature limits. §8. |
+| `constant/meshInfo` | no | `newCase.sh` replaces it with the `meshInfo` of the mesh. MESH.md §7. |
+| `system/controlDictBase.j2` | yes, with care | Time control and function objects. §5, §10. |
+| `system/controlDict` | no | Includes `controlDictBase` and adds `maxCo 0.01`. |
+| `system/fileUpdaterControlDict/controlDict_{1..7,final}.j2` | no | Steps of the Courant ramp. §5. |
+| `system/fileUpdater.j2` | no | Schedule of the Courant ramp. §5. |
+| `system/FOs/FOrunTimeControl.j2` | no | Stop criterion. §5. |
+| `system/fvSchemes`, `fvSchemesUpwind` | no | First-order schemes for the start. §11. |
+| `system/fvSchemesVanLeer` | yes, with care | Second-order schemes. §11. |
+| `system/fvSolution` | no | Linear solvers. §12. |
+| `system/decomposeParDict` | through `--np` | Parallel decomposition. §13. |
+| `system/topoSetDict`, `system/refineMeshDict` | `margin`, `wake`, `tipBand` only | Local refinement. WORKFLOW.md §7. |
+| `Allclean` | no | Removes the mesh, the fields and the logs. |
+
+> **CAUTION** Use `foamDictionary -set` only on `system/flowConditions`.
+> On a file with `#include` or `#eval`, `foamDictionary -set` writes the
+> expanded values. The file then does not follow `flowConditions`.
+
+## 3. Flight condition
+
+### 3.1 flowConditions
+
+| Entry | Default | Unit | Function |
+|---|---|---|---|
+| `Minf` | 1.80 | – | Free-stream Mach number. |
+| `alpha` | 0 | deg | Angle of attack. The velocity turns from +x to +y. |
+| `beta` | 0 | deg | Angle of sideslip. The velocity turns to +z. |
+| `pInf` | 101325 | Pa | Static pressure, ISA sea level. |
+| `Tinf` | 288.15 | K | Static temperature, ISA sea level. |
+| `Ti` | 0.005 | – | Turbulence intensity. |
+| `nuRatio` | 5 | – | Ratio `nut/nu` in the free stream. |
+
+To change a value, use `newCase.sh` (WORKFLOW.md §4) or this command:
 
 ```bash
-./newCase.sh ~/runs/m03 --Minf 0.3
-./newCase.sh ~/runs/m18 --Minf 1.8
+foamDictionary system/flowConditions -entry Minf -set 1.5
 ```
 
-## 1. Panorama
+### 3.2 flowDerived
 
-| | |
+`flowDerived` includes `flowConditions` and calculates the values below with
+`#eval`. The fields in `0.orig/` and `controlDictBase` include `flowDerived`.
+Thus, a change to `flowConditions` changes all the conditions.
+
+| Value | Formula | M 0.3 | M 0.8 | M 1.8 |
+|---|---|---|---|---|
+| `aInf` [m/s] | √(γ R T) | 340.29 | 340.29 | 340.29 |
+| `Uinf` [m/s] | M · a | 102.09 | 272.23 | 612.53 |
+| `rhoInf` [kg/m³] | p / (R T) | 1.225 | 1.225 | 1.225 |
+| `muInf` [Pa s] | As √T / (1 + Ts/T) | 1.790e-5 | 1.790e-5 | 1.790e-5 |
+| `nuInf` [m²/s] | μ / ρ | 1.461e-5 | 1.461e-5 | 1.461e-5 |
+| `kInlet` [m²/s²] | 1.5 (U · Ti)² | 0.391 | 2.779 | 14.07 |
+| `nutInlet` [m²/s] | nuRatio · ν | 7.307e-5 | 7.307e-5 | 7.307e-5 |
+| `omegaInlet` [1/s] | k / νt | 5349 | 3.803e4 | 1.925e5 |
+| `alphatInlet` [kg/(m s)] | ρ νt / Prt | 1.053e-4 | 1.053e-4 | 1.053e-4 |
+
+The values are for ISA sea level, `Ti 0.005`, `nuRatio 5`.
+
+| Value | Formula |
 |---|---|
-| directorio | `case-central/` |
-| solver | `rhoCentralFoam` |
-| formulación | compresible, basada en densidad |
-| tiempo | `Euler` transitorio, paso global adaptativo, con rampa de Courant (§2.3) |
-| ρ | variable, **es la incógnita** |
-| `p` | Pa |
-| energía | `e` sensible, dentro de `rhoE` |
-| campos en `0/` | `U p T k omega nut alphat` |
-| viscosidad | Sutherland μ(T) |
-| turbulencia | k-ω SST con wall functions |
-| se parametriza con | `Minf`, `pInf`, `Tinf` |
-| inicialización | corriente uniforme |
+| `Ux`, `Uy`, `Uz` | U·(cos α cos β, sin α cos β, sin β) |
+| Drag direction `dx`, `dy`, `dz` | (cos α cos β, sin α cos β, sin β) |
+| Lift direction `lx`, `ly`, `lz` | (−sin α, cos α, 0) |
 
-**Por qué uno solo.** Antes había tres plantillas (`simpleFoam`,
-`rhoSimpleFoam`, `rhoCentralFoam`). Un Cd que sale de tres solvers distintos
-cambia de discretización justo en los bordes del régimen, y el salto en la
-curva no se puede separar de la física. Con un solo solver, la curva Cd–Mach
-tiene la misma numérica en todos los puntos.
+Constants in `flowDerived`: `Rgas 287.05`, `gammaGas 1.4`, `Prt 0.85`. They
+must agree with `thermophysicalProperties` (§7). The Sutherland constants
+are written in the `muInf` formula.
 
-## 2. Ecuaciones y numérica
+## 4. Equations and numerical method
 
-### 2.1 `rhoCentralFoam`
+`rhoCentralFoam` does not solve a pressure equation. It advances the
+conserved variables ρ, ρU and ρE with a central-upwind flux. Then it applies
+the diffusive terms implicitly. Thus `fvSolution` has no `SIMPLE` or
+`PIMPLE` dictionary and no relaxation factors.
 
-**No resuelve una ecuación de presión.** Avanza las variables conservadas ρ,
-ρU y ρE con un flujo central-upwind y después aplica implícitamente las
-correcciones difusivas. Por eso `fvSolution` no tiene ni `SIMPLE` ni factores
-de relajación: un esquema explícito basado en densidad no tiene qué
-sub-relajar. `rho`, `rhoU` y `rhoE` usan `diagonal`; sólo `U`, `e`, `k` y
-`omega` tienen un solver lineal de verdad.
+**Flux.** `fluxScheme Kurganov`. The scheme divides the face flux with the
+local wave speeds a⁺ and a⁻. It captures shocks without a Riemann solver and
+without artificial viscosity.
 
-**Esquema de flujo:** `fluxScheme Kurganov`, el esquema central-upwind que
-parte el flujo de cara según las velocidades de onda locales `a⁺` y `a⁻`.
-Captura el choque sin resolver un problema de Riemann y sin viscosidad
-artificial ajustada a mano.
+- Kurganov and Tadmor (2000), "New High-Resolution Central Schemes for
+  Nonlinear Conservation Laws and Convection-Diffusion Equations",
+  *J. Comput. Phys.* **160**, 241–282.
+- Kurganov, Noelle and Petrova (2001), *SIAM J. Sci. Comput.* **23**(3),
+  707–740.
+- Greenshields, Weller, Gasparini and Reese (2010), "Implicit and explicit
+  schemes for flows of aerodynamic and turbomachinery fluids", *Int. J.
+  Numer. Meth. Fluids* **63**, 1–21. Implementation and validation in
+  OpenFOAM.
 
-- Kurganov y Tadmor (2000), "New High-Resolution Central Schemes for Nonlinear Conservation Laws and Convection-Diffusion Equations", *J. Comput. Phys.* **160**, 241-282.
-- Kurganov, Noelle y Petrova (2001), *SIAM J. Sci. Comput.* **23**(3), 707-740.
-- La implementación en OpenFOAM y su validación: Greenshields, Weller, Gasparini y Reese (2010), "Implicit and explicit schemes for flows of aerodynamic and turbomachinery fluids", *Int. J. Numer. Meth. Fluids* **63**, 1-21.
+**Reconstruction.** The primitive variables go to the faces with the van
+Leer limiter: `reconstruct(rho) vanLeer`, `reconstruct(U) vanLeerV`,
+`reconstruct(T) vanLeer`. At a discontinuity the limiter decreases the
+scheme to first order. In smooth regions the scheme stays second order.
+`vanLeerV` limits in the direction of the largest gradient. van Leer (1979),
+*J. Comput. Phys.* **32**, 101–136.
 
-**Reconstrucción:** las variables primitivas se llevan a las caras con
-limitador van Leer (`reconstruct(rho) vanLeer`, `reconstruct(U) vanLeerV`,
-`reconstruct(T) vanLeer`). El limitador baja el esquema a primer orden en la
-discontinuidad y lo mantiene de segundo orden en las zonas suaves, que es lo
-que hace que el choque quede monótono. van Leer (1979), *J. Comput. Phys.*
-**32**, 101-136.
+## 5. Courant ramp and stop criterion
 
+### 5.1 Function
 
-### 2.2 Arranque: rampa de Courant
+A uniform free stream on a no-slip wall causes a large transient. The ramp
+starts with a small `maxCo` (0.01) and first-order schemes. Then it increases
+`maxCo` step by step. The method comes from the OpenFOAM ToolChain
+(`templates/rhoCentralFoam`).
 
-Calcada del OpenFOAM ToolChain (`templates/rhoCentralFoam`): arrancar con
-`maxCo` muy bajo y esquemas de primer orden, y subir de a pasos. La corriente
-uniforme contra una pared no-slip es un transitorio violento, y es ahí donde
-explota.
+The `timeActivatedFileUpdate` function objects in `system/fileUpdater` do the
+ramp. At each time step they compare the time with a schedule. At each
+switch time they copy a file on `system/controlDict` or on
+`system/fvSchemes`. `runTimeModifiable yes` makes the solver read the new
+file.
 
-La hace el functionObject `timeActivatedFileUpdate`, en `system/fileUpdater`.
-En cada paso mira el tiempo y, al cruzar un umbral, copia otro archivo encima
-de `system/controlDict` o de `system/fvSchemes`; `runTimeModifiable` lo relee.
+### 5.2 config.json
 
-| archivo | qué es |
-|---|---|
-| `config.json` | los parámetros de la rampa; `newCase.sh` renderiza con él todos los `*.j2` |
-| `system/controlDictBase.j2` | el `controlDict` de siempre, sin `maxCo` |
-| `system/controlDict`, `fileUpdaterControlDict/controlDict_{1..7,final}.j2` | incluyen la base y agregan su `maxCo`: 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5, recortados a `final_Co` |
-| `system/fileUpdater.j2` | el calendario: qué archivo entra a qué tiempo |
-| `system/fvSchemesUpwind`, `fvSchemesVanLeer` | reconstrucción de primer orden y la de van Leer |
-| `system/FOs/FOrunTimeControl.j2` | corte por convergencia del promedio de `Cd`, sólo en `controlDict_final` |
+`newCase.sh` renders all `*.j2` files with these values.
 
-El calendario es el del ToolChain, en **iteraciones**: rampa en 0, 20, 35, 50,
-65, 80, 100; a `vanLeer` pasa a van Leer y repite la rampa desde 0.01 (en
-+0, 20, 35, 150, 300, 800, 2000); a `minIter` entra `controlDict_final` con
-`final_Co` y el `runTimeControl`.
-
-**La diferencia con el ToolChain.** Allá corren `localEuler`, donde el tiempo
-es la iteración. Acá es `Euler` en segundos reales, así que el template
-convierte cada iteración en tiempo con `t = Σ nᵢ · maxCoᵢ · tauCo`. `tauCo` es
-el paso que da Co = 1 en la peor celda; se lee del log como `deltaT / maxCo`
-una vez que el Co se estabiliza. Si está mal, la rampa se corre en el tiempo,
-pero el Co sigue acotado por `maxCo`. Con `tauCo` también se fija el `deltaT`
-inicial, porque `rhoCentralFoam` da el primer paso a `1.2 · deltaT` sin mirar
-el Co: con un `1e-8` fijo, esta malla arrancaba con Co = 61 y moría con
-`sigFpe` en el paso 1.
-
-| clave | valor | qué hace |
+| Key | Default | Function |
 |---|---|---|
-| `tauCo` | `2e-10` | s. Medido en la malla completa de 2.3 M a M 1.8. `c` domina `|U| + c`, así que a M 0.3 es del mismo orden |
-| `vanLeer` | `2000` | iteración del cambio a van Leer; `-1` se queda en upwind |
-| `minIter` | `3000` | iteración de `controlDict_final` |
-| `final_Co` | `0.3` | techo de toda la rampa |
-| `coeffs_fields`, `coeffs_variation`, `coeffs_range` | `Cd`, `0.001`, `300` | condición del `runTimeControl`. A α ≠ 0 se pueden sumar `Cl` y `CmPitch`; a α = 0 no, porque su promedio es ~0 y el criterio relativo no cierra nunca |
+| `tauCo` | `2e-10` | Time step in s that gives Co = 1 in the worst cell. |
+| `vanLeer` | `2000` | Iteration of the change from upwind to van Leer. `-1` keeps upwind. |
+| `minIter` | `3000` | Iteration of the change to `controlDict_final`. |
+| `final_Co` | `0.3` | Maximum `maxCo` of all the ramp. |
+| `coeffs_fields` | `["Cd"]` | Coefficients in the stop criterion. |
+| `coeffs_variation` | `[0.001]` | Relative tolerance of each coefficient. |
+| `coeffs_range` | `[300]` | Window in iterations of each coefficient. |
 
-Medido: el Co queda clavado en 0.0100 y a las 20 iteraciones pasa a 0.0200.
-El mismo log muestra el problema de fondo: **Co medio 5e-9 contra máximo
-0.02**. Una sola región de celdas diminutas fija el paso de 2.3 M celdas;
-con `tauCo = 2e-10` s, llegar al estacionario son ~10⁹ pasos. La rampa evita
-la explosión, pero no hace barata la corrida: eso es de la malla, que hoy
-tiene volúmenes negativos ([TROUBLESHOOTING.md](TROUBLESHOOTING.md)).
+At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. At α = 0 do not
+add them: their average is approximately 0, and a relative criterion on 0
+does not stop.
 
-## 3. Turbulencia
+### 5.3 Schedule
+
+The schedule is in iterations:
+
+| Phase | Iterations | `maxCo` |
+|---|---|---|
+| Upwind | 0, 20, 35, 50, 65, 80, 100 | 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 |
+| van Leer | `vanLeer` + 0, 20, 35, 150, 300, 800, 2000 | 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 |
+| Final | `minIter` | `final_Co`, with `runTimeControl` |
+
+Each `maxCo` is limited to `final_Co`. The template removes the events after
+`minIter`.
+
+The case uses `Euler` in physical time, not `localEuler`. The template thus
+changes each iteration into a time:
+
+```
+t = Σ nᵢ · maxCoᵢ · tauCo
+```
+
+The initial time step is `deltaT = 0.01 · tauCo / 1.2`. `rhoCentralFoam`
+makes its first step at 1.2·`deltaT` and does not examine the Courant
+number.
+
+### 5.4 Measure tauCo
+
+> **CAUTION** The value `2e-10` comes from the previous structured mesh.
+> Measure `tauCo` again on each new mesh. If `tauCo` is incorrect, the
+> switches occur at incorrect iterations. `maxCo` still limits the Courant
+> number.
+
+1. Make a case and run it.
+2. In `log.rhoCentralFoam`, find a time step where the Courant number is
+   constant.
+3. Calculate `tauCo = deltaT / maxCo` with the values of that step.
+4. Write the value in `case-central/config.json`.
+5. Make the cases again with `newCase.sh`.
+
+### 5.5 Stop criterion
+
+`controlDict_final` adds `runTimeControl1`. For each field in
+`coeffs_fields`, it calculates the average over the last `coeffs_range`
+iterations. The run stops when the relative change of the average is less
+than `coeffs_variation`.
+
+> **CAUTION** The window is in iterations, not in physical time. With a
+> small time step, 300 iterations are a small fraction of one flow-through
+> time (2.955 m / `Uinf`). The average can then be constant before the flow
+> is steady. After each run, compare the physical time of the run with the
+> flow-through time. Look at the full `Cd` history.
+
+`endTime 0.05` s is the second limit. At M 1.8 one flow-through time is
+4.8 ms.
+
+## 6. Turbulence
+
+File: `constant/turbulenceProperties`.
 
 ```
 simulationType  RAS;
 RASModel        kOmegaSST;
 turbulence      on;
+printCoeffs     on;
 ```
 
-**Modelo de cierre.** Hipótesis de Boussinesq: el tensor de Reynolds se modela como una viscosidad turbulenta por la tasa de deformación,
+**Closure.** The Boussinesq hypothesis gives the Reynolds stress from an
+eddy viscosity and the strain rate:
 
 ```
 −⟨u'ᵢu'ⱼ⟩ = νt (∂Uᵢ/∂xⱼ + ∂Uⱼ/∂xᵢ) − (2/3) k δᵢⱼ
+νt = a₁ k / max(a₁ ω, S F₂)
 ```
 
-con `νt = a₁k / max(a₁ω, S F₂)`. Ese denominador es el **limitador de tensión cortante** que distingue al SST de un k-ω común, y es la razón de elegirlo para un cohete: acota la producción de νt en gradiente de presión adverso, que es exactamente lo que pasa en el boattail y en la unión aleta-cuerpo, donde un k-ε o un k-ω sin limitar predicen la separación tarde.
+The denominator is the shear-stress limiter. It limits the production of νt
+in adverse pressure gradients. These gradients occur on the boattail and at
+the fin-body junction.
 
-**Referencias.**
+**References.**
 
-- Menter (1994), "Two-Equation Eddy-Viscosity Turbulence Models for Engineering Applications", *AIAA Journal* **32**(8), 1598-1605. El modelo original, con las funciones de mezcla F₁ y F₂.
-- Menter, Kuntz y Langtry (2003), "Ten Years of Industrial Experience with the SST Turbulence Model", *Turbulence, Heat and Mass Transfer* **4**, 625-632. **Ésta es la versión que implementa OpenFOAM**, no la de 1994: cambian la constante de producción y el limitador. Si comparás contra literatura, fijate cuál de las dos usa.
-- La implementación exacta, con todas las constantes, está en el código:
-  `src/TurbulenceModels/turbulenceModels/RAS/kOmegaSST/`. Constantes por
-  defecto: `alphaK1 0.85`, `alphaK2 1.0`, `alphaOmega1 0.5`, `alphaOmega2
-  0.856`, `beta1 0.075`, `beta2 0.0828`, `betaStar 0.09`, `gamma1 5/9`,
-  `gamma2 0.44`, `a1 0.31`, `b1 1.0`, `c1 10`, `F3 no`.
+- Menter (1994), "Two-Equation Eddy-Viscosity Turbulence Models for
+  Engineering Applications", *AIAA Journal* **32**(8), 1598–1605.
+- Menter, Kuntz and Langtry (2003), "Ten Years of Industrial Experience with
+  the SST Turbulence Model", *Turbulence, Heat and Mass Transfer* **4**,
+  625–632. OpenFOAM uses this version. When you compare with the literature,
+  find which version the source uses.
+- Source code: `src/TurbulenceModels/turbulenceModels/RAS/kOmegaSST/`.
+  Default constants: `alphaK1 0.85`, `alphaK2 1.0`, `alphaOmega1 0.5`,
+  `alphaOmega2 0.856`, `beta1 0.075`, `beta2 0.0828`, `betaStar 0.09`,
+  `gamma1 5/9`, `gamma2 0.44`, `a1 0.31`, `b1 1.0`, `c1 10`, `F3 no`.
 
-**Tratamiento de pared.** Funciones de pared en las cuatro paredes:
+**Wall treatment** on `cone`, `walls`, `tail`, `fins`:
 
-| Campo | Condición | Por qué |
+| Field | Condition | Reason |
 |---|---|---|
-| `nut` | `nutUSpaldingWallFunction` | la ley de Spalding es **continua en y+**, así que la primera celda puede caer en la subcapa, en la zona buffer o en la capa logarítmica sin un salto en τw. Spalding (1961), "A Single Formula for the Law of the Wall", *J. Appl. Mech.* **28**(3), 455-458 |
-| `k` | `kLowReWallFunction` | también continua en y+, por consistencia con la anterior |
-| `omega` | `omegaWallFunction` | mezcla las formas de subcapa y logarítmica de ω |
-| `alphat` | `compressible::alphatWallFunction`, `Prt 0.85` | difusividad térmica turbulenta a partir de νt |
+| `nut` | `nutUSpaldingWallFunction` | Spalding's law is continuous in y+. The first cell can be in the viscous sublayer, the buffer layer or the log layer. Spalding (1961), *J. Appl. Mech.* **28**(3), 455–458. |
+| `k` | `kLowReWallFunction` | Also continuous in y+. |
+| `omega` | `omegaWallFunction` | Blends the sublayer and log-layer values of ω. |
+| `alphat` | `compressible::alphatWallFunction`, `Prt 0.85` | Turbulent thermal diffusivity from νt. |
 
-El objetivo es y+ ≈ 32 en el centro de la primera celda. **La malla se
-dimensiona para una velocidad**, y entre M 0.3 y 1.8 la velocidad cambia 6
-veces: ver [WORKFLOW.md](WORKFLOW.md#3-el-barrido). `Allrun` estima el y+ que
-te va a quedar y avisa si se fue de banda.
+These conditions need wall patches of type `wall`. Refer to MESH.md §6.1.
 
-## 4. Propiedades termofísicas
+The mesh does not set y+. The velocity changes by a factor of 6 from M 0.3
+to M 1.8. Measure y+ on each case. `Allrun` shows the command that reads
+y+ from the log.
 
-```
-thermoType
-{
-    type            hePsiThermo;
-    mixture         pureMixture;
-    transport       sutherland;
-    thermo          hConst;
-    equationOfState perfectGas;
-    specie          specie;
-    energy          sensibleInternalEnergy;
-}
-```
+## 7. Thermophysical properties
 
-| Entrada | Qué significa |
-|---|---|
-| `hePsiThermo` | termodinámica basada en energía usando ψ = 1/(RT), la compresibilidad. `rhoCentralFoam` sólo acepta `psiThermo` |
-| `pureMixture` | una sola especie, sin transporte de composición |
-| `perfectGas` | `p = ρ R T` |
-| `hConst` | Cp constante, `h = Cp(T − Tstd) + Hf` |
-| `sutherland` | `μ(T) = As √T / (1 + Ts/T)` |
-| `sensibleInternalEnergy` | la variable de energía resuelta es `e`, no `h`. `rhoCentralFoam` lo exige |
+File: `constant/thermophysicalProperties`.
 
-**Constantes y su verificación.**
-
-| | valor | verificación |
+| Entry | Value | Function |
 |---|---|---|
-| `molWeight` | 28.96 kg/kmol | R = 8314.46/28.96 = **287.05** J/(kg K) |
-| `Cp` | 1005 J/(kg K) | γ = Cp/(Cp − R) = 1005/717.95 = **1.400** |
-| `As` | 1.4792e-06 kg/(m s √K) | a 288.15 K: μ = 1.4792e-6·√288.15/(1+116/288.15) = **1.790e-05** Pa s, el valor estándar del aire |
+| `type` | `hePsiThermo` | Energy-based thermodynamics with ψ = 1/(RT). `rhoCentralFoam` accepts only `psiThermo`. |
+| `mixture` | `pureMixture` | One species. |
+| `transport` | `sutherland` | μ(T) = As √T / (1 + Ts/T). |
+| `thermo` | `hConst` | Constant Cp. h = Cp (T − Tstd) + Hf. |
+| `equationOfState` | `perfectGas` | p = ρ R T. |
+| `energy` | `sensibleInternalEnergy` | The solver solves e. `rhoCentralFoam` requires it. |
+
+| Constant | Value | Calculation |
+|---|---|---|
+| `molWeight` | 28.96 kg/kmol | R = 8314.46 / 28.96 = 287.05 J/(kg K) |
+| `Cp` | 1005 J/(kg K) | γ = Cp / (Cp − R) = 1005 / 717.95 = 1.400 |
+| `As` | 1.4792e-6 kg/(m s √K) | At 288.15 K: μ = 1.790e-5 Pa s |
 | `Ts` | 116 K | |
 
-La ley de Sutherland en su forma habitual es `μ = μref (T/Tref)^1.5
-(Tref+S)/(T+S)` con μref = 1.716e-05 Pa s, Tref = 273.15 K y S = 110.4 K
-(White, *Viscous Fluid Flow*, 3ª ed., ec. 1-36). La forma de dos parámetros de
-OpenFOAM es algebraicamente la misma: `As √T/(1+Ts/T) = As T^1.5/(T+Ts)`.
+White, *Viscous Fluid Flow*, 3rd ed., eq. 1-36, gives Sutherland's law as
+μ = μref (T/Tref)^1.5 (Tref + S)/(T + S). The OpenFOAM form
+As √T / (1 + Ts/T) = As T^1.5 / (T + Ts) is the same equation.
 
-**Límite de validez de `hConst`.** La temperatura de estancamiento es
-`T₀ = T(1 + (γ−1)/2 · M²)`:
+**Limit of hConst.** The stagnation temperature is
+T₀ = T (1 + (γ − 1)/2 · M²).
 
-| M | T₀ | error de Cp |
+| M | T₀ | Cp error |
 |---|---|---|
-| 0.3 | 293 K | despreciable |
+| 0.3 | 293 K | negligible |
 | 0.8 | 325 K | < 0.5 % |
 | 1.2 | 371 K | ~0.8 % |
 | 1.8 | 475 K | ~1.8 % |
 | 2.5 | 648 K | ~4 % |
 
-En todo el barrido `hConst` alcanza. Arriba de M 2.5 conviene cambiarlo por
-`janaf`, que es lo que usan los tutoriales de `rhoCentralFoam`; los
-coeficientes para aire están en
+Above M 2.5, replace `hConst` with `janaf`. The coefficients for air are in
 `$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35/constant/thermophysicalProperties`.
 
-`Prt = 0.85` es el número de Prandtl turbulento, en la condición de pared de
-`alphat`. Es el valor estándar para aire; Kays (1994), *J. Heat Transfer*
-**116**, 284-295, discute su variación real.
+`Prt = 0.85` is the turbulent Prandtl number for air. Kays (1994),
+*J. Heat Transfer* **116**, 284–295.
 
-**`constant/fvOptions`** recorta T entre 150 y 1200 K. Arrancando desde una
-corriente uniforme, el transitorio inicial puede sacar la temperatura de
-rango, y con `perfectGas` eso da una velocidad del sonido imaginaria y una
-excepción de punto flotante dentro de la librería termodinámica. **No es un
-modelo físico**: después de converger, el mínimo y el máximo de `T` tienen
-que quedar estrictamente adentro.
+## 8. Temperature limits
 
-## 5. De qué se derivan las condiciones
+File: `constant/fvOptions`. Entry `limitT`, type `limitTemperature`, on all
+cells, from 150 K to 1200 K.
 
-`system/flowConditions` tiene **solo números**. `system/flowDerived` hace el
-álgebra con `#eval`, y todo lo demás la incluye. Cada fórmula es verificable:
+The initial transient can move T out of range. With `perfectGas`, a negative
+T gives an imaginary speed of sound, and the solver stops with a floating
+point exception.
 
-| Derivada | Fórmula | A M 0.8, ISA nivel del mar |
+> **CAUTION** This is not a physical model. After each run, make sure that
+> the minimum and the maximum of T are inside the limits and not on them.
+
+## 9. Boundary conditions
+
+The number of characteristics that go in and go out on each boundary sets
+the conditions. `U` and `T` use the same condition at all Mach numbers. `p`
+does not. `0.orig/p` selects the branch with `#if ${{ $Minf > 1 }}`.
+
+| Field | `inlet`, `outlet`, `box` | Function |
 |---|---|---|
-| `aInf` | `√(γ R T)` | 340.3 m/s |
-| `Uinf` | `M · a` | 272.2 m/s |
-| `rhoInf` | `p/(R T)` | 1.225 kg/m³ |
-| `muInf` | Sutherland | 1.790e-05 Pa s |
-| `nuInf` | `μ/ρ` | 1.461e-05 m²/s |
-| `kInlet` | `1.5 (U·Ti)²` | intensidad isótropa |
-| `nutInlet` | `nuRatio · ν` | |
-| `omegaInlet` | `k/νt` | de la definición `νt = k/ω` |
-| `alphatInlet` | `ρ νt / Prt` | |
+| `U` | `freestreamVelocity` | Fixed where the flow goes in. Extrapolated where it goes out. |
+| `T`, `k`, `omega` | `inletOutlet` | Same. |
+| `nut`, `alphat` | `calculated` | From the turbulence model. |
 
-## 6. Esquemas de discretización
+**p, M ≤ 1.** `freestreamPressure` on `inlet`, `outlet` and `box`. It
+extrapolates where the flow goes in and is fixed where the flow goes out. In
+subsonic flow, one acoustic wave goes in through the outlet.
 
-Ver §2.1. `fluxScheme` y las `reconstruct(...)` son las entradas que hacen el
-trabajo; `divSchemes` casi no se usa porque el esquema es basado en densidad.
-`system/fvSchemes` no se edita: la rampa (§2.3) lo pisa con `fvSchemesUpwind`
-al arrancar y con `fvSchemesVanLeer` después.
+**p, M > 1.**
 
-| Término | Esquema | Por qué |
+| Boundary | Condition | Reason |
 |---|---|---|
-| `ddt` | `Euler` | marcha transitoria con paso global; `localEuler` no funcionó en esta malla (§9) |
-| `div(phi,k)`, `div(phi,omega)` | `Gauss upwind` | primer orden a propósito: k y ω son estrictamente positivos y el modelo está calibrado con upwind |
-| `laplacian` | `Gauss linear limited corrected 0.33` | corrección no ortogonal hasta un limitador de 0.33, por la no-ortogonalidad de esta malla |
-| `snGrad` | `limited corrected 0.33` | idem |
+| `inlet` | `fixedValue` | All characteristics go in. |
+| `outlet` | `zeroGradient` | All characteristics go out. |
+| `box` | `waveTransmissive` | The normal velocity is approximately 0. Waves cross the boundary in the two directions. The condition moves p out at u + c and relaxes it to `fieldInf` over `lInf = 10` m. |
 
-## 7. Condiciones de borde
+In v2412, `freestreamPressure` has no supersonic mode. On a supersonic
+outlet it fixes p. This is the reason for the branch.
 
-Vienen de la teoría de características: **cuántas ondas entran y cuántas
-salen por cada borde**. `U` y `T` se resuelven igual a cualquier Mach; `p` no,
-y `0.orig/p` elige la rama con `#if ${{ $Minf > 1 }}`.
+`waveTransmissive` is the non-reflecting condition of Poinsot and Lele
+(1992), *J. Comput. Phys.* **101**, 104–129. At M 1.8 the Mach cone crosses
+`box` (MESH.md §5). A `fixedValue` there reflects the wave into the domain.
 
-| Campo | `inlet`, `outlet`, `box` | Por qué sirve a cualquier Mach |
+**Walls.**
+
+| Field | Condition |
+|---|---|
+| `U` | `noSlip` |
+| `p` | `zeroGradient` |
+| `T` | `zeroGradient` (adiabatic) |
+
+The wall is adiabatic. At M 1.8 the recovery temperature is approximately
+470 K. In a 4 s motor burn, the airframe temperature does not get to this
+value. Zero heat flux is thus the correct limit.
+
+The `symm` entries in `0.orig/` apply only to `half` and `quarter` meshes.
+On a `full` mesh they have no effect.
+
+## 10. Function objects
+
+File: `system/controlDictBase.j2`.
+
+| Name | Type | Output | Interval |
+|---|---|---|---|
+| `forceCoeffs1` | `forceCoeffs` | `Cd`, `Cl`, `Cm` and others | 50 time steps |
+| `forces1` | `forces` | Forces and moments, pressure and viscous parts | 50 time steps |
+| `MachNo` | `MachNo` | Mach number field | write time |
+| `yPlus` | `yPlus` | y+ on the wall patches | write time |
+| `residuals` | `solverInfo` | Residuals of `U`, `e`, `k`, `omega` | each time step |
+| `wallShearStress` | `wallShearStress` | Wall shear stress on `wallPatches` | write time |
+| `Cp` | `pressure`, `staticCoeff` | Static pressure coefficient | write time |
+
+**Reference values of the force coefficients.**
+
+| Entry | Value | Source |
 |---|---|---|
-| `U` | `freestreamVelocity` | fija donde el flujo entra y extrapola donde sale |
-| `T`, `k`, `omega` | `inletOutlet` | idem |
+| `patches` | `$wallPatches` | `constant/meshInfo` |
+| `rho` | `rho` | The density field. p is in Pa. |
+| `rhoInf` | `$rhoInf` | `flowDerived`. Used for the dynamic pressure. |
+| `magUInf` | `$Uinf` | `flowDerived` |
+| `Aref` | `$Aref` | `constant/meshInfo` |
+| `lRef` | `$lRef` | `constant/meshInfo` |
+| `CofR` | `(0 0 0)` | The nose tip. MESH.md §3. |
+| `pitchAxis` | `(0 0 1)` | z axis |
+| `dragDir`, `liftDir` | from α and β | `flowDerived` |
 
-**`p`, M ≤ 1:** `freestreamPressure` en los tres bordes. Es lo contrario de
-`U`: extrapola donde el flujo entra y fija donde sale. En subsónico entra una
-onda acústica por la salida, así que la presión del outlet se impone.
+**Time control.**
 
-**`p`, M > 1:**
-
-| Borde | Condición | Razón |
+| Entry | Value | Function |
 |---|---|---|
-| `inlet` | `fixedValue` | a M > 1 **todas** las características entran, así que todo se impone |
-| `outlet` | `zeroGradient` | todas salen: imponer algo sería sobre-especificar |
-| `box` | `waveTransmissive` | la velocidad **normal** a este borde es casi cero, así que las ondas lo cruzan en ambos sentidos. Advecta la presión hacia afuera a `u + c` y relaja hacia `fieldInf` en la longitud `lInf` |
+| `startFrom` | `latestTime` | A new `./Allrun` continues the run. |
+| `endTime` | 0.05 s | Physical time limit. |
+| `deltaT` | `0.01·tauCo/1.2` | Initial time step. §5.3. |
+| `adjustTimeStep` | yes | The time step follows `maxCo`. |
+| `maxDeltaT` | 1e-5 s | Maximum time step. |
+| `writeInterval` | 0.005 s, adjustable | Interval of the written times. |
+| `purgeWrite` | 2 | Keeps the last two written times. |
+| `writeFormat` | binary | |
 
-`freestreamPressure` en v2412 no tiene modo supersónico: fijaría `p` en un
-outlet supersónico. Por eso la rama.
+## 11. Discretization schemes
 
-`waveTransmissive` implementa la condición no reflectante de Poinsot y Lele
-(1992), "Boundary Conditions for Direct Simulations of Compressible Viscous
-Flows", *J. Comput. Phys.* **101**, 104-129.
+`system/fvSchemesVanLeer` contains the full set. `system/fvSchemes` and
+`system/fvSchemesUpwind` are the same file: they include `fvSchemesVanLeer`
+and set the three `reconstruct` entries to `upwind`. The ramp copies
+`fvSchemesUpwind` at the start and `fvSchemesVanLeer` at iteration
+`vanLeer`. Do not edit `system/fvSchemes`.
 
-**Esto importa acá.** A M 1.8 el ángulo de Mach es 33.7° y el cono desde la
-punta alcanza el farfield en x = 17.6 m, adentro del dominio, que llega a
-41.4 m. O sea que la onda **sale por el borde lateral**, no por el outlet. Una
-`fixedValue` ahí la reflejaría hacia adentro.
+| Term | Scheme | Reason |
+|---|---|---|
+| `fluxScheme` | `Kurganov` | §4 |
+| `reconstruct(rho)`, `reconstruct(T)` | `vanLeer` | §4 |
+| `reconstruct(U)` | `vanLeerV` | §4 |
+| `ddt` | `Euler` | Global time step. `localEuler` did not limit the step on the previous mesh. §14. |
+| `grad` | `Gauss linear` | |
+| `div(tauMC)` | `Gauss linear` | Deviatoric part of the viscous stress. |
+| `div(phi,k)`, `div(phi,omega)` | `Gauss upwind` | k and ω must stay positive. |
+| `laplacian` | `Gauss linear limited corrected 0.33` | Non-orthogonal correction, limited. |
+| `snGrad` | `limited corrected 0.33` | Same. |
+| `wallDist` | `meshWave` | Wall distance for the SST model. |
 
-Las paredes son `noSlip` para `U` y `zeroGradient` para `p` y `T`. `T`
-adiabática: a M 1.8 la temperatura de recuperación ronda los 470 K, que el
-fuselaje no alcanza a seguir en 4 s de quemado, así que flujo de calor nulo es
-el límite correcto y no una temperatura de pared fija.
+## 12. Linear solvers
 
-## 8. Coeficientes de fuerza
+File: `system/fvSolution`.
 
-`p` está en Pa y la densidad es un campo, así que la integración usa el
-campo: `rho rho;`. `rhoInf` sigue haciendo falta, para la presión dinámica
-que normaliza los coeficientes, y sale derivada de `pInf` y `Tinf`.
+| Fields | Solver | Tolerance | `relTol` |
+|---|---|---|---|
+| `rho`, `rhoU`, `rhoE` | `diagonal` | – | – |
+| `U`, `e` | `smoothSolver`, `symGaussSeidel`, 2 sweeps | 1e-9 | 0.01 |
+| `k`, `omega` | `smoothSolver`, `symGaussSeidel`, 1 sweep | 1e-9 | 0.1 |
 
-`Aref`, `lRef` y la lista de paredes vienen de `constant/meshInfo`, así que
-siempre coinciden con la malla. Convención de referencia y centro de presión:
-[WORKFLOW.md](WORKFLOW.md), sección 6.
+The conserved variables are explicit. `diagonal` divides by the diagonal.
+Only the implicit diffusive corrections and the turbulence equations use a
+real linear solver.
 
-## 9. De dónde salió la configuración
+## 13. Parallel decomposition
 
-La plantilla sigue `$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35`
-(cono biconico supersónico externo, con datos experimentales) y la rampa del
-OpenFOAM ToolChain. Lo que cambia respecto del tutorial, y por qué:
+File: `system/decomposeParDict`. `numberOfSubdomains 8`, `method scotch`.
+`newCase.sh --np` and `./Allrun <N>` change `numberOfSubdomains`.
 
-- Limitadores de `laplacian` y `snGrad` en `limited corrected 0.33`, por la
-  no-ortogonalidad de esta malla.
-- Turbulencia `kOmegaSST`; el tutorial del biconico es laminar, porque ese
-  experimento lo es.
-- Las condiciones de pared rarificadas del biconico (`maxwellSlipU`,
-  `smoluchowskiJumpT`) **no** se usan: ese experimento es de baja densidad y
-  este cohete vuela a densidad de nivel del mar.
-- `ddt Euler` en vez de `localEuler`. El paso local es el acelerador estándar,
-  pero en esta malla no controló el paso: el solver reportó Courant del orden
-  de 10⁶ y divergió en menos de diez iteraciones. Esa prueba fue sin rampa y
-  sobre la malla con volúmenes negativos, así que vale repetirla.
-- `fvOptions` con el recorte de T (§4).
+## 14. Origin of the configuration
 
-## 10. Lo que todavía falta
+The template follows
+`$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35` and the
+Courant ramp of the OpenFOAM ToolChain. Differences from the tutorial:
 
-- **Validación.** Nada está contrastado contra datos, y los puntos de bajo
-  Mach son los más sospechosos (§2.2). El plan está en
-  [VALIDATION.md](VALIDATION.md).
-- **Paso de tiempo local.** Ver §9: haría el barrido mucho más barato,
-  sobre todo a bajo Mach.
-- **Malla sin volúmenes negativos.** Hoy fija un `tauCo` de 2e-10 s.
-- **Malla adaptada al cono de Mach.** Las zonas radiales son cilindros; para
-  resolver el choque hacen falta celdas alineadas con el cono.
-- **Chorro de la tobera.** El disco de la base es pared. Modelar el escape
-  pide partirlo en `nozzle` y `base` y una condición de presión y temperatura
-  totales, y la presión de base con motor encendido es muy distinta de la
-  apagada.
-- **Malla por rango de Mach.** `y1` sale de una velocidad; ver §3.
+| Item | Tutorial | Template | Reason |
+|---|---|---|---|
+| Turbulence | laminar | `kOmegaSST` | The rocket flow is turbulent. |
+| Wall conditions | `maxwellSlipU`, `smoluchowskiJumpT` | `noSlip`, adiabatic | The tutorial is a low-density flow. The rocket flies at sea-level density. |
+| `laplacian`, `snGrad` | not limited | `limited corrected 0.33` | Non-orthogonal cells. |
+| `ddt` | `localEuler` | `Euler` | On the previous mesh, `localEuler` gave Courant numbers of 1e6 and diverged in less than ten iterations. That test had no ramp and had negative cell volumes. Do the test again on the cfMesh mesh. |
+| `fvOptions` | none | `limitT` | §8 |
+
+## 15. Open items
+
+| Item | Status |
+|---|---|
+| Validation | Not done. VALIDATION.md. |
+| Wall patch types | No step sets `wall`. MESH.md §6.1. |
+| `tauCo` | Measured on the previous mesh. §5.4. |
+| Stop criterion | Window in iterations, not in flow-through times. §5.5. |
+| Local time step | Not tested on the cfMesh mesh. §14. |
+| Motor jet | The base is a wall. A jet needs a `nozzle` patch and a total-pressure and total-temperature inlet. The base pressure with the motor on is different. |
+| y+ | Not set by the mesh. Measure it on each case. |

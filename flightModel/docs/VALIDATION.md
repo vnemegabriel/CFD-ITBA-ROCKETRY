@@ -1,145 +1,195 @@
-# Validación
+# Validation
 
-La plantilla no está validada. Este documento dice **contra qué compararla
-y con qué cuentas**, para que el resultado sea verificable y no una
-opinión. Las fórmulas de referencia están escritas con sus constantes para que
-puedas evaluarlas a mano.
+This document gives the procedures that compare the case results with
+references. Each reference has its formula and its constants, so that you
+can calculate it by hand.
 
-Orden recomendado: primero el bajo Mach, que es donde hay referencias
-analíticas confiables y donde `rhoCentralFoam` es más sospechoso
-([SOLVERS.md §2.2](SOLVERS.md)), y recién después transónico y supersónico.
+Do the procedures in this sequence:
 
-## 1. Chequeos que no cuestan nada y hay que hacer siempre
+1. The checks in §1, on each run.
+2. Subsonic flow (§2). There are analytical references, and the
+   density-based solver has the largest risk at low Mach number.
+3. Transonic and supersonic flow (§3).
+4. Mesh convergence (§4), before you publish a value.
 
-| Chequeo | Qué debe dar | Qué significa si falla |
+## 1. Checks on each run
+
+| Check | Correct result | Cause if not correct |
 |---|---|---|
-| `Cl` a α = 0 en malla `half` o `full` | ≈ 0 | la costura entre cuadrantes o la deformación de la aleta no son simétricas |
-| `CmRoll` a α = 0 | ≈ 0 | idem |
-| y+ por patch | grueso de la distribución en 20 a 100 | ajustar `nLayers`, ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md#y) |
-| balance de `Cd` cuarto contra mitad | igual dentro de 1 % | `Aref` mal escalado, o el sector no es equivalente |
-| linealidad de `CN` entre α = 2° y 6° | pendiente constante | no convergió, o y+ fuera de rango en las aletas |
+| `Cl`, `CmPitch` at α = 0, β = 0 | ≈ 0 | The mesh is not symmetric, or the run is not converged. |
+| `CmRoll` at α = 0 | ≈ 0 | The fin meshes are not equal. |
+| y+ on each wall patch | Most values from 20 to 100 | Change `nLayers` or `thicknessRatio`. MESH.md §4.4. |
+| Minimum and maximum of T | Inside 150 K and 1200 K, not on the limits | The `fvOptions` limit sets the result. SOLVERS.md §8. |
+| Physical time of the run | Several flow-through times (2.955 m / `Uinf`) | The stop criterion stopped too early. SOLVERS.md §5.5. |
+| `CN` from α = 2° to 6° | Linear in α | The run is not converged, or y+ on the fins is out of range. |
 
-## 2. Subsónico: contra Barrowman
+## 2. Subsonic flow: Barrowman
 
-La referencia son las fórmulas de Barrowman, que son las que usan OpenRocket y
-el resto de la cohetería amateur. Referidas a la **sección del cuerpo**
-`A = πD²/4` y por radián.
+The references are the equations of Barrowman. OpenRocket uses them. The
+coefficients refer to the body cross section A = πd²/4 and are per radian.
 
 - Barrowman (1967), *The Practical Calculation of the Aerodynamic
-  Characteristics of Slender Finned Vehicles*, tesis de maestría, Catholic
-  University of America. Es el documento original.
-- Barrowman y Barrowman (1966), *A Method for Calculating the Static Margin of
-  a Slender Missile*.
-- Para la parte de aletas y su interferencia, la formulación equivalente está
-  en Fleeman, *Tactical Missile Design*, 2ª ed., cap. 2.
+  Characteristics of Slender Finned Vehicles*, MSc thesis, Catholic
+  University of America.
+- Barrowman and Barrowman (1966), *A Method for Calculating the Static
+  Margin of a Slender Missile*.
+- Fleeman, *Tactical Missile Design*, 2nd ed., ch. 2. Equivalent equations
+  for the fins and the fin-body interference.
 
-### 2.1 Fuerza normal y centro de presión
+### 2.1 Geometry data
 
-Con `D = 0.151 m`, `L = 2.955 m`:
-
-| Componente | `CN_α` [1/rad] | `x_cp` desde la punta [m] |
+| Symbol | Value | Source |
 |---|---|---|
-| ogiva | 2.0 (exacto para cualquier nariz de revolución) | 0.466 · L_nariz = 0.37 |
-| cilindro | ≈ 0 en teoría esbelta | — |
-| boattail | `2[(d_base/d)² − 1]` = −0.94 | 2.89 |
-| aletas (4, con interferencia) | ver abajo | 2.70 |
+| d | 0.151 m | `lRef` in `meshInfo` |
+| L | 2.955 m | `lBody` in `meshInfo` |
+| r | 0.0755 m | `rBody` in `meshInfo` |
+| s, exposed semi-span | 0.2355 − 0.0755 = 0.160 m | `finTipR − rBody` |
+| c_r, root chord | 0.301 m | [examine on the fin drawing] |
+| c_t, tip chord | 0.150 m | [examine on the fin drawing] |
+| l_m, length of the mid-chord line | – | [measure on the fin drawing] |
+| (d_base/d)² | 0.53 | [examine on the drawing] |
 
-El término de aletas de Barrowman, para `N = 4`:
+> **NOTE** `finX1 − finX0` in `meshInfo` is 0.401 m. This is the x extent of
+> the fin, not the root chord. Use the fin drawing for c_r, c_t and l_m.
+
+### 2.2 Normal force and centre of pressure
+
+| Component | `CN_α` [1/rad] | `x_cp` from the nose tip [m] |
+|---|---|---|
+| Nose | 2.0, for all noses of revolution | 0.466 · L_nose for an ogive |
+| Cylinder | ≈ 0 in slender-body theory | – |
+| Boattail | 2[(d_base/d)² − 1] = −0.94 | [calculate from the drawing] |
+| Fins, N = 4, with interference | Equation below | [calculate from the drawing] |
+
+Fin term:
 
 ```
-CN_fin = (4 N (s/d)²) / (1 + sqrt(1 + (2 l / (c_r + c_t))²))
-K_interf = 1 + r / (s + r)
+CN_fins = K_fb · 4 N (s/d)² / (1 + √(1 + (2 l_m / (c_r + c_t))²))
+K_fb    = 1 + r / (s + r)
 ```
 
-con `s` = semi-envergadura expuesta = 0.2355 − 0.0755 = 0.160 m,
-`r` = radio del cuerpo = 0.0755 m, `d` = 0.151 m,
-`c_r` = 0.301 m, `c_t` = 0.150 m, `l` = longitud del borde de ataque.
+### 2.3 Procedure
 
-**Cómo compararlo con la CFD.** Corré un barrido en α de 0 a 6° en malla
-`half`, ajustá la pendiente de `Cl` contra α en radianes, y comparala con la
-suma. Para el desglose por componente, agregá un `forceCoeffs` por patch
-(`cone`, `walls`, `tail`, `fins`) y compará cada término por separado: es
-mucho más informativo que un solo número.
+1. Run an angle-of-attack sweep from 0° to 6°. Refer to WORKFLOW.md §9.3.
+2. Calculate the slope of `CN` against α in radians. Use the force normal
+   to the body axis, not `Cl`. `Cl` is normal to the free stream.
+3. Compare the slope with the sum of the components.
+4. For the breakdown, add one `forceCoeffs` function object for each patch
+   (`cone`, `walls`, `tail`, `fins`). Compare each term with its reference.
 
-Ojo con el sesgo conocido: el contorno del patch `fins` está cuantizado y su
-área queda 3.8 % alta en `coarse`. Eso se traslada casi directo a `CN_fin`.
-Ver [WORKFLOW.md](WORKFLOW.md#el-borde-en-escalera-del-patch-fins).
+### 2.4 Drag at α = 0
 
-### 2.2 Arrastre a α = 0
+Compare the drag components, not the total.
 
-Descomposición, que es lo que conviene comparar en vez del total:
-
-| Término | Referencia |
+| Term | Reference |
 |---|---|
-| fricción | `Cf · S_mojada / Aref` con `Cf = 0.0576 Re_L^-0.2` (placa plana turbulenta, Schlichting *Boundary-Layer Theory* 7ª ed. cap. 21). A `Re_L = 2×10⁷` da `Cf ≈ 0.00203` |
-| factor de forma del cuerpo | `1 + 1/(2·fineness)`, con fineness = L/D = 19.6 |
-| factor de forma de la aleta | `1 + 2t/c` |
-| arrastre de base | correlación de Hoerner, *Fluid-Dynamic Drag* (1965), cap. 3, con `(d_base/d)² = 0.53` |
+| Skin friction | Cf · S_wet / Aref, with Cf = 0.0576 Re_L^−0.2 (turbulent flat plate, Schlichting, *Boundary-Layer Theory*, 7th ed., ch. 21) |
+| Body form factor | 1 + 1/(2 · L/d), with L/d = 19.57 |
+| Fin form factor | 1 + 2 t/c |
+| Base drag | Hoerner, *Fluid-Dynamic Drag* (1965), ch. 3, with (d_base/d)² |
 
-La parte viscosa y la de presión salen separadas en `postProcessing/forces1`,
-columna por columna, así que cada término se compara con su referencia.
+At ISA sea level:
 
-## 3. Transónico y supersónico
+| M | Re_L | Cf |
+|---|---|---|
+| 0.3 | 2.06e7 | 0.00198 |
+| 0.8 | 5.50e7 | 0.00163 |
+| 1.8 | 1.24e8 | 0.00139 |
 
-Acá no hay fórmula analítica que valga como referencia. Tres caminos, de menos
-a más esfuerzo:
+The Cf correlation is for incompressible flow. Above M 0.3 it does not
+include the compressibility correction.
 
-**Contra el propio tutorial.** Antes de creerle al caso del cohete, corré el
-tutorial del que sale la plantilla y reproducí su resultado. Es la forma más
-barata de separar un problema de configuración de uno de malla:
+`postProcessing/forces1` gives the pressure and viscous parts in different
+columns. Compare the viscous part with the skin friction term.
+
+## 3. Transonic and supersonic flow
+
+No analytical reference applies to the full rocket. Use these three methods,
+from the smallest to the largest work.
+
+### 3.1 Tutorial of the template
+
+Run the tutorial that the template comes from and get its published result:
 
 ```
 $FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35
 ```
 
-El biconico trae datos experimentales, así que da una validación de verdad del
-solver y del esquema de flujo.
+The tutorial has experimental data. This method validates the solver and
+the flux scheme. It separates a configuration error from a mesh error.
 
-**Contra soluciones analíticas de onda.** Para verificar que el esquema captura
-bien un choque, la relación de Rankine-Hugoniot en una cuña es exacta:
+### 3.2 Oblique shock on a wedge
+
+The θ-β-M relation for a wedge is exact:
 
 ```
-tan(theta) = 2 cot(beta) (M² sin²(beta) − 1) / (M² (gamma + cos 2 beta) + 2)
+tan θ = 2 cot β (M² sin²β − 1) / (M² (γ + cos 2β) + 2)
 ```
 
-Anderson, *Modern Compressible Flow*, 3ª ed., cap. 4. El tutorial
-`rhoCentralFoam/wedge15Ma5` es justamente eso.
+Anderson, *Modern Compressible Flow*, 3rd ed., ch. 4. The tutorial
+`rhoCentralFoam/wedge15Ma5` is this case. Compare the shock angle and the
+pressure ratio.
 
-**Contra la curva `Cd(M)` de OpenRocket.** Es la comparación que más te importa
-para la trayectoria, pero es la más débil como validación: OpenRocket usa
-correlaciones semi-empíricas, no verdad de campo. Sirve para detectar un error
-de un factor 2, no para justificar un 5 %.
+### 3.3 Cd(M) from OpenRocket
 
-### El pico transónico
+This comparison is the most important one for the trajectory. It is also
+the weakest validation: OpenRocket uses semi-empirical correlations. It
+finds an error of a factor of 2. It does not support a difference of 5 %.
 
-Lo que hay que reproducir cualitativamente es la subida de `Cd` entre M 0.8 y
-M 1.2, que para un cuerpo esbelto con aletas es del orden de un factor 2 a 3
-respecto del valor subsónico. Si tu curva no lo tiene, la malla es demasiado
-gruesa donde se forma el choque.
+### 3.4 Transonic drag rise
 
-## 4. Convergencia de malla
+The case must show the increase of `Cd` from M 0.8 to M 1.2. For a slender
+body with fins, the peak is approximately 2 to 3 times the subsonic value.
+If the curve does not show it, the mesh is too coarse where the shock
+occurs.
 
-Independiente del régimen, y necesaria para poder citar cualquier número:
+## 4. Mesh convergence
 
-Cambiá `maxCellSize` en `mesh/system/meshDict` por factores de 2 y dejá los
-niveles quietos: eso escala todo el campo sin tocar la resolución relativa
-entre zonas. Una malla por valor, el mismo punto de Mach en todas.
+### 4.1 Procedure
 
-Ojo con y+: el espesor de la primera capa sigue a la celda de superficie, así
-que se mueve con `maxCellSize`. Compensá con `nLayers` para que y+ quede en la
-misma banda en las cuatro mallas, o el estudio mezcla dos efectos. Graficá `Cd`
-contra `N^(-2/3)` y extrapolá; la pendiente te dice el orden observado y la
-ordenada al origen el valor extrapolado. El método está en Roache (1994),
-"Perspective: A Method for Uniform Reporting of Grid Refinement Studies",
-*J. Fluids Eng.* **116**, 405-413.
+1. Make three meshes. Change only `maxCellSize`, with the ratio r = √2.
+   Do not change the levels. Refer to WORKFLOW.md §9.2.
+2. Run the same Mach number on the three meshes.
+3. Measure y+ on each mesh. The first layer thickness follows the surface
+   cell size. If y+ changes much, the study contains two effects. Change
+   `nLayers` to keep y+ in the same range.
+4. Calculate the representative cell size h = N^(−1/3) for each mesh, with
+   N the number of cells.
+5. Calculate the observed order p, the extrapolated value and the grid
+   convergence index (GCI) with the method of Celik et al. (2008).
 
-## 5. Registro
+### 4.2 Equations
 
-Para cada corrida que quieras citar, guardá junto a los resultados:
+With f₁, f₂, f₃ the results on the fine, medium and coarse mesh, and a
+constant ratio r:
 
-- el `output/<nombre>.params.py` de la malla, que la reconstruye exacta
-- el `constant/meshInfo` de la corrida
-- el `system/flowConditions`
-- el `log.checkMesh` y el y+ por patch del log del solver
+```
+p     = ln((f₃ − f₂) / (f₂ − f₁)) / ln r
+f_ext = f₁ + (f₁ − f₂) / (r^p − 1)
+GCI₁₂ = 1.25 · |(f₁ − f₂)/f₁| / (r^p − 1)
+```
 
-Con eso cualquiera reproduce el número. Sin eso, no.
+If (f₃ − f₂)/(f₂ − f₁) is negative, the convergence is oscillatory. The
+equations then do not apply.
+
+- Celik et al. (2008), "Procedure for Estimation and Reporting of
+  Uncertainty Due to Discretization in CFD Applications", *J. Fluids Eng.*
+  **130**, 078001.
+- Roache (1994), "Perspective: A Method for Uniform Reporting of Grid
+  Refinement Studies", *J. Fluids Eng.* **116**, 405–413.
+
+## 5. Record
+
+For each run that you publish, keep these files with the results:
+
+| File | Function |
+|---|---|
+| `<mesh-dir>/system/meshDict` | Makes the mesh again. |
+| `<mesh-dir>/meshInfo` | Mesh parameters and number of cells. |
+| `<mesh-dir>/log.checkMesh` | Mesh quality. |
+| The STL file, or its commit | Geometry. |
+| `<run-dir>/system/flowConditions` | Flight condition. |
+| `<run-dir>/config.json` | Ramp and stop criterion. |
+| y+ for each patch from `log.rhoCentralFoam` | Wall resolution. |
+
+With these files, another person can make the same result again.

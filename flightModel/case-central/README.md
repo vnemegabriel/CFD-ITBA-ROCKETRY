@@ -1,28 +1,25 @@
-# case-central/ — la plantilla, M 0.3 a 1.8
+# case-central/ — case template, M 0.3 to M 1.8
 
-`rhoCentralFoam` con flujo central-upwind de Kurganov, `kOmegaSST` con wall
-functions, aire como gas perfecto con viscosidad de Sutherland. Una sola
-plantilla para todo el barrido; se copia con `../newCase.sh`.
+`rhoCentralFoam` with the Kurganov central-upwind flux, `kOmegaSST` with wall
+functions, and air as a perfect gas with Sutherland viscosity. One template
+for all the sweep.
 
-**No está validada.** Los números no tienen respaldo hasta que se haga
-[../docs/VALIDATION.md](../docs/VALIDATION.md), y los de M 0.3 y 0.6 son los
-más sospechosos: ver [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.2.
+> **CAUTION** The template is not validated. Do not use the results before
+> you do the procedures in [../docs/VALIDATION.md](../docs/VALIDATION.md).
+
+Do not run a case in this directory. Make a case with `../newCase.sh`:
 
 ```bash
-../newCase.sh ~/runs/m03 --Minf 0.3
-../newCase.sh ~/runs/m18 --Minf 1.8
+../newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
+../newCase.sh ~/runs/m18 --mesh ~/meshes/base --Minf 1.8
 ```
 
-- **Lo que cambia con el Mach** es sólo la condición de borde de `p`:
-  `0.orig/p` elige `freestreamPressure` o `fixedValue`/`zeroGradient`/
-  `waveTransmissive` según `Minf > 1`. Todo lo demás es igual. Ver
-  [../docs/SOLVERS.md](../docs/SOLVERS.md), §7.
-- **Arranca con rampa de Courant**, calcada del OpenFOAM ToolChain: `maxCo` de
-  0.01 a `final_Co` y upwind → van Leer, con los parámetros en `config.json`.
-  Ver [../docs/SOLVERS.md](../docs/SOLVERS.md), §2.3.
-- **Es cara.** Paso global adaptativo con `Euler`: el paso lo fija el límite
-  acústico de la celda más chica. Con la malla actual eso son ~2e-10 s por
-  unidad de Courant.
-- **La malla se dimensiona para una velocidad**, y del punto más lento al más
-  rápido el barrido cambia 6 veces. Leé `Uinf` y el y+ esperado del banner de
-  `./Allrun`.
+| Item | Function | Reference |
+|---|---|---|
+| `system/flowConditions` | The only file that sets the flight condition. | [SOLVERS.md §3](../docs/SOLVERS.md) |
+| `config.json` | Courant ramp and stop criterion. `newCase.sh` renders the `*.j2` files with it. | [SOLVERS.md §5](../docs/SOLVERS.md) |
+| `0.orig/p` | The only boundary condition that changes with the Mach number. It changes at `Minf = 1`. | [SOLVERS.md §9](../docs/SOLVERS.md) |
+| `constant/meshInfo` | `newCase.sh` replaces it with the `meshInfo` of the mesh. | [MESH.md §7](../docs/MESH.md) |
+
+The mesh does not set y+, and the velocity changes by a factor of 6 in the
+sweep. Measure y+ on each case.
