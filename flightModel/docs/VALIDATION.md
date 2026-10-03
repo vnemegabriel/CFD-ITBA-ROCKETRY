@@ -19,7 +19,7 @@ Do the procedures in this sequence:
 | `Cl`, `CmPitch` at α = 0, β = 0 | ≈ 0 | The mesh is not symmetric, or the run is not converged. |
 | `CmRoll` at α = 0 | ≈ 0 | The fin meshes are not equal. |
 | y+ on each wall patch | Most values from 20 to 100 | Change `nLayers` or `thicknessRatio`. MESH.md §4.4. |
-| Minimum and maximum of T | Inside 150 K and 1200 K, not on the limits | The `fvOptions` limit sets the result. SOLVERS.md §8. |
+| Minimum and maximum of T | Physically possible: near the stagnation temperature at most, not near 0 | The transient is not resolved. SOLVERS.md §8. |
 | Physical time of the run | Several flow-through times (2.955 m / `Uinf`) | The run stopped before the flow was steady. SOLVERS.md §5.5. |
 | `CN` from α = 2° to 6° | Linear in α | The run is not converged, or y+ on the fins is out of range. |
 

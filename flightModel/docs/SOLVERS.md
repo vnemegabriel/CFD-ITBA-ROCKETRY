@@ -36,7 +36,6 @@ separable from the physics.
 | `0.orig/*` | no | Initial and boundary conditions. §9. |
 | `constant/thermophysicalProperties` | no | Gas model. §7. |
 | `constant/turbulenceProperties` | no | Turbulence model. §6. |
-| `constant/fvOptions` | no | Temperature limits. §8. |
 | `constant/meshInfo` | no | `newCase.sh` replaces it with the `meshInfo` of the mesh. MESH.md §7. |
 | `system/controlDictBase.j2` | yes, with care | Time control and function objects. §5, §10. |
 | `system/controlDict` | no | Includes `controlDictBase` and adds `maxCo 0.01`. |
@@ -331,15 +330,12 @@ Above M 2.5, replace `hConst` with `janaf`. The coefficients for air are in
 
 ## 8. Temperature limits
 
-File: `constant/fvOptions`. Entry `limitT`, type `limitTemperature`, on all
-cells, from 150 K to 1200 K.
+There are none. `rhoCentralFoam` in v2412 does not read `fvOptions`, so a
+`limitTemperature` entry has no effect.
 
 The initial transient can move T out of range. With `perfectGas`, a negative
 T gives an imaginary speed of sound, and the solver stops with a floating
-point exception.
-
-> **CAUTION** This is not a physical model. After each run, make sure that
-> the minimum and the maximum of T are inside the limits and not on them.
+point exception. The Courant ramp (§5) is the only protection.
 
 ## 9. Boundary conditions
 
@@ -480,7 +476,6 @@ Courant ramp of the OpenFOAM ToolChain. Differences from the tutorial:
 | Wall conditions | `maxwellSlipU`, `smoluchowskiJumpT` | `noSlip`, adiabatic | The tutorial is a low-density flow. The rocket flies at sea-level density. |
 | `laplacian`, `snGrad` | not limited | `limited corrected 0.33` | Non-orthogonal cells. |
 | `ddt` | `localEuler` | `Euler` | On the previous mesh, `localEuler` gave Courant numbers of 1e6 and diverged in less than ten iterations. That test had no ramp and had negative cell volumes. Do the test again on the cfMesh mesh. |
-| `fvOptions` | none | `limitT` | §8 |
 
 ## 15. Open items
 
