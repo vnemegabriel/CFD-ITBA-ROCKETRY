@@ -262,9 +262,6 @@ give `--refine` to `newCase.sh`.
 | `finTip` | Annulus from `finTipR − tipBand` to `finTipR + margin` | None. The region does not touch the body. |
 | `finBox` | Cylinder of radius `finTipR + margin` | The first cell on the body below the fins is half as thick, so y+ there is approximately half. |
 
-> **NOTE** The cell counts in the header of `common/Allrefine` are from the
-> previous structured mesh. Record the counts again on the cfMesh mesh.
-
 ## 8. Results
 
 | Data | Location |

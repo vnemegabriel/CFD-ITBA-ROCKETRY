@@ -9,22 +9,8 @@
 # region comes from system/topoSetDict, which reads the fin geometry from
 # constant/meshInfo, so it follows the fins if the geometry changes.
 #
-# What it costs, measured with the shipped dictionaries on the coarse half mesh
-# (1,060,000 cells):
-#
-#     tip    24,784 cells in the set -> 1,233,488 total, +16 %,  0.65 % polyhedra
-#     fins  200,580 cells in the set -> 2,464,060 total, +132 %, 0.30 % polyhedra
-#
-# Max non-orthogonality (87.5 deg) and max skewness (2.55) are unchanged by
-# either; only the averages move.  Patches are preserved and refined with the
-# cells: `fins` went from 10,984 to 13,192 faces with the tip band.
-# `fins` also halves y+ under the fins, because its region reaches the wall.
-#
-# Whether you need this at all: the chordwise and fin-normal spacings are
-# already refined by the mesh generator (FIN_H_X, AZ_FIN_H) and are already
-# local.  Only the radial direction is global, which is what this fixes.  For
-# drag at zero incidence you probably do not need it; for the tip vortex at
-# incidence you do.  See docs/WORKFLOW.md section 3.
+# For drag at zero incidence you probably do not need it; for the tip vortex
+# at incidence you do.  See docs/WORKFLOW.md section 7.
 cd "${0%/*}" || exit 1
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
 
