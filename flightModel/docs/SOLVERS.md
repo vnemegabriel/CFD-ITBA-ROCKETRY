@@ -153,17 +153,16 @@ file.
 
 | Key | Default | Function |
 |---|---|---|
-| `tauCo` | `2e-10` | Time step in s that gives Co = 1 in the worst cell. |
+| `tauCo` | `3.3e-8` | Time step in s that gives Co = 1 in the worst cell. |
 | `vanLeer` | `2000` | Iteration of the change from upwind to van Leer. `-1` keeps upwind. |
 | `minIter` | `3000` | Iteration of the change to `controlDict_final`. |
 | `final_Co` | `0.3` | Maximum `maxCo` of all the ramp. |
 | `coeffs_fields` | `["Cd"]` | Coefficients in the stop criterion. |
-| `coeffs_variation` | `[0.001]` | Relative tolerance of each coefficient. |
-| `coeffs_range` | `[300]` | Window in iterations of each coefficient. |
+| `coeffs_variation` | `[0.001]` | Absolute tolerance of each coefficient. |
+| `coeffs_window` | `[2]` | Window of each coefficient, in flow-through times. |
 
-At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. At α = 0 do not
-add them: their average is approximately 0, and a relative criterion on 0
-does not stop.
+At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
+is absolute, so it also applies to a coefficient with an average near 0.
 
 ### 5.3 Schedule
 
@@ -191,33 +190,52 @@ number.
 
 ### 5.4 Measure tauCo
 
-> **CAUTION** The value `2e-10` comes from the previous structured mesh.
-> Measure `tauCo` again on each new mesh. If `tauCo` is incorrect, the
-> switches occur at incorrect iterations. `maxCo` still limits the Courant
-> number.
+`tauCo` depends on the mesh and a little on the Mach number. Values on the
+base mesh of `Allmesh` (2 144 494 cells), measured on the first steps from
+the uniform free stream:
 
-1. Make a case and run it.
-2. In `log.rhoCentralFoam`, find a time step where the Courant number is
-   constant.
-3. Calculate `tauCo = deltaT / maxCo` with the values of that step.
-4. Write the value in `case-central/config.json`.
+| M | `tauCo` |
+|---|---|
+| 0.3 | 3.31e-8 s |
+| 1.8 | 2.71e-8 s |
+
+`config.json` has `3.3e-8`. A `tauCo` larger than the real value makes each
+phase of the ramp last more iterations than the schedule, which is the safe
+direction. `maxCo` still limits the Courant number.
+
+Measure `tauCo` again when you change the mesh:
+
+1. Make a case and run some time steps.
+2. In `log.rhoCentralFoam`, read `deltaT` and the max Courant number on the
+   next line. The solver calculates the Courant number with that `deltaT`.
+3. Calculate `tauCo = deltaT / Co_max`. All the steps from the uniform
+   free stream give the same value.
+4. Write the largest value in `case-central/config.json`.
 5. Make the cases again with `newCase.sh`.
 
 ### 5.5 Stop criterion
 
 `controlDict_final` adds `runTimeControl1`. For each field in
-`coeffs_fields`, it calculates the average over the last `coeffs_range`
-iterations. The run stops when the relative change of the average is less
-than `coeffs_variation`.
+`coeffs_fields`, the `average` condition calculates a moving average with a
+window of `coeffs_window` flow-through times:
 
-> **CAUTION** The window is in iterations, not in physical time. With a
-> small time step, 300 iterations are a small fraction of one flow-through
-> time (2.955 m / `Uinf`). The average can then be constant before the flow
-> is steady. After each run, compare the physical time of the run with the
-> flow-through time. Look at the full `Cd` history.
+```
+window = coeffs_window · lBody / Uinf
+```
 
-`endTime 0.05` s is the second limit. At M 1.8 one flow-through time is
-4.8 ms.
+The window is in physical time. The condition starts when the run changes to
+`controlDict_final`, at `minIter`. The run stops when both are true:
+
+1. The physical time since `minIter` is more than the window.
+2. |average − current value| < `coeffs_variation`, for all the fields.
+
+`endTime = 10 · lBody / Uinf` is the second limit:
+
+| M | Flow-through time | `endTime` |
+|---|---|---|
+| 0.3 | 28.9 ms | 0.289 s |
+| 0.8 | 10.9 ms | 0.109 s |
+| 1.8 | 4.82 ms | 0.048 s |
 
 ## 6. Turbulence
 
@@ -402,7 +420,7 @@ File: `system/controlDictBase.j2`.
 | Entry | Value | Function |
 |---|---|---|
 | `startFrom` | `latestTime` | A new `./Allrun` continues the run. |
-| `endTime` | 0.05 s | Physical time limit. |
+| `endTime` | 10 · `lBody` / `Uinf` | Physical time limit: 10 flow-through times. |
 | `deltaT` | `0.01·tauCo/1.2` | Initial time step. §5.3. |
 | `adjustTimeStep` | yes | The time step follows `maxCo`. |
 | `maxDeltaT` | 1e-5 s | Maximum time step. |
@@ -469,9 +487,9 @@ Courant ramp of the OpenFOAM ToolChain. Differences from the tutorial:
 | Item | Status |
 |---|---|
 | Validation | Not done. VALIDATION.md. |
-| Wall patch types | No step sets `wall`. MESH.md §6.1. |
-| `tauCo` | Measured on the previous mesh. §5.4. |
-| Stop criterion | Window in iterations, not in flow-through times. §5.5. |
+| Wall patch types | `cartesianMesh` sets `wall`; `Allmesh` checks it. MESH.md §6.1. |
+| `tauCo` | Measured on the base mesh, from the uniform free stream. §5.4. |
+| Stop criterion | Window of 2 flow-through times. §5.5. |
 | Local time step | Not tested on the cfMesh mesh. §14. |
 | Motor jet | The base is a wall. A jet needs a `nozzle` patch and a total-pressure and total-temperature inlet. The base pressure with the motor on is different. |
 | y+ | Not set by the mesh. Measure it on each case. |

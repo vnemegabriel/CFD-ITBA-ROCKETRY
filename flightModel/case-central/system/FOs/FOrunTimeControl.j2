@@ -19,8 +19,7 @@ runTimeControl1
             functionObject  forceCoeffs1;
             fields          ({{ field }});
             tolerance       {{ coeffs_variation[loop.index0] }};
-            window          {{ coeffs_range[loop.index0] }};
-            base            iter;
+            window          #eval{ {{ coeffs_window[loop.index0] }}*$lBody/$Uinf };
             windowType      approximate;
             groupID         1;
         }

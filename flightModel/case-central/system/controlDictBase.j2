@@ -23,14 +23,11 @@ startFrom       latestTime;
 startTime       0;
 stopAt          endTime;
 
-// REAL seconds.  The step adapts to maxCo below, so endTime is physical time,
-// and reaching a steady state takes of order ten flow-through times: at M 1.8
-// one pass over the 2.955 m body is 4.8 ms, so 0.05 s is the right order.
-// Expect a few hundred thousand steps; see the note in fvSchemesVanLeer.
+// Physical seconds, ten flow-through times of the body.
 // rhoCentralFoam takes its FIRST step at 1.2 deltaT without looking at maxCo,
 // so deltaT has to start below the stable step: maxCo 0.01 times tauCo.
 deltaT          {{ '%.3g'|format(0.01*tauCo/1.2) }};
-endTime         0.05;
+endTime         #eval{ 10*$lBody/$Uinf };
 
 writeControl    adjustable;
 writeInterval   0.005;
