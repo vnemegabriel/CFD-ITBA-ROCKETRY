@@ -209,11 +209,11 @@ m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
 | Argument | Default |
 |---|---|
 | `sweep-file` | `flightModel/sweep.txt` |
-| `runs-dir` | `flightModel/runs` |
+| `runs-dir` | `~/runs` |
 | `meshes-dir` | `~/meshes` |
 
-> **CAUTION** The default `runs-dir` is in the repository. Give a
-> `runs-dir` outside the repository, outside OneDrive and outside `/mnt/c`.
+> **CAUTION** If your home directory is in OneDrive or in `/mnt/c`, give a
+> `runs-dir` and a `meshes-dir` outside them.
 
 ### 6.3 Steps that run.sh does for each line
 
