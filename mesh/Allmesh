@@ -1,5 +1,5 @@
 #!/bin/sh
-# ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finLevel n]
+# ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finCellSize m]
 #
 #     ./Allmesh ~/meshes/base
 #     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
@@ -23,7 +23,7 @@ DIR=""; SRC=""; H=""; FIN=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --maxCellSize) H=$2;   shift 2 ;;
-        --finLevel)    FIN=$2; shift 2 ;;
+        --finCellSize) FIN=$2; shift 2 ;;
         -*) echo "unknown option $1"; usage ;;
         *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
             shift ;;
@@ -39,9 +39,9 @@ SRC=$(realpath "$SRC")
 mkdir -p "$DIR"
 cp -r "$HERE/system" "$HERE/meshInfo" "$DIR/"
 cd "$DIR"
+"$HERE/stl/checkStl.py" "$SRC" --meshInfo meshInfo || { cd /; rm -rf "$DIR"; exit 1; }
 [ -n "$H" ]   && foamDictionary -entry maxCellSize -set "$H" system/meshDict > /dev/null
-[ -n "$FIN" ] && foamDictionary -entry localRefinement/fins/additionalRefinementLevels \
-                     -set "$FIN" system/meshDict > /dev/null
+[ -n "$FIN" ] && foamDictionary -entry localRefinement/fins/cellSize -set "$FIN" system/meshDict > /dev/null
 
 # STL solid names become patch names; the cases expect these four.
 sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
@@ -57,20 +57,25 @@ check surfaceGenerateBoundingBox
 runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
 check surfaceFeatureEdges
 
-runApplication cartesianMesh
-check cartesianMesh
-
-runApplication createPatch -overwrite
-check createPatch
-
-runApplication checkMesh -allTopology -allGeometry
-check checkMesh
+# cartesianMesh is not deterministic (OpenMP): the same input can come out
+# with or without negative volumes, so a bad draw is simply repeated.
+for TRY in 1 2 3; do
+    rm -rf constant/polyMesh log.cartesianMesh log.createPatch log.checkMesh
+    runApplication cartesianMesh
+    check cartesianMesh
+    runApplication createPatch -overwrite
+    check createPatch
+    runApplication checkMesh -allTopology -allGeometry
+    check checkMesh
+    grep -q "negative cell volume" log.checkMesh || break
+    echo "!! attempt $TRY: negative cell volumes"
+done
 
 N=$(awk '/^    cells:/{print $2; exit}' log.checkMesh)
 foamDictionary -entry nCells -set "$N" meshInfo > /dev/null
 foamDictionary -entry maxCellSize -add "$(foamDictionary -entry maxCellSize -value system/meshDict)" meshInfo > /dev/null
-foamDictionary -entry finLevel -add \
-    "$(foamDictionary -entry localRefinement/fins/additionalRefinementLevels -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry finCellSize -add \
+    "$(foamDictionary -entry localRefinement/fins/cellSize -value system/meshDict)" meshInfo > /dev/null
 foamDictionary -entry meshDir -add "\"$(pwd)\"" meshInfo > /dev/null
 
 echo
@@ -78,5 +83,6 @@ grep -E "cells:|hexahedra:|prisms:|polyhedra:|negative cell volume|non-orthogona
      log.checkMesh | sed 's/^/   /'
 echo
 grep -q "negative cell volume" log.checkMesh && {
-    echo "!! negative cell volumes: this mesh is unusable"; exit 1; }
+    mv constant/polyMesh constant/polyMesh.bad
+    echo "!! negative cell volumes in 3 attempts: unusable (kept as constant/polyMesh.bad)"; exit 1; }
 echo "next: ./newCase.sh <run> --mesh $(pwd) --Minf 0.3"

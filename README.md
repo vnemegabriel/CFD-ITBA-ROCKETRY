@@ -9,7 +9,7 @@ common/       Allrun, Allrefine — los scripts que va a usar cada corrida
 case-central/ la plantilla de caso
 newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
 run.sh        corre todo sweep.txt en serie
-sweep.txt     un punto de Mach por línea
+sweep.example.txt  plantilla de barrido; se copia a sweep.txt, que no se versiona
 docs/         cómo se usa y por qué
 ```
 
@@ -29,8 +29,8 @@ El barrido entero:
 ./run.sh
 ```
 
-Los directorios de corrida van **fuera de OneDrive y fuera de `/mnt/c`**: las
-dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
+Las corridas van en `~/runs` y las mallas en `~/meshes`, **fuera de la repo**:
+pesan gigas y no se versionan.
 
 ## Qué leer
 

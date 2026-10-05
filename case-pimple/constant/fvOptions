@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - compressible external aero |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// ============================================================================
+//  Temperature clip.  NOT a physical model: a numerical guard.
+//
+//  Both compressible templates start from a uniform free stream, so the first
+//  few iterations carry a violent transient.  With perfectGas an excursion to
+//  a negative or near-zero temperature makes the speed of sound imaginary and
+//  the run dies inside the thermophysical library with a floating point
+//  exception and a stack trace that names nothing useful.  Without this clip
+//  that is exactly what happens on iteration 1.
+//
+//  The bounds must be WIDE ENOUGH not to touch the converged solution.  Check
+//  after a run that min/max T are strictly inside them; if the solution sits
+//  on a bound, the answer is being set by this file and not by the physics.
+//  At M 1.8 the stagnation temperature is 475 K, so 1200 K is far clear.
+// ============================================================================
+
+limitT
+{
+    type            limitTemperature;
+    active          yes;
+    selectionMode   all;
+    min             150;        // K
+    max             1200;       // K
+}
+
+// ************************************************************************* //

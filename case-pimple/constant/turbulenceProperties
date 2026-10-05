@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - quarter-symmetry external aero
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      turbulenceProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// NOTE ON THE FORK: this file is CORRECT for ESI v2412 - my earlier review
+// assumed OpenFOAM Foundation v11, where the file is constant/momentumTransport
+// instead. On v2412 constant/turbulenceProperties is the one that is read, and
+// constant/momentumTransport (which said `simulationType laminar`) is inert.
+//
+// Delete constant/momentumTransport so there is exactly one source of truth.
+// Running laminar at Re_L = 1.97e7 would have been meaningless.
+
+simulationType  RAS;
+
+RAS
+{
+    // k-omega SST: the right default for external aero with adverse pressure
+    // gradients (boattail, fin-body junction). Its wall treatment is
+    // y+-continuous, which is what makes the y+ ~ 32 stack in
+    // snappyHexMeshDict.new safe even where y+ drifts locally.
+    RASModel        kOmegaSST;
+
+    turbulence      on;
+    printCoeffs     on;
+}
+
+// ************************************************************************* //

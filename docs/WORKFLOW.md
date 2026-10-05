@@ -10,10 +10,10 @@ mesh/Allmesh ~/meshes/base          # malla, ~2 min
 cd ~/runs/m08 && ./Allrun 8
 ```
 
-O el barrido entero de una: editá `sweep.txt` y corré `./run.sh`.
+O el barrido entero de una: `cp sweep.example.txt sweep.txt`, editalo y corré `./run.sh`. `sweep.txt` y `runs/` no se versionan: son de cada máquina.
 
-Poné los directorios de corrida **fuera de OneDrive y fuera de `/mnt/c`**: las
-dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
+Las corridas van en `~/runs` y las mallas en `~/meshes`, **fuera de la repo**:
+pesan gigas y no se versionan.
 
 ## 1. La malla
 
@@ -50,6 +50,35 @@ La malla actual son 2.1 M celdas, 96 % hexaedros, sin volúmenes negativos.
 Detrás de la base la estela baja de a un nivel en tres cilindros coaxiales
 (`baseWake` 6.25 mm, `nearWake` 12.5 mm, `midWake` 25 mm) antes de entrar a
 `wake`.
+
+Para cambiar las cotas del cohete (largo, diámetro, L/D de la ojiva von
+Kármán, boattail, aletas y su posición) está `mesh/stl/makeRocket.py`:
+
+```bash
+mesh/stl/makeRocket.py mesh/stl/largo.stl --bodyLength 2.5
+mesh/Allmesh ~/meshes/largo mesh/stl/largo.stl
+```
+
+Las cotas también pueden venir de un archivo, una `nombre valor` por línea.
+`mesh/stl/Aconcagua.dims` trae las del Aconcagua: se copia, se edita y se
+pasa con `--dims`. Lo que va en la línea de comandos le gana al archivo:
+
+```bash
+cp mesh/stl/Aconcagua.dims mesh/stl/largo.dims       # editar
+mesh/stl/makeRocket.py mesh/stl/largo.stl --dims mesh/stl/largo.dims
+```
+
+Sin opciones reproduce el Aconcagua. Rechaza cotas incompatibles (la raíz de
+la aleta tiene que apoyar sobre el cilindro) y no escribe una superficie que
+no esté cerrada y con normales hacia afuera.
+
+Cualquier STL, del CAD o de `makeRocket.py`, pasa antes de mallar por
+`mesh/stl/checkStl.py`: solids `nosecone`, `body`, `boattail` y `fins`, metros,
+eje x con la punta en x = 0, aletas en los planos y = 0 y z = 0, superficie
+cerrada. Si algo falla, `Allmesh` no malla. De ese mismo STL saca `Aref`,
+`lRef`, `rBody`, `lBody` y la geometría de aletas, y los escribe en el
+`meshInfo` de la malla: ya no se editan a mano. Las cajas y conos de estela del `meshDict`
+están en x absoluta: si la base se mueve, movelos.
 
 Para mallar otra geometría: ponela en `mesh/stl/` y `mesh/Allmesh ~/meshes/otro mesh/stl/mi_cohete.stl`. El STL tiene que traer
 los solids nombrados `nosecone`, `body`, `boattail` y `fins` — `Allmesh` los
@@ -90,15 +119,15 @@ m08     --mesh base --Minf 0.8
 m03-h2  --mesh h2 --maxCellSize 0.8 --Minf 0.3
 ```
 
-`./run.sh [sweep.txt] [runs] [mallas]` las arma y corre en serie bajo `runs/`.
+`./run.sh [sweep.txt] [runs] [mallas]` las arma y corre en serie bajo `~/runs/`.
 Saltea las que ya existen, así que si se corta, volvés a lanzarlo y sigue
 donde estaba.
 
 `--mesh` es obligatorio. Un nombre suelto vive en `~/meshes/`. Si la malla no
 existe, `run.sh` la construye antes con `mesh/Allmesh`, aplicando
-`--maxCellSize` y `--finLevel` (nivel de `fins`) a la copia del `meshDict`; las
+`--maxCellSize` y `--finCellSize` (metros, tamaño en `fins`) a la copia del `meshDict`; las
 líneas siguientes que la nombran la reusan. Si una línea pide una malla que ya
-existe con otro `maxCellSize` o `finLevel`, el barrido se detiene en vez de
+existe con otro `maxCellSize` o `finCellSize`, el barrido se detiene en vez de
 correr sobre la malla equivocada. `Allmesh` también se detiene si la malla sale
 con volúmenes negativos.
 
@@ -201,7 +230,7 @@ for a in 0 2 4 6 8; do
 done
 ```
 
-**Refinar más las aletas.** Subí `fins` a nivel 10 en `localRefinement`, o usá
+**Refinar más las aletas.** Bajá `cellSize` de `fins` en `localRefinement` (por ejemplo a 0.0016), o usá
 `./Allrefine tip` en el caso ya armado, que refina 2:1 una banda alrededor de
 la punta sin volver a mallar.
 
@@ -214,8 +243,7 @@ la punta sin volver a mallar.
 - Las mallas no se versionan y viven fuera de la repo: se reconstruyen con
   `mesh/Allmesh <dir>` en
   cinco minutos. Lo que se versiona es el STL y el `meshDict`.
-- Los directorios de corrida van fuera de la repo, fuera de OneDrive y fuera
-  de `/mnt/c`.
+- Los directorios de corrida van fuera de la repo, en `~/runs`.
 - Un cambio en el `meshDict` que mueva la malla se commitea junto con el
   número de celdas y la salida de `checkMesh` que produjo.
 

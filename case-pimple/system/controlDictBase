@@ -17,20 +17,15 @@ FoamFile
 #include "${FOAM_CASE}/constant/meshInfo"
 
 // rhoCentralFoam: density-based, explicit, central-upwind shock capturing.
-application     rhoCentralFoam;
+application     rhoPimpleFoam;
 
 startFrom       latestTime;
 startTime       0;
 stopAt          endTime;
 
-// REAL seconds.  The step adapts to maxCo below, so endTime is physical time,
-// and reaching a steady state takes of order ten flow-through times: at M 1.8
-// one pass over the 2.955 m body is 4.8 ms, so 0.05 s is the right order.
-// Expect a few hundred thousand steps; see the note in fvSchemesVanLeer.
-// rhoCentralFoam takes its FIRST step at 1.2 deltaT without looking at maxCo,
-// so deltaT has to start below the stable step: maxCo 0.01 times tauCo.
-deltaT          {{ '%.3g'|format(0.01*tauCo/1.2) }};
-endTime         0.05;
+// endTime: two passes of the flow over the body at M 0.3 (2 x 2.955 / 105).
+deltaT          1e-6;
+endTime         0.06;
 
 writeControl    adjustable;
 writeInterval   0.005;
@@ -42,12 +37,9 @@ timeFormat      general;
 timePrecision   6;
 runTimeModifiable true;
 
-// The step is raised until the worst cell sits at maxCo, then capped at
-// maxDeltaT.  maxCo is NOT set here: system/controlDict and every
-// fileUpdaterControlDict/controlDict_* include this file and add their own,
-// and system/fileUpdater swaps them as the run advances.
+// maxCo is convective (|U|, not |U| + c): the acoustics are implicit here.
 adjustTimeStep  yes;
-maxDeltaT       1e-5;
+maxDeltaT       1e-4;
 
 functions
 {
@@ -143,7 +135,6 @@ functions
         writeControl    writeTime;
     }
 
-    #include "${FOAM_CASE}/system/fileUpdater"
 }
 
 // ************************************************************************* //

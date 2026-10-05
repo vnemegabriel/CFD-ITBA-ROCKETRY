@@ -37,6 +37,10 @@ if [ -n "$1" ]; then
 fi
 NP=$(getNumberOfProcessors)
 
+failed() {
+    grep -qE "FOAM FATAL|Floating point exception|sigFpe" "log.$1" 2>/dev/null
+}
+
 restore0Dir
 
 APP=$(getApplication)
@@ -47,6 +51,12 @@ if [ "$NP" -gt 1 ]; then
     runApplication reconstructPar -latestTime
 else
     runApplication "$APP"
+fi
+
+if failed "$APP"; then
+    echo "!! $APP failed:"; grep -m1 -A4 -E "FOAM FATAL|Floating point exception" "log.$APP"
+    echo "   last written time reconstructed; min/max per step in postProcessing/minMax"
+    exit 1
 fi
 
 echo

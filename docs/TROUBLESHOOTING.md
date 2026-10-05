@@ -41,8 +41,19 @@ aletas con sus 3 capas:
 | `nLayers 3` (hereda 10) | 2,299,425 | **102** | 174.5° | 334.5 | 19,058 |
 | `nLayers 3; allowDiscontinuity 1` | 2,075,194 | **0** | 87.5° | 14.6 | 3,492 |
 
+El tamaño de celda en `fins` es absoluto (`cellSize 0.003125`), no un nivel.
+Con un nivel, `maxCellSize 3.2` daba 6.25 mm sobre una aleta de 6 mm y 167
+volúmenes negativos; con 3.13 mm fijos, 0 (1.12 M celdas, skew 14.6).
+
 Consecuencia: el primer espesor en las aletas es mayor que antes, y el y+
 también. Ver la sección y+.
+
+**El mismo `meshDict` a veces da volúmenes negativos y a veces no**
+`cartesianMesh` corre con OpenMP y no es determinístico: el mismo STL y el
+mismo diccionario dieron 131 volúmenes negativos en una corrida y 0 en la
+siguiente (1,151,329 contra 1,151,319 celdas). `Allmesh` reintenta hasta tres
+veces. Para comparar dos ajustes del `meshDict` no alcanza una corrida de cada
+uno. Determinístico pero ~30 veces más lento: `OMP_NUM_THREADS=1`.
 
 **`checkMesh` falla 6 chequeos pero sin volúmenes negativos**
 Es lo normal en esta malla: skewness ~15, determinante chico en ~490 k celdas,
@@ -138,7 +149,7 @@ El primer paso se da a `1.2 · deltaT` sin mirar `maxCo`. `deltaT` sale de
 ## Lo que se ve en ParaView
 
 **La aleta se ve gruesa o escalonada**
-Subí el nivel de `fins` en `localRefinement` del `meshDict`. El borde de
+Bajá `cellSize` de `fins` en `localRefinement` del `meshDict`. El borde de
 ataque lo sostiene la extracción de aristas de feature
 (`surfaceFeatureEdges -angle 30`), no el nivel: si el borde se ve redondeado,
 el problema es el ángulo, no el refinamiento.
@@ -171,7 +182,7 @@ el y+ quede en la misma banda.
 **y+ alto en `fins` y razonable en el cuerpo**
 Las aletas van con `nLayers 3` y el cuerpo con 10, así que el primer espesor
 ahí es mayor. Subir las aletas por encima de 3 enreda la extrusión: subí en su
-lugar el nivel de `fins` en `localRefinement`, que achica la celda de
+lugar bajá `cellSize` de `fins` en `localRefinement`, que achica la celda de
 superficie y con ella la primera capa.
 
 ## Entorno
@@ -186,5 +197,3 @@ Finales de línea CRLF. El repo lleva `.gitattributes` con `eol=lf`; si un
 archivo se editó con una herramienta de Windows que los cambió: `sed -i 's/\r$//' archivo`
 o `dos2unix`.
 
-**Corridas lentas, `processor*` que no se borran, archivos bloqueados**
-La corrida está en OneDrive o en `/mnt/c`. Mover a `~/runs` en WSL.

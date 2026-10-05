@@ -1,0 +1,33 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - quarter-symmetry external aero
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// CORRECTION: was 16 subdomains on an 8-physical-core Ryzen 7 250.
+// snappyHexMesh is memory-bandwidth bound during castellation and layer
+// addition, so SMT threads buy roughly 0-10% while inflating peak RAM by ~2x.
+// This mesh is estimated at ~5e6 cells => ~10-12 GB peak with 8 ranks.
+numberOfSubdomains  8;
+
+method              scotch;
+
+// snappyHexMesh rebalances internally (see maxLoadUnbalance 0.10 in
+// snappyHexMeshDict.new), so the initial decomposition matters less than the
+// rank count. If you want a deterministic geometric split instead, use:
+//
+// method           hierarchical;
+// hierarchicalCoeffs { n (2 2 2); order xyz; }
+
+// ************************************************************************* //

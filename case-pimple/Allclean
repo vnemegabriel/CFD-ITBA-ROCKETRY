@@ -1,0 +1,11 @@
+#!/bin/sh
+# Allclean -- back to the template: no mesh, no fields, no logs.
+cd "${0%/*}" || exit 1
+. "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/CleanFunctions"
+
+# time dirs, processor*, postProcessing, logs; keeps 0.orig
+cleanCase0
+
+# the mesh itself, including any cell sets left by ./Allrefine
+rm -rf constant/polyMesh 0
+rm -f log.* *.foam

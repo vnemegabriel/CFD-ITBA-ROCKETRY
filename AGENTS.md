@@ -41,7 +41,9 @@ newCase.sh    plantilla + malla + condiciones -> una corrida
 run.sh        sweep.txt en serie, sobre una malla
 ```
 
-No hay Python en la repo. La malla se define en `mesh/system/meshDict` y todo
+Los únicos Python son `mesh/stl/makeRocket.py`, que genera el STL a partir de
+cotas, y `mesh/stl/checkStl.py`, que lo valida (sólo biblioteca estándar). La
+malla se define en `mesh/system/meshDict` y todo
 ahí es un **nivel**: un entero que parte una celda al medio, local a un patch o
 a una caja, sin acoplarse a nada más.
 

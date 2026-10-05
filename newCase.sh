@@ -4,13 +4,14 @@
 #     ./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --np 16
 #     ./newCase.sh ~/runs/a05 --mesh ~/meshes/base --Minf 0.8 --alpha 5 --refine tip
+#     ./newCase.sh ~/runs/p03 --mesh ~/meshes/base --Minf 0.3 --template case-pimple
 #
-# Copies case-central plus a mesh built by mesh/Allmesh.  See docs/WORKFLOW.md.
-# Keep run directories out of OneDrive and out of /mnt/c.
+# Copies a template (default case-central) plus a mesh built by mesh/Allmesh.
+# Keep run directories out of the repo (~/runs).
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
-usage() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 RUN=$1; shift
 
@@ -22,6 +23,7 @@ while [ $# -gt 0 ]; do
         --alpha|--beta|--Ti|--nuRatio|--Minf|--pInf|--Tinf)
             SET[${1#--}]=$2; shift 2 ;;
         --mesh)   MESH=$2;   shift 2 ;;
+        --template) TEMPLATE=$2; shift 2 ;;
         --np)     NP=$2;     shift 2 ;;
         --refine) REFINE=$2; shift 2 ;;
         *) echo "unknown option $1"; usage ;;
@@ -29,6 +31,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$MESH" ] || { echo "--mesh <mesh-dir> is required"; usage; }
+[ -d "$ROOT/$TEMPLATE/system" ] || { echo "no template $ROOT/$TEMPLATE"; exit 1; }
 [ -d "$MESH/constant/polyMesh" ] || { echo "no mesh in $MESH: run mesh/Allmesh $MESH first"; exit 1; }
 
 case "$REFINE" in ''|tip|fins) ;; *) echo "--refine takes tip or fins"; usage ;; esac
@@ -48,12 +51,14 @@ cd "$RUN"
 touch case.foam
 
 TEMPLATES=$(find . -name '*.j2')
-if [ -n "$TEMPLATES" ]; then
-    command -v jinja2 > /dev/null || { echo "!! needs jinja2:  pipx install jinja2-cli"; exit 1; }
+render() {
     for f in $TEMPLATES; do
         jinja2 --strict "$f" config.json --format=json -o "${f%.j2}"
-        rm "$f"
     done
+}
+if [ -n "$TEMPLATES" ]; then
+    command -v jinja2 > /dev/null || { echo "!! needs jinja2:  pipx install jinja2-cli"; exit 1; }
+    render
     echo "rendered $(echo "$TEMPLATES" | wc -l) templates from config.json"
 fi
 
@@ -67,6 +72,23 @@ done
 [ -n "$NP" ] && foamDictionary -entry numberOfSubdomains -set "$NP" system/decomposeParDict > /dev/null
 
 [ -n "$REFINE" ] && ./Allrefine "$REFINE"
+
+# tauCo is the step that puts the worst cell at Co = 1.  It depends on this
+# mesh and this Mach, so it is measured here with one serial step.
+if grep -q '"tauCo"' config.json; then
+    DT0=$(foamDictionary -entry deltaT -value system/controlDictBase)
+    cp -r 0.orig 0
+    foamDictionary -entry stopAt -set writeNow system/controlDictBase > /dev/null
+    timeout 1800 "$(foamDictionary -entry application -value system/controlDict)" > log.tauCo 2>&1 || true
+    CO=$(awk '/^Mean and max Courant/{print $NF; exit}' log.tauCo)
+    rm -rf 0 [1-9]* 0.[0-9]* postProcessing
+    [ -n "$CO" ] || { echo "!! could not measure tauCo, see $RUN/log.tauCo"; exit 1; }
+    TAU=$(LC_ALL=C awk -v dt="$DT0" -v co="$CO" 'BEGIN{printf "%.3g", dt/co}')
+    sed -i "s/\"tauCo\": *[^,}]*/\"tauCo\": $TAU/" config.json
+    render
+    echo "tauCo = $TAU s  (measured: Co $CO at deltaT $DT0)"
+fi
+[ -n "$TEMPLATES" ] && rm $TEMPLATES
 
 echo
 echo "ready: cd $RUN && ./Allrun ${NP:+$NP}"

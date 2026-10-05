@@ -41,7 +41,9 @@ newCase.sh    plantilla + malla + condiciones -> una corrida
 run.sh        sweep.txt en serie, sobre una malla
 ```
 
-No hay Python en la repo. La malla se define en `mesh/system/meshDict` y todo
+Los únicos Python son `mesh/stl/makeRocket.py`, que genera el STL a partir de
+cotas, y `mesh/stl/checkStl.py`, que lo valida (sólo biblioteca estándar). La
+malla se define en `mesh/system/meshDict` y todo
 ahí es un **nivel**: un entero que parte una celda al medio, local a un patch o
 a una caja, sin acoplarse a nada más.
 
@@ -63,13 +65,6 @@ a una caja, sin acoplarse a nada más.
 
 ## Trampas conocidas
 
-- **La repo vive adentro de OneDrive y OneDrive revierte archivos.** Pasó: una
-  restauración de sync dejó un archivo fuente en una versión anterior a dos
-  commits, y el archivo igual parseaba, así que no se notaba leyéndolo. Después
-  de cualquier interrupción, `git diff --stat` antes de confiar en el working
-  tree; un archivo con cientos de líneas borradas que vos no borraste es esto.
-  Se recupera con `git checkout HEAD -- <archivo>`. El mitigante real es
-  commitear seguido.
 - **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
   f-string se convierte en salto de línea real y rompe el archivo.
 - **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL

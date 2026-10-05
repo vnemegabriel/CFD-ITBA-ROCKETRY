@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua external aero               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      refineMeshDict;
+}
+// ============================================================================
+//  Local 2:1 refinement of one cell set (./Allrefine).  OPTIONAL.
+//
+//  `set` names a set from system/topoSetDict; ./Allrefine overwrites it with
+//  finTip or finBox according to its argument, so you normally do not edit it
+//  here.
+//
+//  `directions` is what makes this worth doing at all.  With all three, every
+//  cell in the set is split into 8.  Dropping one direction splits into 4 and
+//  costs half as much, but the global coordinate system below is CARTESIAN
+//  (tan1 = x, tan2 = y, normal = z) while the mesh is cylindrical, so "y" and
+//  "z" are not the radial and azimuthal directions of the mesh.  Refining a
+//  subset of the directions therefore refines a subset that rotates with
+//  azimuth, which is almost never what you want.  Keep all three unless you
+//  have checked what it does on your sector.
+//
+//  refineMesh introduces 2:1 hanging nodes, which OpenFOAM represents as
+//  polyhedral cells on the SURFACE of the set.  The mesh stops being 100 %
+//  hexahedral: under 1 % of cells, and measured quality (max
+//  non-orthogonality, max skewness) is unchanged.  A thin band such as finTip
+//  is nearly all surface, so it produces about as many polyhedra as a much
+//  larger region would.
+// ============================================================================
+
+set             finTip;         // finTip | finBox  (./Allrefine sets this)
+
+coordinateSystem global;
+
+globalCoeffs
+{
+    tan1            (1 0 0);
+    tan2            (0 1 0);
+}
+
+directions      ( tan1 tan2 normal );
+
+useHexTopology  true;           // split hexes into hexes
+geometricCut    false;          // cut at edge midpoints, not geometrically
+writeMesh       false;          // ./Allrefine passes -overwrite instead
+
+// ************************************************************************* //

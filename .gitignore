@@ -89,3 +89,7 @@ mesh/case.foam
 mesh/stl/surface.stl
 mesh/stl/geometry.stl
 mesh/geometry.fms
+
+# local run lists and run directories: never versioned
+sweep.txt
+runs/

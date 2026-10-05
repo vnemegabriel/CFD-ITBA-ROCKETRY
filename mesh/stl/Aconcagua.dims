@@ -1,0 +1,21 @@
+# Aconcagua working geometry: the makeRocket.py defaults.  Metres.
+# Copy, edit, and run:  ./makeRocket.py new.stl --dims new.dims
+
+diameter        0.151
+noseLD          5.298013245033113   # nose length / diameter (0.8 m)
+bodyLength      2.03           # cylinder only
+tailLength      0.125
+baseDiameter    0.110
+
+finRootChord    0.30047
+finTipChord     0.15
+finSpan         0.16           # body surface to tip
+finSweep        0.25078        # tip LE aft of root LE
+finFromBase     0.12531        # root TE to base plane
+finThickness    0.006
+finLEBevel      0.03316
+finTEBevel      0.02118
+finEmbed        0.0005         # root sunk into the body
+
+nTheta          96
+nNose           60
