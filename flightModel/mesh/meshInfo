@@ -39,9 +39,9 @@ finTipR         0.2355;
 
 finTipSmear     0.004;
 
-finX0           2.52922;
+finX0           2.52953;
 
-finX1           2.93;
+finX1           2.93031;
 
 wallPatches     ( cone walls tail fins );
 

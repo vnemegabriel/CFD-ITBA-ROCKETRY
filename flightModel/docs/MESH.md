@@ -39,14 +39,15 @@ region changes.
 | Step | Application | Input | Output | Function |
 |---|---|---|---|---|
 | 1 | `cp` | `mesh/system/`, `mesh/meshInfo` | `<mesh-dir>/system/`, `<mesh-dir>/meshInfo` | Each mesh keeps a copy of its dictionaries. |
-| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel` | `system/meshDict` | Writes the options into the copy. |
+| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio` | `system/meshDict` | Writes the options into the copy. |
+| 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
 | 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. Refer to §5. |
 | 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
 | 7 | `createPatch -overwrite` | `system/createPatchDict` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
-| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `meshDir`. |
+| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
 
 ### 2.1 Function of the .fms file
@@ -107,7 +108,8 @@ grep -E '^ *solid ' mesh/stl/<file>.stl
 
 ### 3.2 Use a new geometry
 
-1. Put the STL in `mesh/stl/`.
+1. Put the STL in `mesh/stl/`, or write it with `makeRocket.py` (§3.3).
+   The `_finEdges.obj` file must be next to it.
 2. Make sure that the STL agrees with the requirements in §3.
 3. Change the distances in `surfaceGenerateBoundingBox` in `Allmesh`. Refer
    to §5.
@@ -115,6 +117,44 @@ grep -E '^ *solid ' mesh/stl/<file>.stl
    `meshDict`. Refer to §4.3.
 5. Change `mesh/meshInfo`. Refer to §7.
 6. Run `mesh/Allmesh <mesh-dir> mesh/stl/<file>.stl`.
+
+### 3.3 makeRocket.py
+
+`mesh/makeRocket.py` writes the geometry from its dimensions. Run it with no
+option for the Aconcagua:
+
+```bash
+python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117.stl
+```
+
+It writes two files: the STL and `<name>_finEdges.obj`, the leading and
+trailing edges of the fins as lines. `python3 mesh/makeRocket.py -h` gives
+the options. A file with one `name value` on each line can give the
+dimensions (`--dims`).
+
+| Part | Shape | Solid name |
+|---|---|---|
+| Nose | Von Kármán, 0.8 m long | `nosecone` |
+| Body | Cylinder, d = 0.151 m | `body` |
+| Fins | 4 fins, biconvex section of constant thickness 11.7 mm, edges rounded with 1 mm | `fins` |
+| Boattail | Cone to d = 0.110 m, and the base | `boattail` |
+
+The script writes a file only if the surface is closed and all the normals
+point out. These properties of the surface come from measurements with
+`cartesianMesh`. Do not change them:
+
+| Property | Reason, measured with the same `meshDict` |
+|---|---|
+| Nose, body + fins and boattail are three closed shells that touch on coplanar caps. The rings of adjacent shells are turned by half a facet. | One continuous hull gave 12 to 87 negative cell volumes at the body-boattail shoulder. |
+| Body and fins are one shell: the fin root is cut into the cylinder. | With the fins as separate shells sunk into the body, the fin-body junction was not an edge of the surface. The layers of the two surfaces met at one node in the corner. |
+| The leading edge, the trailing edge and the tip of the fins have a radius (`--finEdgeRadius`, 1 mm). | With sharp edges, the layers of the two fin faces met at the edge: maximum skewness 25 to 33, non-orthogonality up to 176°. With the radius: skewness 3.7, non-orthogonality 77° to 82°. |
+| The root trailing edge is on the shoulder (`--finFromBase` = `--tailLength`). | |
+| 44 facets around the axis (`--nTheta`). | With 96 facets the continuous hull had more negative volumes. |
+
+The radius is in the section parallel to the axis. Normal to the swept
+leading edge (57°), it is approximately 0.5 mm. The section is the convex
+hull of the biconvex arcs and a circle of the radius at each edge, so the
+profile is a little thicker in approximately the first 80 mm of the chord.
 
 ## 4. meshDict
 
@@ -153,6 +193,13 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 | `midWake` | cone | 6 | 25 mm | x from 2.85 to 5.00 m, radius 0.26 m |
 | `wake` | box | 4 | 100 mm | x from 1.0 to 9.0 m, y and z ±0.80 m |
 | `farWake` | box | 2 | 400 mm | x from 1.0 to 27.0 m, y and z ±2.0 m |
+| `noseTip` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.040 m |
+| `noseApex` | sphere | 11 (`--finLevel` + 2) | 0.78 mm | Centre (0 0 0), radius 0.010 m |
+
+`noseTip` has the level of the fins on each mesh. `noseApex` makes the curve
+of the tip. The layer thickness follows the surface cell size, so it also
+keeps the layers thinner than the radius of the nose near the tip. Without
+`noseApex`, the mesh `h2` had 13 negative cell volumes at the tip.
 
 The wake regions decrease the cell size one level at a time behind the base.
 The positions are for the Aconcagua (body length 2.955 m). For a different
@@ -166,13 +213,29 @@ dictionary does not set a y+ target.
 
 | Entry | Value | Function |
 |---|---|---|
-| `nLayers` | 10 | Number of layers on all patches that have no entry in `patchBoundaryLayers`. |
-| `thicknessRatio` | 1.2 | Ratio between the thicknesses of two adjacent layers. |
-| `patchBoundaryLayers/cone, walls, tail` | `nLayers 10` | Layers on the body. |
-| `patchBoundaryLayers/fins` | `nLayers 3`, `allowDiscontinuity 1` | Layers on the fins. The fin is thin. More layers cause tangled cells at the leading edge. `allowDiscontinuity` lets the number of layers change at the fin-body junction. |
+| `nLayers` | 1 | Layers on all patches that have no entry in `patchBoundaryLayers`: the six faces of the domain. One layer is not split. |
+| `patchBoundaryLayers/cone, walls, tail` | `nLayers 10`, `thicknessRatio 1.2` | Layers on the body. `Allmesh --nLayers` and `--thicknessRatio` change them. |
+| `patchBoundaryLayers/fins` | `nLayers 3`, `thicknessRatio 1.2`, `allowDiscontinuity 1` | Layers on the fins. More layers caused tangled cells at the leading edge of the 6 mm fin. `allowDiscontinuity` lets the number of layers change at the fin-body junction. |
 | `optimiseLayer` | 1 | Smooths the layers after the extrusion. |
 | `untangleLayers` | 1 | Repairs tangled layer cells. |
 | `optimisationParameters` | `nSmoothNormals 5`, `maxNumIterations 5`, `featureSizeFactor 0.3`, `reCalculateNormals 1`, `relThicknessTol 0.03` | Parameters of the layer optimization. |
+
+> **CAUTION** cfMesh splits the layer only on the patches that have an
+> entry in `patchBoundaryLayers`. With only the global `nLayers 10`, the body
+> got no layers, and the faces of the domain got 10. Keep an entry for each
+> wall patch.
+
+The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
+cell size, r the `thicknessRatio` and n the `nLayers`. The three meshes of
+`sweep.txt` keep t₁ the same:
+
+| Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
+|---|---|---|---|---|---|
+| `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm |
+| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm |
+| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.242 mm |
+
+The fins keep 3 layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
 
 Procedure to set y+:
 
@@ -181,6 +244,17 @@ Procedure to set y+:
 3. Read y+ for each patch. Refer to WORKFLOW.md §8.
 4. If y+ is not correct, change `nLayers` or `thicknessRatio` and make a new
    mesh.
+
+### 4.5 edgeMeshRefinement
+
+| Entry | Value | Function |
+|---|---|---|
+| `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
+| `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
+
+The oblique shock starts at the leading edge and the expansion at the
+trailing edge.
 
 ## 5. Domain
 
@@ -247,11 +321,12 @@ File: `mesh/meshInfo`. `Allmesh` copies it into the mesh directory.
 | `finRootR` | 0.075 m | user | no script | Radius of the fin root. |
 | `finTipR` | 0.2355 m | user | `topoSetDict`, `Allrefine` | Radius of the fin tip. |
 | `finTipSmear` | 0.004 m | user | no script | Width of the tip chamfer. |
-| `finX0` | 2.52922 m | user | `topoSetDict` | x of the fin front. |
-| `finX1` | 2.93 m | user | `topoSetDict` | x of the fin rear. |
+| `finX0` | 2.52953 m | user | `topoSetDict` | x of the fin front. |
+| `finX1` | 2.93031 m | user | `topoSetDict` | x of the fin rear. |
 | `wallPatches` | `(cone walls tail fins)` | user | `controlDictBase` | Patches in the force integration and in `wallShearStress`. |
 | `maxCellSize` | from `meshDict` | `Allmesh` | no script | Record of the mesh. |
 | `finLevel` | from `meshDict` | `Allmesh` | no script | Record of the mesh. |
+| `nLayers`, `thicknessRatio` | from `meshDict`, patch `walls` | `Allmesh` | no script | Record of the mesh. |
 | `meshDir` | path | `Allmesh` | no script | Record of the mesh. |
 
 > **NOTE** `Aref` must agree with `sector`. For a `half` mesh, use half the

@@ -1,14 +1,29 @@
 # One run per line:  <name> <newCase.sh options>
 # --mesh names the mesh (a bare name lives in ~/meshes).  If it does not exist,
-# run.sh builds it first, with --maxCellSize and --finLevel if given.
+# run.sh builds it first, with --maxCellSize, --finLevel, --nLayers and
+# --thicknessRatio if given.
 # Blank lines and # are ignored.  ./run.sh runs them in series.
-m03  --mesh base --Minf 0.3
-m06  --mesh base --Minf 0.6
-m08  --mesh base --Minf 0.8
-m12  --mesh base --Minf 1.2
-m18  --mesh base --Minf 1.8
+#
+# Coast, t > 4 s: pInf and Tinf are ISA at the altitude where the TeleMega
+# passes each Mach (pad 896 m MSL).
+#   M 1.8  t  4.0 s  1936 m      M 0.8  t 13.5 s  5604 m      M 0.3  t 26.5 s  7901 m
+#   M 1.2  t  8.2 s  3913 m      M 0.6  t 18.3 s  6710 m
+# Meshes: maxCellSize ratio sqrt(2); nLayers/thicknessRatio hold y1 = 0.241 mm.
 
-# Mesh convergence at M 0.3: ratio sqrt(2), cells up to x2.8 per step.
-# m03-h1  --mesh h1 --maxCellSize 1.6  --Minf 0.3
-# m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
-# m03-h3  --mesh h3 --maxCellSize 0.8  --Minf 0.3
+m18-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2    --Minf 1.8 --pInf 80127 --Tinf 275.56
+m12-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2    --Minf 1.2 --pInf 62346 --Tinf 262.72
+m08-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2    --Minf 0.8 --pInf 49800 --Tinf 251.72
+m06-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2    --Minf 0.6 --pInf 42766 --Tinf 244.54
+m03-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2    --Minf 0.3 --pInf 36113 --Tinf 236.79
+
+m18-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229  --Minf 1.8 --pInf 80127 --Tinf 275.56
+m12-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229  --Minf 1.2 --pInf 62346 --Tinf 262.72
+m08-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229  --Minf 0.8 --pInf 49800 --Tinf 251.72
+m06-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229  --Minf 0.6 --pInf 42766 --Tinf 244.54
+m03-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229  --Minf 0.3 --pInf 36113 --Tinf 236.79
+
+m18-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2    --Minf 1.8 --pInf 80127 --Tinf 275.56
+m12-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2    --Minf 1.2 --pInf 62346 --Tinf 262.72
+m08-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2    --Minf 0.8 --pInf 49800 --Tinf 251.72
+m06-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2    --Minf 0.6 --pInf 42766 --Tinf 244.54
+m03-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2    --Minf 0.3 --pInf 36113 --Tinf 236.79

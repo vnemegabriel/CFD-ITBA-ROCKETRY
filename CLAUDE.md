@@ -34,14 +34,15 @@ real se mueve con la velocidad. Medilo en cada corrida.
 ## La estructura
 
 ```
-flightModel/mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
+flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine
 flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/run.sh        sweep.txt en serie, sobre una malla
 ```
 
-No hay Python en la repo. La malla se define en `mesh/system/meshDict` y todo
+El único Python es `mesh/makeRocket.py`, que escribe el STL; sólo usa la
+biblioteca estándar. La malla se define en `mesh/system/meshDict` y todo
 ahí es un **nivel**: un entero que parte una celda al medio, local a un patch o
 a una caja, sin acoplarse a nada más.
 
@@ -53,11 +54,13 @@ a una caja, sin acoplarse a nada más.
   negativos, no-ortogonalidad y skewness en unos minutos. Un cambio sin número
   al lado no está terminado.
 - **`checkMesh` con volúmenes negativos = malla inservible.** Los otros
-  chequeos de `-allGeometry` que fallan hoy (skewness ~15, determinante chico
-  en ~490 k celdas de capa) son de otra categoría y no bloquean.
-- **Las aletas van con `nLayers 3`.** Más enreda la extrusión: el borde de
-  ataque es un filo y la aleta tiene 6 mm de espesor. Está medido en
-  `docs/TROUBLESHOOTING.md`.
+  chequeos de `-allGeometry` que fallan hoy (determinante chico en las celdas
+  de capa, face tets, celdas cóncavas) son de otra categoría y no bloquean.
+- **Las aletas van con `nLayers 3`.** Más enreda la extrusión. Se midió con
+  la aleta vieja de 6 mm y borde de ataque en filo; la actual tiene 11.7 mm
+  y bordes con radio de 1 mm, y no se volvió a medir.
+- **Los cantos de las aletas llevan radio.** Con filo, las capas de las dos
+  caras chocan en el borde (skewness 25–33). Está en `docs/MESH.md` §3.3.
 - Antes de cortar o cambiar algo, grepeá `docs/` además del código.
 - Una tarea por sesión. Un commit por tarea.
 

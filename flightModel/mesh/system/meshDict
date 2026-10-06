@@ -73,6 +73,25 @@ localRefinement
 // locally: its radial zone was a cylinder running the whole 59 m of domain.
 objectRefinements
 {
+    noseTip
+    {
+        // stagnation point and the bow shock standoff; Allmesh --finLevel
+        // sets this level too, so it always matches the fins
+        type        sphere;
+        additionalRefinementLevels 9;      // 3.13 mm
+        centre      (0 0 0);
+        radius      0.040;
+    }
+
+    noseApex
+    {
+        // the curve of the tip itself; two levels above the fins
+        type        sphere;
+        additionalRefinementLevels 11;     // 0.78 mm
+        centre      (0 0 0);
+        radius      0.010;
+    }
+
     nearField
     {
         type        box;
@@ -134,22 +153,37 @@ objectRefinements
     }
 }
 
+// ------------------------------------------------------------------ edges --
+// Leading and trailing edges of the fins: the oblique shock starts at the LE,
+// the expansion at the TE.  finEdges.obj is written by makeRocket.py next to
+// the STL and copied by Allmesh; --finLevel n sets this to n + 1.
+edgeMeshRefinement
+{
+    finEdges
+    {
+        edgeFile    "finEdges.obj";
+        additionalRefinementLevels 10;     // 1.56 mm
+        refinementThickness 0.010;
+    }
+}
+
 // ------------------------------------------------------------------ layers --
 // The boundary layer is EXTRUDED, not octree-refined, so y1 is set by nLayers
 // and thicknessRatio against the local surface cell rather than solved for.
-// Check y+ on the first run and tune nLayers; that is the one place where the
-// structured generator was more direct (it solved y1 from YPLUS_TARGET).
+// cfMesh splits the layer only on patches listed below: the global nLayers
+// reaches the domain faces too, so it stays at 1.  Allmesh --nLayers and
+// --thicknessRatio set cone, walls and tail so that y1 = 0.241 mm on every
+// maxCellSize.  The fins stay at 3 layers.
 boundaryLayers
 {
-    nLayers         10;
-    thicknessRatio  1.2;
+    nLayers         1;
 
     patchBoundaryLayers
     {
-        cone     { nLayers 10; }
-        walls    { nLayers 10; }
-        tail     { nLayers 10; }
-        fins     { nLayers 3; allowDiscontinuity 1; }
+        cone     { nLayers 10; thicknessRatio 1.2; }
+        walls    { nLayers 10; thicknessRatio 1.2; }
+        tail     { nLayers 10; thicknessRatio 1.2; }
+        fins     { nLayers 3;  thicknessRatio 1.2; allowDiscontinuity 1; }
     }
 
     optimiseLayer 1;
