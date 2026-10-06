@@ -13,7 +13,10 @@ does, and the result.
 | Path | Contents |
 |---|---|
 | `mesh/Allmesh` | Script that makes one mesh. |
-| `mesh/stl/Aconcagua.stl` | Geometry of the rocket. |
+| `mesh/makeRocket.py` | Script that writes the geometry: the STL and its fin-edge file. MESH.md §3.3. |
+| `mesh/stl/Aconcagua_biconvex117.stl` | Geometry of the rocket: the output of `makeRocket.py` with its defaults. |
+| `mesh/stl/Aconcagua_biconvex117_finEdges.obj` | Leading and trailing edges of the fins, for `edgeMeshRefinement`. |
+| `mesh/stl/Aconcagua.stl` | Previous geometry: 6 mm fins with bevelled edges. |
 | `mesh/system/` | `meshDict`, `createPatchDict`, and the `controlDict`, `fvSchemes`, `fvSolution` that the mesh applications need. |
 | `mesh/meshInfo` | Reference values and fin geometry of the mesh. |
 | `case-central/` | Case template for `rhoCentralFoam`. |
@@ -28,6 +31,8 @@ does, and the result.
 | OpenFOAM | ESI v2412, with cfMesh (`cartesianMesh`). |
 | `jinja2` | `jinja2-cli`. Install it with `pipx install jinja2-cli`. |
 | Shell tools | `bash`, `rsync`, `awk`, GNU `sed`. |
+| Python 3 | Only for `mesh/makeRocket.py`. Standard library only. |
+| Memory | 32 GB for the mesh `h3` (14.2 M cells). `checkMesh` used 12.7 GB on it. |
 
 Do this step before you use a script:
 
@@ -48,14 +53,17 @@ do not do this step.
 
 ```bash
 mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
+             [--nLayers <n>] [--thicknessRatio <r>]
 ```
 
 | Argument | Default | Function |
 |---|---|---|
 | `<mesh-dir>` | none, mandatory | Directory for the new mesh. It must not exist. |
-| `[stl-file]` | `mesh/stl/Aconcagua.stl` | Geometry. MESH.md §3 gives the requirements. |
+| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117.stl` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
 | `--maxCellSize <m>` | value in `meshDict` (1.6 m) | Sets `maxCellSize` in the copy of `meshDict`. |
-| `--finLevel <n>` | value in `meshDict` (9) | Sets the refinement level of the `fins` patch in the copy of `meshDict`. |
+| `--finLevel <n>` | value in `meshDict` (9) | Sets the level of the `fins` patch and of `noseTip` to n, of `finEdges` to n + 1 and of `noseApex` to n + 2. |
+| `--nLayers <n>` | value in `meshDict` (10) | Sets `nLayers` of `cone`, `walls` and `tail`. |
+| `--thicknessRatio <r>` | value in `meshDict` (1.2) | Sets `thicknessRatio` of `cone`, `walls` and `tail`. |
 
 ### 3.2 Procedure
 
@@ -75,7 +83,7 @@ mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
 |---|---|
 | `<mesh-dir>/constant/polyMesh/` | The mesh. |
 | `<mesh-dir>/system/` | A copy of `mesh/system/`, with the options applied. Each mesh keeps the `meshDict` that made it. |
-| `<mesh-dir>/meshInfo` | A copy of `mesh/meshInfo`. `Allmesh` adds `nCells`, `maxCellSize`, `finLevel` and `meshDir`. |
+| `<mesh-dir>/meshInfo` | A copy of `mesh/meshInfo`. `Allmesh` adds `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio` and `meshDir`. |
 | `<mesh-dir>/log.*` | One log for each application. |
 
 `Allmesh` does not write into a directory that exists. To make the mesh
@@ -190,21 +198,24 @@ case with `newCase.sh`.
 `newCase.sh`.
 
 ```
-m03     --mesh base --Minf 0.3
-m08     --mesh base --Minf 0.8
-m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
+m18-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2   --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229 --Minf 1.8 --pInf 80127 --Tinf 275.56
 ```
 
 - Lines that start with `#`, and empty lines, have no effect.
 - `--mesh` is mandatory on each line.
 - A mesh name without `/` is a directory in `<meshes-dir>`.
-- `--maxCellSize` and `--finLevel` apply only when `run.sh` makes the mesh.
+- `--maxCellSize`, `--finLevel`, `--nLayers` and `--thicknessRatio` apply
+  only when `run.sh` makes the mesh.
 
 ### 6.2 Command
 
 ```bash
-./run.sh [sweep-file] [runs-dir] [meshes-dir]
+./run.sh [--meshOnly] [sweep-file] [runs-dir] [meshes-dir]
 ```
+
+`--meshOnly` makes the meshes of the sweep file and no case. Use it to
+examine the meshes before the cases start.
 
 | Argument | Default |
 |---|---|
@@ -220,8 +231,10 @@ m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
 1. If `<runs-dir>/<name>` exists, it goes to the next line. Thus, if you run
    `run.sh` again after a stop, it continues from the first case that does
    not exist.
-2. If the mesh exists, it compares `maxCellSize` and the `fins` level of the
-   mesh with the options of the line. It stops if they are different.
+2. If the mesh exists, it compares `maxCellSize`, the `fins` level,
+   `nLayers` and `thicknessRatio` of the mesh with the options of the line.
+   It stops if they are different. It does not compare the geometry: after
+   a change of the STL, remove the old meshes.
 3. If the mesh directory exists but has no mesh, it stops.
 4. If the mesh does not exist, it runs `mesh/Allmesh` with the options of
    the line. It stops if `Allmesh` stops with an error. The next lines that
@@ -297,14 +310,15 @@ with its start time.
 3. Use the same Mach number for all meshes.
 
 ```
-m03-h1  --mesh h1 --maxCellSize 1.6  --Minf 0.3
-m03-h2  --mesh h2 --maxCellSize 1.13 --Minf 0.3
-m03-h3  --mesh h3 --maxCellSize 0.8  --Minf 0.3
+m03-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2   --Minf 0.3
+m03-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229 --Minf 0.3
+m03-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2   --Minf 0.3
 ```
 
-The first layer thickness changes with the surface cell size, so y+ changes
-between the meshes. Measure y+ on each mesh. VALIDATION.md §4 gives the
-analysis.
+The first layer thickness follows the surface cell size. `--nLayers` and
+`--thicknessRatio` keep it at 0.241 mm on the three meshes, so that y+ does
+not change between them. MESH.md §4.4 gives the calculation. Measure y+ on
+each mesh to confirm. VALIDATION.md §4 gives the analysis.
 
 ### 9.3 Angle-of-attack sweep
 
@@ -321,6 +335,52 @@ Use one of these two methods:
 
 - Make a new mesh with `--finLevel 10`.
 - Run `./Allrefine tip` in the case, before `./Allrun`.
+
+### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
+
+`sweep.txt` holds the 15 cases. To make the same results on another
+computer:
+
+1. Do the steps of §2.
+2. Optional: write the geometry again and compare it with the file in the
+   repository. The two files must be equal.
+
+   ```bash
+   python3 mesh/makeRocket.py /tmp/check.stl && cmp /tmp/check.stl mesh/stl/Aconcagua_biconvex117.stl
+   ```
+
+3. Make the three meshes and examine them:
+
+   ```bash
+   ./run.sh --meshOnly
+   ```
+
+   The meshes must agree with this table:
+
+   | Mesh | `maxCellSize` | Cells | Negative volumes | Max skewness | Max non-orthogonality |
+   |---|---|---|---|---|---|
+   | `h1` | 1.6 | 2 815 097 | 0 | 3.72 | 82.2 |
+   | `h2` | 1.1314 | 5 887 448 | 0 | 3.65 | 76.7 |
+   | `h3` | 0.8 | 14 204 200 | 0 | 4.08 | 77.3 |
+
+4. Run the cases:
+
+   ```bash
+   ./run.sh
+   ```
+
+The flight conditions are those of the coast phase (t > 4 s) of the IREC
+flight in Midland. For each Mach number, `pInf` and `Tinf` are the ISA
+values at the altitude where the TeleMega recorded that Mach number. The
+pad is at 896 m MSL. The data is in `fin_flutter/data/midland_telemega_data.csv`.
+
+| M | t [s] | Altitude MSL [m] | `pInf` [Pa] | `Tinf` [K] |
+|---|---|---|---|---|
+| 1.8 | 4.0 | 1936 | 80127 | 275.56 |
+| 1.2 | 8.2 | 3913 | 62346 | 262.72 |
+| 0.8 | 13.5 | 5604 | 49800 | 251.72 |
+| 0.6 | 18.3 | 6710 | 42766 | 244.54 |
+| 0.3 | 26.5 | 7901 | 36113 | 236.79 |
 
 ## 10. Rules
 

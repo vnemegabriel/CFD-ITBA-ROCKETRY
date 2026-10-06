@@ -1,5 +1,6 @@
 #!/bin/sh
 # ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finLevel n]
+#           [--nLayers n] [--thicknessRatio r]
 #
 #     ./Allmesh ~/meshes/base
 #     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
@@ -18,19 +19,21 @@ check() {
     return 0
 }
 
-usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
-DIR=""; SRC=""; H=""; FIN=""
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+DIR=""; SRC=""; H=""; FIN=""; NL=""; TR=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --maxCellSize) H=$2;   shift 2 ;;
         --finLevel)    FIN=$2; shift 2 ;;
+        --nLayers)     NL=$2;  shift 2 ;;
+        --thicknessRatio) TR=$2; shift 2 ;;
         -*) echo "unknown option $1"; usage ;;
         *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
             shift ;;
     esac
 done
 [ -n "$DIR" ] || usage
-SRC=${SRC:-$HERE/stl/Aconcagua.stl}
+SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117.stl}
 [ -f "$SRC" ] || SRC=$HERE/$SRC
 [ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
 SRC=$(realpath "$SRC")
@@ -39,9 +42,26 @@ SRC=$(realpath "$SRC")
 mkdir -p "$DIR"
 cp -r "$HERE/system" "$HERE/meshInfo" "$DIR/"
 cd "$DIR"
-[ -n "$H" ]   && foamDictionary -entry maxCellSize -set "$H" system/meshDict > /dev/null
-[ -n "$FIN" ] && foamDictionary -entry localRefinement/fins/additionalRefinementLevels \
-                     -set "$FIN" system/meshDict > /dev/null
+# foamDictionary -set echoes the entry on stderr
+setEntry() {
+    foamDictionary -entry "$1" -set "$2" system/meshDict > /dev/null 2>&1 ||
+        { echo "!! cannot set $1 in meshDict"; exit 1; }
+}
+[ -z "$H" ] || setEntry maxCellSize "$H"
+if [ -n "$FIN" ]; then
+    setEntry localRefinement/fins/additionalRefinementLevels "$FIN"
+    setEntry objectRefinements/noseTip/additionalRefinementLevels "$FIN"
+    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels $((FIN + 1))
+    setEntry objectRefinements/noseApex/additionalRefinementLevels $((FIN + 2))
+fi
+for p in cone walls tail; do
+    [ -z "$NL" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/nLayers "$NL"
+    [ -z "$TR" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/thicknessRatio "$TR"
+done
+
+EDGES=${SRC%.stl}_finEdges.obj
+[ -f "$EDGES" ] || { echo "!! no $EDGES: make it with makeRocket.py"; exit 1; }
+cp "$EDGES" finEdges.obj
 
 # STL solid names become patch names; the cases expect these four.
 sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
@@ -76,6 +96,8 @@ foamDictionary -entry nCells -set "$N" meshInfo > /dev/null
 foamDictionary -entry maxCellSize -add "$(foamDictionary -entry maxCellSize -value system/meshDict)" meshInfo > /dev/null
 foamDictionary -entry finLevel -add \
     "$(foamDictionary -entry localRefinement/fins/additionalRefinementLevels -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry nLayers -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/nLayers -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry thicknessRatio -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/thicknessRatio -value system/meshDict)" meshInfo > /dev/null
 foamDictionary -entry meshDir -add "\"$(pwd)\"" meshInfo > /dev/null
 
 echo
