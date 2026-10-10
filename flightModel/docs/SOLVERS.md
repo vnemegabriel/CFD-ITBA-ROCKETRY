@@ -155,9 +155,9 @@ file.
 | `tauCo` | `3.3e-8` | Time step in s that gives Co = 1 in the worst cell. |
 | `vanLeer` | `2000` | Iteration of the change from upwind to van Leer. `-1` keeps upwind. |
 | `minIter` | `3000` | Iteration of the change to `controlDict_final`. |
-| `final_Co` | `0.3` | Maximum `maxCo` of all the ramp. |
+| `final_Co` | `0.5` | Maximum `maxCo` of all the ramp. |
 | `coeffs_fields` | `["Cd"]` | Coefficients in the stop criterion. |
-| `coeffs_variation` | `[0.001]` | Absolute tolerance of each coefficient. |
+| `coeffs_variation` | `[0.0001]` | Absolute tolerance of each coefficient. |
 | `coeffs_window` | `[2]` | Window of each coefficient, in flow-through times. |
 
 At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
