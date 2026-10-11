@@ -54,17 +54,19 @@ do not do this step.
 
 ```bash
 mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
-             [--nLayers <n>] [--thicknessRatio <r>]
+             [--nLayers <n>] [--thicknessRatio <r>] [--y1 <m>] [--full]
 ```
 
 | Argument | Default | Function |
 |---|---|---|
 | `<mesh-dir>` | none, mandatory | Directory for the new mesh. It must not exist. |
-| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117.stl` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
+| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117_half.stl`, or `Aconcagua_biconvex117.stl` with `--full` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
 | `--maxCellSize <m>` | value in `meshDict` (1.6 m) | Sets `maxCellSize` in the copy of `meshDict`. |
-| `--finLevel <n>` | value in `meshDict` (9) | Sets the level of the `fins` patch and of `noseTip` to n, of `finEdges` to n + 1 and of `noseApex` to n + 2. |
+| `--finLevel <n>` | value in `meshDict` (9) | Sets the level of the `fins` patch, `noseTip`, `noseApex` and `finEdges` to n. |
 | `--nLayers <n>` | value in `meshDict` (10) | Sets `nLayers` of `cone`, `walls` and `tail`. |
 | `--thicknessRatio <r>` | value in `meshDict` (1.2) | Sets `thicknessRatio` of `cone`, `walls` and `tail`. |
+| `--y1 <m>` | none | First layer thickness on the body. Sets `nLayers` and `thicknessRatio`; do not give them too. MESH.md §4.4. |
+| `--full` | half mesh | Mesh of the whole rocket, fins at 0, 90, 180 and 270°. Without it the mesh is the half z ≥ 0, with the patch `symm` on z = 0 and the fins at 45° (MESH.md §5.1). |
 
 ### 3.2 Procedure
 
@@ -203,8 +205,8 @@ Meshes and cases are two steps. `runMesh.sh` builds the meshes;
 `mesh/Allmesh`.
 
 ```
-h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
-h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h1  --maxCellSize 1.6    --y1 0.0007
+h2  --maxCellSize 1.1314 --y1 0.0007
 ```
 
 ```bash
@@ -327,9 +329,9 @@ with its start time.
 
 ```
 # meshes.txt
-h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
-h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
-h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
+h1  --maxCellSize 1.6    --y1 0.0007
+h2  --maxCellSize 1.1314 --y1 0.0007
+h3  --maxCellSize 0.8    --y1 0.0007
 
 # sweep.txt
 m03-h1  --mesh h1 --Minf 0.3
@@ -337,10 +339,10 @@ m03-h2  --mesh h2 --Minf 0.3
 m03-h3  --mesh h3 --Minf 0.3
 ```
 
-The first layer thickness follows the surface cell size. `--nLayers` and
-`--thicknessRatio` keep it at 0.241 mm on the three meshes, so that y+ does
-not change between them. MESH.md §4.4 gives the calculation. Measure y+ on
-each mesh to confirm. VALIDATION.md §4 gives the analysis.
+`--y1` keeps the first layer thickness the same on the three meshes, so that
+y+ does not change between them. MESH.md §4.4 gives the calculation and the
+y+ that t₁ = 0.7 mm gives at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
+gives the analysis.
 
 ### 9.3 Angle-of-attack sweep
 
@@ -381,9 +383,9 @@ computer:
 
    | Mesh | `maxCellSize` | Cells | Negative volumes | Max skewness | Max non-orthogonality |
    |---|---|---|---|---|---|
-   | `h1` | 1.6 | 2 815 097 | 0 | 3.72 | 82.2 |
-   | `h2` | 1.1314 | 5 887 448 | 0 | 3.65 | 76.7 |
-   | `h3` | 0.8 | 14 204 200 | 0 | 4.08 | 77.3 |
+   | `h1` | 1.6 | 1 206 017 | 0 | 4.37 | 80.2 |
+   | `h2` | 1.1314 | 2 366 806 | 0 | 3.23 | 80.8 |
+   | `h3` | 0.8 | 6 008 963 | 0 | 3.35 | 71.3 |
 
 4. Run the cases:
 

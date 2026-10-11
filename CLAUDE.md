@@ -25,9 +25,11 @@ resolver bien la malla, en orden:
 
 Todo el barrido es a α = 0. No pagues celdas por el vórtice de punta de aleta.
 
-**Una malla por punto de Mach.** El espesor de la primera capa sale de la
-extrusión contra la celda de superficie, no de un y+ objetivo, así que el y+
-real se mueve con la velocidad. Medilo en cada corrida.
+**Un solo juego de mallas (h1, h2, h3) para todo el barrido.** Media malla,
+con plano de simetría en z = 0 y aletas a 45°, e y1 = 0.7 mm fijado con
+`Allmesh --y1`: da y+ > 30 a M 0.3 y sube con la velocidad (~330 a M 1.8),
+así que se trabaja con wall functions. No armes mallas por Mach. El y+ real
+medilo en cada corrida.
 
 ---
 

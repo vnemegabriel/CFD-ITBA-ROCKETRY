@@ -39,15 +39,15 @@ region changes.
 | Step | Application | Input | Output | Function |
 |---|---|---|---|---|
 | 1 | `cp` | `mesh/system/`, `mesh/meshInfo` | `<mesh-dir>/system/`, `<mesh-dir>/meshInfo` | Each mesh keeps a copy of its dictionaries. |
-| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio` | `system/meshDict` | Writes the options into the copy. |
+| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
 | 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
-| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. Refer to §5. |
+| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. On the half mesh (default), `zMin` is on z = 0. Refer to §5. |
 | 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
-| 7 | `createPatch -overwrite` | `system/createPatchDict` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box`. |
+| 7 | `createPatch -overwrite` | `createPatchDictHalf`, or `createPatchDict` with `--full` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box` (and `symm`). On the half mesh, sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
-| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `meshDir`. |
+| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `y1`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
 
 ### 2.1 Function of the .fms file
@@ -132,6 +132,18 @@ trailing edges of the fins as lines. `python3 mesh/makeRocket.py -h` gives
 the options. A file with one `name value` on each line can give the
 dimensions (`--dims`).
 
+The geometry of the half meshes (§5.1) comes from the same script:
+
+```bash
+python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117_half.stl --finRoll 45 --half
+```
+
+`--finRoll 45` turns the fins to 45, 135, 225 and 315°, so that the plane
+z = 0 passes between two fins. `--half` cuts every shell at z = 0 and keeps
+z ≥ 0; an edge that crosses z = 0 is cut at the same point from both of its
+triangles. The cut is open, and the `zMin` face of the domain closes it.
+`--half` stops if a fin is near z = 0.
+
 | Part | Shape | Solid name |
 |---|---|---|
 | Nose | Von Kármán, 0.8 m long | `nosecone` |
@@ -194,12 +206,19 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 | `wake` | box | 4 | 100 mm | x from 1.0 to 9.0 m, y and z ±0.80 m |
 | `farWake` | box | 2 | 400 mm | x from 1.0 to 27.0 m, y and z ±2.0 m |
 | `noseTip` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.040 m |
-| `noseApex` | sphere | 11 (`--finLevel` + 2) | 0.78 mm | Centre (0 0 0), radius 0.010 m |
+| `noseApex` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.010 m |
 
 `noseTip` has the level of the fins on each mesh. `noseApex` makes the curve
 of the tip. The layer thickness follows the surface cell size, so it also
 keeps the layers thinner than the radius of the nose near the tip. Without
-`noseApex`, the mesh `h2` had 13 negative cell volumes at the tip.
+`noseApex`, the full mesh `h2` with t₁ = 0.241 mm had 13 negative cell
+volumes at the tip.
+
+`noseApex` was two levels above the fins (0.78 mm). On `h1` it gave cells
+of 4 µm at the apex, and with `rhoCentralFoam` the smallest cell sets the
+time step of the whole mesh. It is now at the level of the fins, and so is
+`finEdges` (§4.5). On the half `h1` with t₁ = 0.7 mm this gave no negative
+volume; measure `h2` and `h3` before you use them.
 
 The wake regions decrease the cell size one level at a time behind the base.
 The positions are for the Aconcagua (body length 2.955 m). For a different
@@ -226,16 +245,42 @@ dictionary does not set a y+ target.
 > wall patch.
 
 The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
-cell size, r the `thicknessRatio` and n the `nLayers`. The three meshes of
-`meshes.txt` keep t₁ the same:
+cell size, r the `thicknessRatio` and n the `nLayers`.
+
+`Allmesh --y1 <m>` sets t₁ directly: it takes the fewest layers that keep
+r ≤ 1.2 on the body cell (`maxCellSize` / 2^level of `walls`), then solves r
+for that number of layers. It writes `y1` into `meshInfo`.
+
+The wall treatment uses wall functions, so the target is y+ > 30 at the cell
+centre (y = t₁/2). One set of meshes serves the whole sweep: t₁ = 0.7 mm
+gives y+ > 30 at M 0.3, the lowest Mach number, and y+ rises with the speed.
+From the flat-plate friction at the aft body (x ≈ 2.8 m), where y+ is
+lowest, at the conditions of the sweep:
+
+| M | y+ per mm of t₁ | y+ at the cell centre, t₁ = 0.7 mm |
+|---|---|---|
+| 0.3 | ~110 | ~38 |
+| 0.6 | ~230 | ~80 |
+| 0.8 | ~330 | ~115 |
+| 1.2 | ~550 | ~195 |
+| 1.8 | ~950 | ~330 |
+
+At M 1.8 the first cell is still about 2 % of the boundary layer thickness
+(~30 mm at the aft body), inside the log layer. These are estimates: measure
+y+ on each case.
 
 | Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
 |---|---|---|---|---|---|
-| `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm |
-| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm |
-| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.242 mm |
+| `h1` | 1.6 | 6.25 mm | 6 | 1.158 | 0.7 mm |
+| `h2` | 1.1314 | 4.42 mm | 5 | 1.117 | 0.7 mm |
+| `h3` | 0.8 | 3.13 mm | 4 | 1.074 | 0.7 mm |
 
-The fins keep 3 layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
+t₁ is the same on the three meshes, so y+ does not change between them. The
+fins keep 3 layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
+
+The thicker t₁ also makes the layer cells in the concave corners less thin.
+On the half `h1` the smallest cell went from 3.5 µm (t₁ 0.241 mm, full mesh)
+to 8.8 µm (t₁ 0.7 mm, half mesh, `noseApex` at the fin level).
 
 Procedure to set y+:
 
@@ -250,7 +295,7 @@ Procedure to set y+:
 | Entry | Value | Function |
 |---|---|---|
 | `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
-| `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finEdges/additionalRefinementLevels` | 9 (`--finLevel`) | 3.13 mm with `maxCellSize 1.6`. One level more gave thin cells at the root of the edges. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
 
 The oblique shock starts at the leading edge and the expansion at the
@@ -273,7 +318,26 @@ surfaceGenerateBoundingBox surface.stl geometry.stl  17.73 38.415 11.5395 11.539
 | Lateral (±y, ±z) | 11.5395 m | ±11.78 m |
 
 These values are in `Allmesh`, not in a dictionary. They are for the
-Aconcagua. At M 1.8 the Mach angle is 33.7°, and the Mach cone from the nose
+Aconcagua.
+
+### 5.1 Half mesh
+
+At α = 0 the flow has the symmetry of the fins. By default `Allmesh` meshes
+z ≥ 0 with the half geometry of §3.3; `--full` meshes the whole rocket:
+
+```
+surfaceGenerateBoundingBox surface.stl geometry.stl  17.73 38.415 11.6085 11.6085 0 11.6048
+```
+
+The walls of the box are those of the full mesh, and `zMin` is on z = 0.
+`createPatchDictHalf` makes it the patch `symm`, of type `symmetry`, which
+`0.orig/` already has. `meshInfo` gets `sector half`, `symmetryFraction 0.5`
+and `Aref` = π·rBody²/2, so the coefficients are those of the full rocket.
+`Allrun` then permits α but not β.
+
+On `h1` the half mesh has 66 % of the cells of the full one, not 50 %: the
+fins at 45° are diagonal to the octree and need more cells each. It does not
+change the time step, which the smallest cell sets. At M 1.8 the Mach angle is 33.7°, and the Mach cone from the nose
 crosses the lateral boundary at approximately x = 17.6 m. The pressure
 boundary condition on `box` must thus let the wave go out. Refer to
 SOLVERS.md §9.
@@ -288,6 +352,9 @@ patches with fixed names. `createPatch` merges them:
 | `inlet` | `patch` | `xMin` |
 | `outlet` | `patch` | `xMax` |
 | `box` | `patch` | `yMin`, `yMax`, `zMin`, `zMax` |
+
+`createPatchDictHalf`, for the half mesh, takes `zMin` out of `box` and makes it
+`symm`, of type `symmetry`.
 
 `pointSync false`. The file does not change the wall patches.
 
@@ -310,11 +377,11 @@ File: `mesh/meshInfo`. `Allmesh` copies it into the mesh directory.
 
 | Entry | Value | Written by | Read by | Function |
 |---|---|---|---|---|
-| `sector` | `full` | user | `Allrun` | Part of the rocket in the mesh: `quarter`, `half` or `full`. Sets the permitted flow angles. |
-| `symmetryFraction` | 1 | user | no script | Fraction of the rocket in the mesh. |
+| `sector` | `full` | user, `Allmesh` (half) | `Allrun` | Part of the rocket in the mesh: `quarter`, `half` or `full`. Sets the permitted flow angles. |
+| `symmetryFraction` | 1 | user, `Allmesh` (half) | no script | Fraction of the rocket in the mesh. |
 | `fins` | `true` | user | `Allrefine` | `Allrefine` stops if it is not `true`. |
 | `nCells` | from `checkMesh` | `Allmesh`, `Allrefine` | no script | Number of cells. |
-| `Aref` | 0.0179081 m² | user | `controlDictBase` | Reference area: π·rBody² for the full rocket. |
+| `Aref` | 0.0179081 m² | user, `Allmesh` (half) | `controlDictBase` | Reference area: π·rBody² for the full rocket, half of it for a half mesh. |
 | `lRef` | 0.151 m | user | `controlDictBase` | Reference length: body diameter. |
 | `rBody` | 0.0755 m | user | no script | Body radius. |
 | `lBody` | 2.955 m | user | no script | Body length. |
