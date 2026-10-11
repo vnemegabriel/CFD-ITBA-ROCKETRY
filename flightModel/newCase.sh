@@ -13,6 +13,7 @@ ROOT=$(cd "$(dirname "$0")" && pwd)
 usage() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 RUN=$1; shift
+OPTIONS="$*"
 
 [ -n "$WM_PROJECT_DIR" ] || { echo "source the OpenFOAM bashrc first"; exit 1; }
 declare -A SET
@@ -39,13 +40,26 @@ mkdir -p "$RUN"
 rsync -a --exclude 'constant/polyMesh' --exclude 'log.*' --exclude '/0' \
       --exclude 'processor*' --exclude 'postProcessing' --exclude '[1-9]*' \
       "$ROOT/$TEMPLATE/" "$RUN/"
-cp -r "$MESH/constant/polyMesh" "$RUN/constant/"
+MESH=$(cd "$MESH" && pwd)
+if [ -n "$REFINE" ]; then
+    cp -r "$MESH/constant/polyMesh" "$RUN/constant/"
+else
+    ln -s "$MESH/constant/polyMesh" "$RUN/constant/polyMesh"
+fi
 cp "$MESH/meshInfo" "$RUN/constant/meshInfo"
 cp "$ROOT/common/Allrun" "$ROOT/common/Allrefine" "$RUN/"
 chmod +x "$RUN"/Allrun "$RUN"/Allrefine
 
 cd "$RUN"
 touch case.foam
+cat > run.info <<EOF
+case        "$(basename "$PWD")";
+created     "$(date -Iseconds)";
+commit      "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo unknown)";
+mesh        "$MESH";
+nCells      $(foamDictionary -entry nCells -value constant/meshInfo);
+options     "$OPTIONS";
+EOF
 
 TEMPLATES=$(find . -name '*.j2')
 if [ -n "$TEMPLATES" ]; then

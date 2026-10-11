@@ -22,6 +22,12 @@ esac
 
 [ -d constant/polyMesh ] || {
     echo "no mesh: run mesh/Allmesh first"; exit 1; }
+# newCase.sh links the shared mesh; refineMesh -overwrite would change it for every case
+if [ -L constant/polyMesh ]; then
+    SHARED=$(readlink -f constant/polyMesh)
+    rm constant/polyMesh
+    cp -r "$SHARED" constant/polyMesh
+fi
 
 # refineMesh maps any fields it finds; running it on a case that already has
 # fields silently refines those instead of starting from a clean mesh.  Test
