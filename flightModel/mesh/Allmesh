@@ -1,12 +1,15 @@
 #!/bin/sh
 # ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finLevel n]
-#           [--nLayers n] [--thicknessRatio r] [--y1 m] [--half]
+#           [--nLayers n] [--thicknessRatio r] [--y1 m] [--full]
 #
 #     ./Allmesh ~/meshes/base
 #     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
 #     ./Allmesh ~/meshes/otro stl/mi_cohete.stl
-#     ./Allmesh ~/meshes/h1half --half --y1 0.0007
+#     ./Allmesh ~/meshes/h1 --y1 0.0007
+#     ./Allmesh ~/meshes/h1full --full
 #
+# The default is the half mesh, z >= 0, with a symmetry plane on z = 0;
+# --full meshes the whole rocket.
 # Builds the mesh in <mesh-dir> with a copy of system/ and meshInfo, so every
 # mesh keeps the meshDict that made it.  The options are set on that copy.
 # Never overwrites an existing directory.
@@ -20,8 +23,8 @@ check() {
     return 0
 }
 
-usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
-DIR=""; SRC=""; H=""; FIN=""; NL=""; TR=""; Y1=""; HALF=0
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+DIR=""; SRC=""; H=""; FIN=""; NL=""; TR=""; Y1=""; HALF=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --maxCellSize) H=$2;   shift 2 ;;
@@ -30,6 +33,7 @@ while [ $# -gt 0 ]; do
         --thicknessRatio) TR=$2; shift 2 ;;
         --y1)          Y1=$2;  shift 2 ;;
         --half)        HALF=1; shift ;;
+        --full)        HALF=0; shift ;;
         -*) echo "unknown option $1"; usage ;;
         *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
             shift ;;

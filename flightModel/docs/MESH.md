@@ -42,10 +42,10 @@ region changes.
 | 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
 | 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
-| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. With `--half`, `zMin` is on z = 0. Refer to §5. |
+| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. On the half mesh (default), `zMin` is on z = 0. Refer to §5. |
 | 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
-| 7 | `createPatch -overwrite` | `system/createPatchDict`, or `createPatchDictHalf` with `--half` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box` (and `symm`). With `--half`, sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
+| 7 | `createPatch -overwrite` | `createPatchDictHalf`, or `createPatchDict` with `--full` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box` (and `symm`). On the half mesh, sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
 | 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `y1`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
@@ -252,17 +252,31 @@ r ≤ 1.2 on the body cell (`maxCellSize` / 2^level of `walls`), then solves r
 for that number of layers. It writes `y1` into `meshInfo`.
 
 The wall treatment uses wall functions, so the target is y+ > 30 at the cell
-centre (y = t₁/2). From the flat-plate friction at the aft body (x ≈ 2.8 m),
-where y+ is lowest, at the conditions of the sweep:
+centre (y = t₁/2). One set of meshes serves the whole sweep: t₁ = 0.7 mm
+gives y+ > 30 at M 0.3, the lowest Mach number, and y+ rises with the speed.
+From the flat-plate friction at the aft body (x ≈ 2.8 m), where y+ is
+lowest, at the conditions of the sweep:
 
-| M | y+ per mm of t₁ | t₁ | `h1` | `h2` | `h3` |
+| M | y+ per mm of t₁ | y+ at the cell centre, t₁ = 0.7 mm |
+|---|---|---|
+| 0.3 | ~110 | ~38 |
+| 0.6 | ~230 | ~80 |
+| 0.8 | ~330 | ~115 |
+| 1.2 | ~550 | ~195 |
+| 1.8 | ~950 | ~330 |
+
+At M 1.8 the first cell is still about 2 % of the boundary layer thickness
+(~30 mm at the aft body), inside the log layer. These are estimates: measure
+y+ on each case.
+
+| Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
 |---|---|---|---|---|---|
-| 0.3 | ~110 | 0.7 mm | 6 layers, r 1.158 | 5, r 1.117 | 4, r 1.074 |
-| 0.6 | ~230 | 0.3 mm | 10, r 1.155 | 8, r 1.169 | 7, r 1.130 |
+| `h1` | 1.6 | 6.25 mm | 6 | 1.158 | 0.7 mm |
+| `h2` | 1.1314 | 4.42 mm | 5 | 1.117 | 0.7 mm |
+| `h3` | 0.8 | 3.13 mm | 4 | 1.074 | 0.7 mm |
 
-t₁ is the same on the three meshes of each Mach number, so y+ does not change
-between them. Each Mach number thus needs its own meshes. The fins keep 3
-layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
+t₁ is the same on the three meshes, so y+ does not change between them. The
+fins keep 3 layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
 
 The thicker t₁ also makes the layer cells in the concave corners less thin.
 On the half `h1` the smallest cell went from 3.5 µm (t₁ 0.241 mm, full mesh)
@@ -308,8 +322,8 @@ Aconcagua.
 
 ### 5.1 Half mesh
 
-At α = 0 the flow has the symmetry of the fins. `Allmesh --half` meshes
-z ≥ 0 with the half geometry of §3.3:
+At α = 0 the flow has the symmetry of the fins. By default `Allmesh` meshes
+z ≥ 0 with the half geometry of §3.3; `--full` meshes the whole rocket:
 
 ```
 surfaceGenerateBoundingBox surface.stl geometry.stl  17.73 38.415 11.6085 11.6085 0 11.6048
@@ -339,7 +353,7 @@ patches with fixed names. `createPatch` merges them:
 | `outlet` | `patch` | `xMax` |
 | `box` | `patch` | `yMin`, `yMax`, `zMin`, `zMax` |
 
-`createPatchDictHalf`, for `--half`, takes `zMin` out of `box` and makes it
+`createPatchDictHalf`, for the half mesh, takes `zMin` out of `box` and makes it
 `symm`, of type `symmetry`.
 
 `pointSync false`. The file does not change the wall patches.
@@ -363,11 +377,11 @@ File: `mesh/meshInfo`. `Allmesh` copies it into the mesh directory.
 
 | Entry | Value | Written by | Read by | Function |
 |---|---|---|---|---|
-| `sector` | `full` | user, `Allmesh --half` | `Allrun` | Part of the rocket in the mesh: `quarter`, `half` or `full`. Sets the permitted flow angles. |
-| `symmetryFraction` | 1 | user, `Allmesh --half` | no script | Fraction of the rocket in the mesh. |
+| `sector` | `full` | user, `Allmesh` (half) | `Allrun` | Part of the rocket in the mesh: `quarter`, `half` or `full`. Sets the permitted flow angles. |
+| `symmetryFraction` | 1 | user, `Allmesh` (half) | no script | Fraction of the rocket in the mesh. |
 | `fins` | `true` | user | `Allrefine` | `Allrefine` stops if it is not `true`. |
 | `nCells` | from `checkMesh` | `Allmesh`, `Allrefine` | no script | Number of cells. |
-| `Aref` | 0.0179081 m² | user, `Allmesh --half` | `controlDictBase` | Reference area: π·rBody² for the full rocket, half of it for a half mesh. |
+| `Aref` | 0.0179081 m² | user, `Allmesh` (half) | `controlDictBase` | Reference area: π·rBody² for the full rocket, half of it for a half mesh. |
 | `lRef` | 0.151 m | user | `controlDictBase` | Reference length: body diameter. |
 | `rBody` | 0.0755 m | user | no script | Body radius. |
 | `lBody` | 2.955 m | user | no script | Body length. |
