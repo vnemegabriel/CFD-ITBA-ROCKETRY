@@ -54,7 +54,7 @@ dict de OpenFOAM, así que se lee con `foamDictionary`.
 | `commit` | `newCase.sh` | `git describe --dirty` de la repo; `-dirty` = había cambios sin commitear |
 | `mesh`, `nCells` | `newCase.sh` | Malla enlazada y número de celdas |
 | `options` | `newCase.sh` | La línea de opciones tal cual |
-| `host`, `cpu`, `np` | `Allrun` | Máquina y procesos MPI |
+| `host`, `cpu`, `np`, `cpuset` | `Allrun` | Máquina, procesos MPI y CPUs permitidos (`OMPI_MCA_hwloc_base_cpu_set`) |
 | `start`, `end`, `wallSeconds` | `Allrun` | Wall total de decomposePar + solver + reconstructPar |
 | `status` | `Allrun` | `ok` si el log del solver termina en `End`, si no `failed` |
 | `steps`, `simTime` | `Allrun` | Pasos de esta ejecución y tiempo físico inicial y final |
@@ -72,6 +72,22 @@ Las core-horas son `wallSeconds · np / 3600`. Para comparar con Nektar++:
 
 Dos corridas que comparten la máquina se pisan el ancho de banda de memoria.
 Para una comparación de tiempos, corré de a una o anotá qué más corría.
+
+### Una corrida por socket
+
+`newton` tiene 2 sockets de 14 núcleos físicos. Los CPUs lógicos 0–13 son
+el socket 0 y 14–27 el socket 1; 28–55 son los hyperthreads. `runParallel`
+no acepta opciones de `mpirun`, pero Open MPI lee las variables `OMPI_MCA_*`,
+que pasan por `run.sh` y `Allrun`:
+
+```bash
+OMPI_MCA_hwloc_base_cpu_set=0-13  OMPI_MCA_hwloc_base_binding_policy=core ./run.sh sweep_m03.txt
+OMPI_MCA_hwloc_base_cpu_set=14-27 OMPI_MCA_hwloc_base_binding_policy=core ./run.sh sweep_m06.txt
+```
+
+Cada corrida queda en su socket, con su memoria y su L3, un proceso por
+núcleo físico. El ancho de banda deja de ser compartido entre corridas; la
+frecuencia del turbo sí sigue dependiendo de la carga total.
 
 `log.time.<fecha>` guarda la salida completa de `/usr/bin/time -v`.
 

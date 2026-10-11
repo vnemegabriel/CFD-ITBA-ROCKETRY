@@ -73,6 +73,7 @@ run_$STAMP
     host        "$(hostname)";
     cpu         "$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)";
     np          $NP;
+    cpuset      "${OMPI_MCA_hwloc_base_cpu_set:-all}";
     start       "$STARTISO";
     end         "$(date -Iseconds)";
     status      $STATUS;
