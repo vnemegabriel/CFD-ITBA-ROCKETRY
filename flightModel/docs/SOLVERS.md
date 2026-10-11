@@ -421,7 +421,7 @@ File: `system/controlDictBase.j2`.
 | `adjustTimeStep` | yes | The time step follows `maxCo`. |
 | `maxDeltaT` | 1e-5 s | Maximum time step. |
 | `writeInterval` | 0.005 s, adjustable | Interval of the written times. |
-| `purgeWrite` | 2 | Keeps the last two written times. |
+| `purgeWrite` | 1 | Keeps the last written time. |
 | `writeFormat` | binary | |
 
 ## 11. Discretization schemes

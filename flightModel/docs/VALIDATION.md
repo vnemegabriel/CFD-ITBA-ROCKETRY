@@ -190,6 +190,6 @@ For each run that you publish, keep these files with the results:
 | The STL file, or its commit | Geometry. |
 | `<run-dir>/system/flowConditions` | Flight condition. |
 | `<run-dir>/config.json` | Ramp and stop criterion. |
-| y+ for each patch from `log.rhoCentralFoam` | Wall resolution. |
+| y+ for each patch from `postProcessing/yPlus` | Wall resolution. |
 
 With these files, another person can make the same result again.

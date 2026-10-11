@@ -119,7 +119,7 @@ you do not give keep the template values.
    `constant/polyMesh`, or if `<run-dir>` exists.
 2. It copies `case-central/` into `<run-dir>`. It does not copy the mesh,
    the logs, `0/`, `processor*`, `postProcessing/` or the time directories.
-3. It copies `<mesh-dir>/constant/polyMesh/` into `<run-dir>/constant/`.
+3. It links `<run-dir>/constant/polyMesh` to `<mesh-dir>/constant/polyMesh/`. With `--refine` it copies it. Refer to MEASUREMENTS.md §3.
 4. It copies `<mesh-dir>/meshInfo` to `<run-dir>/constant/meshInfo`. This
    file replaces the `meshInfo` of the template.
 5. It copies `common/Allrun` and `common/Allrefine` into `<run-dir>`.
@@ -282,14 +282,14 @@ give `--refine` to `newCase.sh`.
 | `Cd`, `Cl`, `Cm` for each 50 time steps | `postProcessing/forceCoeffs1/<start-time>/coefficient.dat` |
 | Forces and moments in N, pressure and viscous parts | `postProcessing/forces1/<start-time>/force.dat`, `moment.dat` |
 | Residuals of `U`, `e`, `k`, `omega` | `postProcessing/residuals/<start-time>/solverInfo.dat` |
-| y+ for each wall patch | `log.rhoCentralFoam`, and the field `yPlus` in each written time |
+| y+ for each wall patch | `postProcessing/yPlus/<start-time>/yPlus.dat`, and the field `yPlus` in the last written time |
 | Mach number, pressure coefficient, wall shear stress | Fields in each written time |
 | ParaView | `paraview case.foam`. `newCase.sh` makes `case.foam`. |
 
 `<start-time>` is `0` for a new run. A continued run writes a new directory
 with its start time.
 
-`purgeWrite 2` keeps only the last two time directories.
+`purgeWrite 1` keeps only the last time directory. MEASUREMENTS.md lists all the outputs, `run.info` and the notification.
 
 ## 9. Typical studies
 
