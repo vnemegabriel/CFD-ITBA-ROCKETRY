@@ -9,6 +9,7 @@
 # sector cannot represent (see constant/meshInfo).
 cd "${0%/*}" || exit 1
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
+LC_ALL=C; export LC_ALL
 
 [ -d constant/polyMesh ] || { echo "no mesh: run mesh/Allmesh first"; exit 1; }
 
@@ -41,15 +42,78 @@ restore0Dir
 
 APP=$(getApplication)
 
+BINDING=none
+if [ -f socket ] && [ "$NP" -gt 1 ]; then
+    SOCKET=$(cat socket)
+    CORES=$(lscpu -p=SOCKET,CORE | awk -F, -v s="$SOCKET" '$1 == s {print $2}' | sort -un | wc -l)
+    [ "$NP" -le "$CORES" ] || { echo "!! $NP processes do not fit in the $CORES cores of socket $SOCKET"; exit 1; }
+    i=0; : > rankfile
+    while [ $i -lt "$NP" ]; do echo "rank $i=localhost slot=$SOCKET:$i" >> rankfile; i=$((i + 1)); done
+    OMPI_MCA_rmaps_rank_file_path=$PWD/rankfile; export OMPI_MCA_rmaps_rank_file_path
+    BINDING="socket $SOCKET, one process per core"
+fi
+STAMP=$(date +%Y%m%d-%H%M%S)
+START=$(date +%s)
+STARTISO=$(date -Iseconds)
+
 if [ "$NP" -gt 1 ]; then
     runApplication decomposePar -force
-    runParallel -np "$NP" "$APP"
+    /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runParallel -np "$1" "$2"' sh "$NP" "$APP"
     runApplication reconstructPar -latestTime
 else
-    runApplication "$APP"
+    /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runApplication "$1"' sh "$APP"
+fi
+END=$(date +%s)
+
+# ---- record ------------------------------------------------------------------
+STATUS=failed
+grep -q '^End' "log.$APP" && STATUS=ok
+NCELLS=$(foamDictionary -entry nCells -value constant/meshInfo)
+STEPS=$(grep -c '^Time = ' "log.$APP")
+T0=$(awk '/^Time = /{print $3; exit}' "log.$APP")
+T1=$(awk '/^Time = /{t = $3} END{print t}' "log.$APP")
+RSS=$(awk -F': ' '/Maximum resident/{print $2}' log.time)
+CD=$(tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null | tail -n 1 | awk '{print $2}')
+WALL=$((END - START))
+COST=$(awk -v w=$WALL -v n=$NP -v c=$NCELLS -v s=$STEPS 'BEGIN{print (s > 0) ? w*n*1e6/(c*s) : 0}')
+
+cat >> run.info <<EOF
+
+run_$STAMP
+{
+    host        "$(hostname)";
+    cpu         "$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)";
+    np          $NP;
+    binding     "$BINDING";
+    start       "$STARTISO";
+    end         "$(date -Iseconds)";
+    status      $STATUS;
+    wallSeconds $WALL;
+    steps       $STEPS;
+    simTime     (${T0:-0} ${T1:-0});
+    maxRSSkB    ${RSS:-0};
+    coreUsPerCellStep $COST;
+    Cd          ${CD:-0};
+}
+EOF
+
+if [ "$NP" -gt 1 ] && grep -q '^End' log.reconstructPar 2>/dev/null; then
+    rm -rf processor*
+fi
+mv log.time "log.time.$STAMP"
+for f in log.decomposePar "log.$APP" log.reconstructPar; do
+    [ -f "$f" ] && xz -T0 --suffix=".$STAMP.xz" "$f"
+done
+
+NOTIFY_URL=${NOTIFY_URL:-$(cat "$HOME/.config/aconcagua/notify" 2>/dev/null)}
+if [ -n "$NOTIFY_URL" ]; then
+    curl -s -m 10 -H "Title: $(basename "$PWD") $STATUS" \
+         -d "t = ${T1:-0} s   Cd = ${CD:-?}   $(awk -v w=$WALL 'BEGIN{printf "%.1f h", w/3600}')" \
+         "$NOTIFY_URL" > /dev/null || true
 fi
 
 echo
-echo "coefficients: postProcessing/forceCoeffs1/0/coefficient.dat"
-tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null
-echo "y+ per patch: grep -A6 'yPlus' log.$APP | tail -12   (measure it: the mesh sets no y+ target)"
+echo "status $STATUS   t = ${T1:-0} s   Cd = ${CD:-?}   wall $WALL s   $COST core-us/cell/step"
+echo "record: run.info   coefficients: postProcessing/forceCoeffs1/*/coefficient.dat"
+echo "y+ per patch: postProcessing/yPlus/*/yPlus.dat   (measure it: the mesh sets no y+ target)"
+[ "$STATUS" = ok ]

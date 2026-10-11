@@ -2,8 +2,8 @@
     "tauCo": 3.3e-8,
     "vanLeer": 2000,
     "minIter": 3000,
-    "final_Co": 0.3,
+    "final_Co": 0.5,
     "coeffs_fields": ["Cd"],
-    "coeffs_variation": [0.001],
+    "coeffs_variation": [0.0001],
     "coeffs_window": [2]
 }

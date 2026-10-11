@@ -38,7 +38,8 @@ flightModel/mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine
 flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
-flightModel/run.sh        sweep.txt en serie, sobre una malla
+flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
+flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
 ```
 
 No hay Python en la repo. La malla se define en `mesh/system/meshDict` y todo

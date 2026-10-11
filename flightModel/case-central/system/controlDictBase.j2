@@ -31,7 +31,7 @@ endTime         #eval{ 10*$lBody/$Uinf };
 
 writeControl    adjustable;
 writeInterval   0.005;
-purgeWrite      2;
+purgeWrite      1;
 writeFormat     binary;
 writePrecision  8;
 writeCompression off;
@@ -59,7 +59,7 @@ functions
         libs            (forces);
         writeControl    timeStep;
         writeInterval   50;
-        log             yes;
+        log             no;
         patches         $wallPatches;
         rho             rho;
         rhoInf          $rhoInf;
@@ -106,6 +106,7 @@ functions
         type            solverInfo;
         libs            (utilityFunctionObjects);
         writeControl    timeStep;
+        writeInterval   50;
         fields          (U e k omega);
         writeResidualFields no;
     }
@@ -127,6 +128,15 @@ functions
         pInf            $pInf;
         UInf            ($Ux $Uy $Uz);
         writeControl    writeTime;
+    }
+
+    timeInfo
+    {
+        type            timeInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   50;
+        perTimeStep     yes;
     }
 
     #include "${FOAM_CASE}/system/fileUpdater"
