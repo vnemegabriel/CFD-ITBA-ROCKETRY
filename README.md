@@ -8,7 +8,9 @@ flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshDict — la malla
 flightModel/common/       Allrun, Allrefine — los scripts que va a usar cada corrida
 flightModel/case-central/ la plantilla de caso
 flightModel/newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
-flightModel/run.sh        corre todo sweep.txt en serie
+flightModel/runMesh.sh    construye las mallas de meshes.txt
+flightModel/runCase.sh    corre todo sweep.txt en serie, sobre mallas ya hechas
+flightModel/meshes.txt    una malla por línea
 flightModel/sweep.txt     un punto de Mach por línea
 flightModel/docs/         cómo se usa y por qué
 ```
@@ -26,7 +28,8 @@ cd ~/runs/prueba && ./Allrun 8
 El barrido entero:
 
 ```bash
-flightModel/run.sh
+flightModel/runMesh.sh
+flightModel/runCase.sh
 ```
 
 Los directorios de corrida van **fuera de OneDrive y fuera de `/mnt/c`**: las

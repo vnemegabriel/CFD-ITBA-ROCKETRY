@@ -227,7 +227,7 @@ dictionary does not set a y+ target.
 
 The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
 cell size, r the `thicknessRatio` and n the `nLayers`. The three meshes of
-`sweep.txt` keep t₁ the same:
+`meshes.txt` keep t₁ the same:
 
 | Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
 |---|---|---|---|---|---|

@@ -22,7 +22,8 @@ does, and the result.
 | `case-central/` | Case template for `rhoCentralFoam`. |
 | `common/Allrun`, `common/Allrefine` | Scripts that `newCase.sh` copies into each case. |
 | `newCase.sh` | Script that makes one case from the template and one mesh. |
-| `run.sh`, `sweep.txt` | Script and input file for a sweep of cases. |
+| `runMesh.sh`, `meshes.txt` | Script and input file that build the meshes. |
+| `runCase.sh`, `sweep.txt` | Script and input file for a sweep of cases on existing meshes. |
 
 ## 2. Requirements
 
@@ -131,8 +132,8 @@ you do not give keep the template values.
 8. It writes `--np` into `system/decomposeParDict`.
 9. It runs `./Allrefine` if you give `--refine`.
 
-> **NOTE** In `newCase.sh`, `--mesh` is a path. Only `run.sh` accepts a mesh
-> name without a path.
+> **NOTE** In `newCase.sh`, `--mesh` is a path. Only `runCase.sh` accepts a
+> mesh name without a path.
 
 ## 5. Run a case
 
@@ -191,60 +192,74 @@ sure that it is the last time and not 0.
 `./Allclean` also removes `constant/polyMesh`. After `./Allclean`, make a new
 case with `newCase.sh`.
 
-## 6. Run a sweep
+## 6. Meshes and sweeps
 
-### 6.1 Input file
+Meshes and cases are two steps. `runMesh.sh` builds the meshes;
+`runCase.sh` makes and runs the cases on meshes that already exist.
+
+### 6.1 Build the meshes
+
+`meshes.txt` has one mesh on each line: a name, then the options of
+`mesh/Allmesh`.
+
+```
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+```
+
+```bash
+./runMesh.sh [meshes-file] [meshes-dir]      # default: meshes.txt, ~/meshes
+```
+
+For each line:
+
+1. If the mesh exists, it compares `maxCellSize`, the `fins` level,
+   `nLayers` and `thicknessRatio` with the line. It keeps the mesh if they
+   are equal and stops if they are different. It does not compare the
+   geometry: after a change of the STL, remove the old meshes.
+2. If the mesh directory exists but has no mesh, it stops.
+3. Otherwise it runs `mesh/Allmesh` with the options of the line, and stops
+   if `Allmesh` stops with an error.
+
+### 6.2 Run the cases
 
 `sweep.txt` has one case on each line: a case name, then the options of
 `newCase.sh`.
 
 ```
-m18-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2   --Minf 1.8 --pInf 80127 --Tinf 275.56
-m18-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229 --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h1  --mesh h1 --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h2  --mesh h2 --Minf 1.8 --pInf 80127 --Tinf 275.56
 ```
 
 - Lines that start with `#`, and empty lines, have no effect.
-- `--mesh` is mandatory on each line.
-- A mesh name without `/` is a directory in `<meshes-dir>`.
-- `--maxCellSize`, `--finLevel`, `--nLayers` and `--thicknessRatio` apply
-  only when `run.sh` makes the mesh.
-
-### 6.2 Command
+- `--mesh` is mandatory on each line. A name without `/` is a directory in
+  `<meshes-dir>`.
 
 ```bash
-./run.sh [--meshOnly] [sweep-file] [runs-dir] [meshes-dir]
+./runCase.sh [sweep-file] [runs-dir] [meshes-dir]   # default: sweep.txt, ~/runs, ~/meshes
 ```
 
-`--meshOnly` makes the meshes of the sweep file and no case. Use it to
-examine the meshes before the cases start.
+For each line:
 
-| Argument | Default |
-|---|---|
-| `sweep-file` | `flightModel/sweep.txt` |
-| `runs-dir` | `~/runs` |
-| `meshes-dir` | `~/meshes` |
+1. If `<runs-dir>/<name>` exists, it goes to the next line. Thus, if you run
+   `runCase.sh` again after a stop, it continues from the first case that
+   does not exist.
+2. If the mesh does not exist, it stops. Build it with `runMesh.sh`.
+3. It runs `newCase.sh`. It stops if `newCase.sh` stops with an error.
+4. It runs `./Allrun` with the default number of processes. If `Allrun`
+   stops with an error, it shows a message and goes to the next line.
+
+The cases run one after the other. To use both sockets, run two sweep files
+at the same time, one with `--socket 0` and one with `--socket 1`
+(MEASUREMENTS.md §2).
+
+> **CAUTION** `runCase.sh` reads the sweep file line by line while it runs.
+> Do not edit the file in place until it ends: the next line is read from the
+> old byte offset of the new content. Stop `runCase.sh` (the solver can go
+> on), edit, and run it again; it skips the cases that exist.
 
 > **CAUTION** If your home directory is in OneDrive or in `/mnt/c`, give a
 > `runs-dir` and a `meshes-dir` outside them.
-
-### 6.3 Steps that run.sh does for each line
-
-1. If `<runs-dir>/<name>` exists, it goes to the next line. Thus, if you run
-   `run.sh` again after a stop, it continues from the first case that does
-   not exist.
-2. If the mesh exists, it compares `maxCellSize`, the `fins` level,
-   `nLayers` and `thicknessRatio` of the mesh with the options of the line.
-   It stops if they are different. It does not compare the geometry: after
-   a change of the STL, remove the old meshes.
-3. If the mesh directory exists but has no mesh, it stops.
-4. If the mesh does not exist, it runs `mesh/Allmesh` with the options of
-   the line. It stops if `Allmesh` stops with an error. The next lines that
-   name this mesh use it again.
-5. It runs `newCase.sh`. It stops if `newCase.sh` stops with an error.
-6. It runs `./Allrun` with the default number of processes. If `Allrun`
-   stops with an error, it shows a message and goes to the next line.
-
-The cases run one after the other.
 
 ## 7. Refine the mesh near the fins (optional)
 
@@ -297,7 +312,7 @@ with its start time.
 ### 9.1 Mach sweep
 
 1. Write one line for each Mach number in `sweep.txt`.
-2. Run `./run.sh`.
+2. Run `./runCase.sh`.
 3. Measure y+ in each case. The mesh does not set y+, and the velocity
    changes by a factor of 6 from M 0.3 to M 1.8.
 
@@ -311,9 +326,15 @@ with its start time.
 3. Use the same Mach number for all meshes.
 
 ```
-m03-h1  --mesh h1 --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2   --Minf 0.3
-m03-h2  --mesh h2 --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229 --Minf 0.3
-m03-h3  --mesh h3 --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2   --Minf 0.3
+# meshes.txt
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
+
+# sweep.txt
+m03-h1  --mesh h1 --Minf 0.3
+m03-h2  --mesh h2 --Minf 0.3
+m03-h3  --mesh h3 --Minf 0.3
 ```
 
 The first layer thickness follows the surface cell size. `--nLayers` and
@@ -339,7 +360,7 @@ Use one of these two methods:
 
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
 
-`sweep.txt` holds the 15 cases. To make the same results on another
+`meshes.txt` holds the three meshes and `sweep.txt` the 15 cases. To make the same results on another
 computer:
 
 1. Do the steps of §2.
@@ -353,7 +374,7 @@ computer:
 3. Make the three meshes and examine them:
 
    ```bash
-   ./run.sh --meshOnly
+   ./runMesh.sh
    ```
 
    The meshes must agree with this table:
@@ -367,7 +388,7 @@ computer:
 4. Run the cases:
 
    ```bash
-   ./run.sh
+   ./runCase.sh
    ```
 
 The flight conditions are those of the coast phase (t > 4 s) of the IREC
@@ -401,7 +422,8 @@ mesh/Allmesh ~/meshes/base                                   # mesh
 ./newCase.sh ~/runs/NAME --mesh ~/meshes/base --Minf 0.8 --np 8
 cd ~/runs/NAME && ./Allrun 8                                 # run
 
-./run.sh sweep.txt ~/runs ~/meshes                           # sweep
+./runMesh.sh meshes.txt ~/meshes                             # meshes
+./runCase.sh sweep.txt ~/runs ~/meshes                       # sweep
 
 ./Allrefine tip                                              # before Allrun
 ./Allclean                                                   # removes mesh and results

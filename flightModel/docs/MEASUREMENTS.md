@@ -134,5 +134,5 @@ echo https://ntfy.sh/<tema> > ~/.config/aconcagua/notify
 corridas que ya están en marcha. La variable de entorno `NOTIFY_URL` tiene
 prioridad sobre el archivo.
 
-No avisa si se mata `run.sh` o el lanzador, o si se cae la máquina: en esos
+No avisa si se mata `runCase.sh`, o si se cae la máquina: en esos
 casos `Allrun` no llega a su última parte.
