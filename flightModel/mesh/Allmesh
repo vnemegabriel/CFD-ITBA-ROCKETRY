@@ -1,10 +1,11 @@
 #!/bin/sh
 # ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m] [--finLevel n]
-#           [--nLayers n] [--thicknessRatio r]
+#           [--nLayers n] [--thicknessRatio r] [--y1 m] [--half]
 #
 #     ./Allmesh ~/meshes/base
 #     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
 #     ./Allmesh ~/meshes/otro stl/mi_cohete.stl
+#     ./Allmesh ~/meshes/h1half --half --y1 0.0007
 #
 # Builds the mesh in <mesh-dir> with a copy of system/ and meshInfo, so every
 # mesh keeps the meshDict that made it.  The options are set on that copy.
@@ -19,21 +20,27 @@ check() {
     return 0
 }
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
-DIR=""; SRC=""; H=""; FIN=""; NL=""; TR=""
+usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+DIR=""; SRC=""; H=""; FIN=""; NL=""; TR=""; Y1=""; HALF=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --maxCellSize) H=$2;   shift 2 ;;
         --finLevel)    FIN=$2; shift 2 ;;
         --nLayers)     NL=$2;  shift 2 ;;
         --thicknessRatio) TR=$2; shift 2 ;;
+        --y1)          Y1=$2;  shift 2 ;;
+        --half)        HALF=1; shift ;;
         -*) echo "unknown option $1"; usage ;;
         *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
             shift ;;
     esac
 done
 [ -n "$DIR" ] || usage
-SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117.stl}
+if [ $HALF = 1 ]; then
+    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117_half.stl}
+else
+    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117.stl}
+fi
 [ -f "$SRC" ] || SRC=$HERE/$SRC
 [ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
 SRC=$(realpath "$SRC")
@@ -51,8 +58,22 @@ setEntry() {
 if [ -n "$FIN" ]; then
     setEntry localRefinement/fins/additionalRefinementLevels "$FIN"
     setEntry objectRefinements/noseTip/additionalRefinementLevels "$FIN"
-    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels $((FIN + 1))
-    setEntry objectRefinements/noseApex/additionalRefinementLevels $((FIN + 2))
+    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels "$FIN"
+    setEntry objectRefinements/noseApex/additionalRefinementLevels "$FIN"
+fi
+if [ -n "$Y1" ]; then
+    [ -z "$NL$TR" ] || { echo "!! --y1 sets nLayers and thicknessRatio: give one or the other"; exit 1; }
+    LW=$(foamDictionary -entry localRefinement/walls/additionalRefinementLevels -value system/meshDict)
+    HW=$(foamDictionary -entry maxCellSize -value system/meshDict)
+    # t1 = h (r - 1) / (r^n - 1): the fewest layers with r <= 1.2, then r for that n
+    set -- $(LC_ALL=C awk -v h="$HW" -v l="$LW" -v y="$Y1" 'BEGIN {
+        h /= 2 ^ l; q = h / y
+        x = log(1 + 0.2 * q) / log(1.2); n = int(x); if (n < x - 1e-9) n++; if (n < 1) n = 1
+        lo = 1.0001; hi = 3
+        for (i = 0; i < 200; i++) { r = (lo + hi) / 2; if ((r ^ n - 1) / (r - 1) > q) hi = r; else lo = r }
+        printf "%d %.4f %.3g\n", n, r, h }')
+    NL=$1; TR=$2
+    echo "y1 $Y1 m on a $3 m wall cell: nLayers $NL, thicknessRatio $TR"
 fi
 for p in cone walls tail; do
     [ -z "$NL" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/nLayers "$NL"
@@ -69,9 +90,15 @@ sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
     -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
     "$SRC" > surface.stl
 
-# Metres out from the model bounding box, not multiples of it.
-runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
-    17.73 38.415 11.5395 11.5395 11.5395 11.5395
+# Metres out from the model bounding box, not multiples of it.  The half
+# keeps the walls of the full box (|y|, z <= 11.775 m) and puts zMin on z = 0.
+if [ $HALF = 1 ]; then
+    runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
+        17.73 38.415 11.6085 11.6085 0 11.6048
+else
+    runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
+        17.73 38.415 11.5395 11.5395 11.5395 11.5395
+fi
 check surfaceGenerateBoundingBox
 
 runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
@@ -80,7 +107,14 @@ check surfaceFeatureEdges
 runApplication cartesianMesh
 check cartesianMesh
 
-runApplication createPatch -overwrite
+if [ $HALF = 1 ]; then
+    runApplication createPatch -overwrite -dict system/createPatchDictHalf
+    foamDictionary -entry sector -set half meshInfo > /dev/null
+    foamDictionary -entry symmetryFraction -set 0.5 meshInfo > /dev/null
+    foamDictionary -entry Aref -set 0.00895405 meshInfo > /dev/null
+else
+    runApplication createPatch -overwrite
+fi
 check createPatch
 
 for P in $(foamDictionary -entry wallPatches -value meshInfo | tr -d '()'); do
@@ -98,6 +132,7 @@ foamDictionary -entry finLevel -add \
     "$(foamDictionary -entry localRefinement/fins/additionalRefinementLevels -value system/meshDict)" meshInfo > /dev/null
 foamDictionary -entry nLayers -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/nLayers -value system/meshDict)" meshInfo > /dev/null
 foamDictionary -entry thicknessRatio -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/thicknessRatio -value system/meshDict)" meshInfo > /dev/null
+[ -z "$Y1" ] || foamDictionary -entry y1 -add "$Y1" meshInfo > /dev/null
 foamDictionary -entry meshDir -add "\"$(pwd)\"" meshInfo > /dev/null
 
 echo

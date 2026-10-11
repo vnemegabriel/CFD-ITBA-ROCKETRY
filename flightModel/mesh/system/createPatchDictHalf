@@ -1,0 +1,38 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      createPatchDictHalf;
+}
+// ============================================================================
+pointSync false;
+patches
+(
+    {
+        name inlet;
+        patchInfo { type patch; }
+        constructFrom patches;
+        patches (xMin);
+    }
+    {
+        name outlet;
+        patchInfo { type patch; }
+        constructFrom patches;
+        patches (xMax);
+    }
+    {
+        name box;
+        patchInfo { type patch; }
+        constructFrom patches;
+        patches (yMin yMax zMax);
+    }
+    {
+        name symm;
+        patchInfo { type symmetry; }
+        constructFrom patches;
+        patches (zMin);
+    }
+);
+// ************************************************************************* //

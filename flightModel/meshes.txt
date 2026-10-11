@@ -2,9 +2,14 @@
 # ./runMesh.sh builds them in series under ~/meshes; existing meshes are kept.
 # Blank lines and # are ignored.
 #
-# Mesh convergence: maxCellSize ratio sqrt(2); nLayers/thicknessRatio hold
-# y1 = 0.241 mm on the body (docs/MESH.md section 4.4).
+# Half meshes (symmetry plane z = 0, fins rolled 45 deg), one set per Mach:
+# --y1 puts y+ near 35 at the aft body for wall functions (docs/MESH.md 4.4).
+# Mesh convergence: maxCellSize ratio sqrt(2), y1 the same on the three.
 
-h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
-h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
-h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
+h1m03  --half --maxCellSize 1.6    --y1 0.0007
+h2m03  --half --maxCellSize 1.1314 --y1 0.0007
+h3m03  --half --maxCellSize 0.8    --y1 0.0007
+
+h1m06  --half --maxCellSize 1.6    --y1 0.0003
+h2m06  --half --maxCellSize 1.1314 --y1 0.0003
+h3m06  --half --maxCellSize 0.8    --y1 0.0003
