@@ -54,7 +54,7 @@ dict de OpenFOAM, así que se lee con `foamDictionary`.
 | `commit` | `newCase.sh` | `git describe --dirty` de la repo; `-dirty` = había cambios sin commitear |
 | `mesh`, `nCells` | `newCase.sh` | Malla enlazada y número de celdas |
 | `options` | `newCase.sh` | La línea de opciones tal cual |
-| `host`, `cpu`, `np`, `cpuset` | `Allrun` | Máquina, procesos MPI y CPUs permitidos (`OMPI_MCA_hwloc_base_cpu_set`) |
+| `host`, `cpu`, `np`, `binding` | `Allrun` | Máquina, procesos MPI y socket fijado (`none` sin `--socket`) |
 | `start`, `end`, `wallSeconds` | `Allrun` | Wall total de decomposePar + solver + reconstructPar |
 | `status` | `Allrun` | `ok` si el log del solver termina en `End`, si no `failed` |
 | `steps`, `simTime` | `Allrun` | Pasos de esta ejecución y tiempo físico inicial y final |
@@ -75,21 +75,27 @@ Para una comparación de tiempos, corré de a una o anotá qué más corría.
 
 ### Una corrida por socket
 
-`newton` tiene 2 sockets de 14 núcleos físicos. Los CPUs lógicos 0–13 son
-el socket 0 y 14–27 el socket 1; 28–55 son los hyperthreads. `runParallel`
-no acepta opciones de `mpirun`, pero Open MPI lee las variables `OMPI_MCA_*`,
-que pasan por `run.sh` y `Allrun`:
+`newton` tiene 2 sockets de 14 núcleos físicos; los CPUs lógicos 28–55 son
+hyperthreads. `--socket <S>` en la línea del sweep (o en `newCase.sh`) fija
+la corrida al socket `S`:
 
-```bash
-OMPI_MCA_hwloc_base_cpu_set=0-13  OMPI_MCA_hwloc_base_binding_policy=core ./run.sh sweep_m03.txt
-OMPI_MCA_hwloc_base_cpu_set=14-27 OMPI_MCA_hwloc_base_binding_policy=core ./run.sh sweep_m06.txt
+```
+m03-h1  --np 8 --socket 0 --mesh h1 ...
+m06-h1  --np 8 --socket 1 --mesh h1 ...
 ```
 
-Cada corrida queda en su socket, con su memoria y su L3, un proceso por
-núcleo físico. El ancho de banda deja de ser compartido entre corridas; la
-frecuencia del turbo sí sigue dependiendo de la carga total.
+`newCase.sh` escribe `S` en el archivo `socket` del caso. `Allrun` arma un
+`rankfile` con el proceso `i` en el núcleo físico `i` de ese socket, y se lo
+pasa a Open MPI por `OMPI_MCA_rmaps_rank_file_path`, porque `runParallel` no
+acepta opciones de `mpirun`. Se detiene si `np` supera los núcleos del
+socket.
 
-`log.time.<fecha>` guarda la salida completa de `/usr/bin/time -v`.
+Cada corrida queda con su memoria, su L3 y un núcleo físico por proceso, sin
+hyperthreads ni migraciones. La frecuencia del turbo sí sigue dependiendo de
+la carga total.
+
+`--cpu-set` (`OMPI_MCA_hwloc_base_cpu_set`) no alcanza: Open MPI 4.1 deja
+cada proceso suelto en todo el socket aunque se pida `--bind-to core`.
 
 ## 3. Disco
 

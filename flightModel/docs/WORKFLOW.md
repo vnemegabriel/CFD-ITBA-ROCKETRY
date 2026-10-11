@@ -108,6 +108,7 @@ again, remove the directory or use a new name.
 | `--Ti <->` | Free-stream turbulence intensity. |
 | `--nuRatio <->` | Ratio `nut/nu` in the free stream. |
 | `--np <N>` | Number of subdomains in `system/decomposeParDict`. |
+| `--socket <S>` | Pins the parallel run to socket `S`, one process per physical core. Refer to MEASUREMENTS.md §2. |
 | `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
 
 The flow options change entries in `system/flowConditions`. The options that

@@ -41,6 +41,17 @@ NP=$(getNumberOfProcessors)
 restore0Dir
 
 APP=$(getApplication)
+
+BINDING=none
+if [ -f socket ] && [ "$NP" -gt 1 ]; then
+    SOCKET=$(cat socket)
+    CORES=$(lscpu -p=SOCKET,CORE | awk -F, -v s="$SOCKET" '$1 == s {print $2}' | sort -un | wc -l)
+    [ "$NP" -le "$CORES" ] || { echo "!! $NP processes do not fit in the $CORES cores of socket $SOCKET"; exit 1; }
+    i=0; : > rankfile
+    while [ $i -lt "$NP" ]; do echo "rank $i=localhost slot=$SOCKET:$i" >> rankfile; i=$((i + 1)); done
+    OMPI_MCA_rmaps_rank_file_path=$PWD/rankfile; export OMPI_MCA_rmaps_rank_file_path
+    BINDING="socket $SOCKET, one process per core"
+fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 START=$(date +%s)
 STARTISO=$(date -Iseconds)
@@ -73,7 +84,7 @@ run_$STAMP
     host        "$(hostname)";
     cpu         "$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)";
     np          $NP;
-    cpuset      "${OMPI_MCA_hwloc_base_cpu_set:-all}";
+    binding     "$BINDING";
     start       "$STARTISO";
     end         "$(date -Iseconds)";
     status      $STATUS;
