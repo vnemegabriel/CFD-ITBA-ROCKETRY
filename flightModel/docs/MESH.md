@@ -206,7 +206,7 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 | `wake` | box | 4 | 100 mm | x from 1.0 to 9.0 m, y and z ±0.80 m |
 | `farWake` | box | 2 | 400 mm | x from 1.0 to 27.0 m, y and z ±2.0 m |
 | `noseTip` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.040 m |
-| `noseApex` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.010 m |
+| `noseApex` | sphere | 11 (`--finLevel` + 2) | 0.78 mm | Centre (0 0 0), radius 0.010 m |
 
 `noseTip` has the level of the fins on each mesh. `noseApex` makes the curve
 of the tip. The layer thickness follows the surface cell size, so it also
@@ -214,11 +214,11 @@ keeps the layers thinner than the radius of the nose near the tip. Without
 `noseApex`, the full mesh `h2` with t₁ = 0.241 mm had 13 negative cell
 volumes at the tip.
 
-`noseApex` was two levels above the fins (0.78 mm). On `h1` it gave cells
-of 4 µm at the apex, and with `rhoCentralFoam` the smallest cell sets the
-time step of the whole mesh. It is now at the level of the fins, and so is
-`finEdges` (§4.5). On the half `h1` with t₁ = 0.7 mm this gave no negative
-volume; measure `h2` and `h3` before you use them.
+On the full `h1`, `noseApex` gave cells of 4 µm at the apex. With
+`rhoCentralFoam` the smallest cell sets the time step of the whole mesh.
+`noseApex` and `finEdges` at the fin level, with t₁ = 0.7 mm, raised it to
+8.8 µm, but the surface of the fins lost a third of its faces. The half mesh
+keeps the levels of the full one: it is the full mesh cut in two.
 
 The wake regions decrease the cell size one level at a time behind the base.
 The positions are for the Aconcagua (body length 2.955 m). For a different
@@ -251,36 +251,34 @@ cell size, r the `thicknessRatio` and n the `nLayers`.
 r ≤ 1.2 on the body cell (`maxCellSize` / 2^level of `walls`), then solves r
 for that number of layers. It writes `y1` into `meshInfo`.
 
-The wall treatment uses wall functions, so the target is y+ > 30 at the cell
-centre (y = t₁/2). One set of meshes serves the whole sweep: t₁ = 0.7 mm
-gives y+ > 30 at M 0.3, the lowest Mach number, and y+ rises with the speed.
-From the flat-plate friction at the aft body (x ≈ 2.8 m), where y+ is
-lowest, at the conditions of the sweep:
-
-| M | y+ per mm of t₁ | y+ at the cell centre, t₁ = 0.7 mm |
-|---|---|---|
-| 0.3 | ~110 | ~38 |
-| 0.6 | ~230 | ~80 |
-| 0.8 | ~330 | ~115 |
-| 1.2 | ~550 | ~195 |
-| 1.8 | ~950 | ~330 |
-
-At M 1.8 the first cell is still about 2 % of the boundary layer thickness
-(~30 mm at the aft body), inside the log layer. These are estimates: measure
-y+ on each case.
+The meshes of the sweep use the layers of the full meshes, t₁ = 0.241 mm:
 
 | Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
 |---|---|---|---|---|---|
-| `h1` | 1.6 | 6.25 mm | 6 | 1.158 | 0.7 mm |
-| `h2` | 1.1314 | 4.42 mm | 5 | 1.117 | 0.7 mm |
-| `h3` | 0.8 | 3.13 mm | 4 | 1.074 | 0.7 mm |
+| `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm |
+| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm |
+| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.241 mm |
 
-t₁ is the same on the three meshes, so y+ does not change between them. The
-fins keep 3 layers, so their t₁ changes: 0.86, 0.61 and 0.43 mm.
+t₁ is the same on the three meshes, so y+ does not change between them.
 
-The thicker t₁ also makes the layer cells in the concave corners less thin.
-On the half `h1` the smallest cell went from 3.5 µm (t₁ 0.241 mm, full mesh)
-to 8.8 µm (t₁ 0.7 mm, half mesh, `noseApex` at the fin level).
+From the flat-plate friction at the aft body (x ≈ 2.8 m), where y+ is
+lowest, at the conditions of the sweep:
+
+| M | y+ per mm of t₁ | y+ at the cell centre, t₁ = 0.241 mm |
+|---|---|---|
+| 0.3 | ~110 | ~13 |
+| 0.6 | ~230 | ~28 |
+| 0.8 | ~330 | ~40 |
+| 1.2 | ~550 | ~66 |
+| 1.8 | ~950 | ~115 |
+
+At M 0.3 and 0.6 the first cell is in the buffer layer. `nut` is
+`nutUSpaldingWallFunction`, which follows Spalding's law through the buffer,
+so it holds there. These are estimates: measure y+ on each case.
+
+With t₁ = 0.7 mm (`--y1 0.0007`) y+ is above 30 on the whole sweep, and the
+smallest cell of the half `h1` went from 3.5 µm to 8.8 µm (with `noseApex`
+and `finEdges` at the fin level).
 
 Procedure to set y+:
 
@@ -295,7 +293,7 @@ Procedure to set y+:
 | Entry | Value | Function |
 |---|---|---|
 | `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
-| `finEdges/additionalRefinementLevels` | 9 (`--finLevel`) | 3.13 mm with `maxCellSize 1.6`. One level more gave thin cells at the root of the edges. |
+| `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
 
 The oblique shock starts at the leading edge and the expansion at the

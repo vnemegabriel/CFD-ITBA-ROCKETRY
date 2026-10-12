@@ -26,9 +26,9 @@ resolver bien la malla, en orden:
 Todo el barrido es a α = 0. No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas (h1, h2, h3) para todo el barrido.** Media malla,
-con plano de simetría en z = 0 y aletas a 45°, e y1 = 0.7 mm fijado con
-`Allmesh --y1`: da y+ > 30 a M 0.3 y sube con la velocidad (~330 a M 1.8),
-así que se trabaja con wall functions. No armes mallas por Mach. El y+ real
+con plano de simetría en z = 0 y aletas a 45°: es la malla completa cortada
+al medio, con los mismos niveles y las mismas capas (y1 = 0.241 mm). Da y+ ~13
+a M 0.3 y ~115 a M 1.8; `nutUSpaldingWallFunction` cubre el buffer. No armes mallas por Mach. El y+ real
 medilo en cada corrida.
 
 ---

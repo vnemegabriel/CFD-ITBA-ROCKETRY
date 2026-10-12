@@ -62,8 +62,8 @@ setEntry() {
 if [ -n "$FIN" ]; then
     setEntry localRefinement/fins/additionalRefinementLevels "$FIN"
     setEntry objectRefinements/noseTip/additionalRefinementLevels "$FIN"
-    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels "$FIN"
-    setEntry objectRefinements/noseApex/additionalRefinementLevels "$FIN"
+    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels $((FIN + 1))
+    setEntry objectRefinements/noseApex/additionalRefinementLevels $((FIN + 2))
 fi
 if [ -n "$Y1" ]; then
     [ -z "$NL$TR" ] || { echo "!! --y1 sets nLayers and thicknessRatio: give one or the other"; exit 1; }

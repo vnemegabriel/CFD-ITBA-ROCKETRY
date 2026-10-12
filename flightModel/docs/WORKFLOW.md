@@ -205,8 +205,8 @@ Meshes and cases are two steps. `runMesh.sh` builds the meshes;
 `mesh/Allmesh`.
 
 ```
-h1  --maxCellSize 1.6    --y1 0.0007
-h2  --maxCellSize 1.1314 --y1 0.0007
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 ```
 
 ```bash
@@ -329,9 +329,9 @@ with its start time.
 
 ```
 # meshes.txt
-h1  --maxCellSize 1.6    --y1 0.0007
-h2  --maxCellSize 1.1314 --y1 0.0007
-h3  --maxCellSize 0.8    --y1 0.0007
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep.txt
 m03-h1  --mesh h1 --Minf 0.3
@@ -339,9 +339,9 @@ m03-h2  --mesh h2 --Minf 0.3
 m03-h3  --mesh h3 --Minf 0.3
 ```
 
-`--y1` keeps the first layer thickness the same on the three meshes, so that
-y+ does not change between them. MESH.md §4.4 gives the calculation and the
-y+ that t₁ = 0.7 mm gives at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
+`nLayers` and `thicknessRatio` keep the first layer thickness at 0.241 mm on
+the three meshes, so that y+ does not change between them. MESH.md §4.4 gives
+the calculation and the y+ at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
 gives the analysis.
 
 ### 9.3 Angle-of-attack sweep
