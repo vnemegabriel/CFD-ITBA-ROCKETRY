@@ -69,6 +69,9 @@ if [ -n "$FIN" ]; then
     setEntry localRefinement/fins/additionalRefinementLevels "$FIN"
     setEntry objectRefinements/noseTip/additionalRefinementLevels "$FIN"
     setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels $((FIN + 1))
+    setEntry edgeMeshRefinement/finRoots/additionalRefinementLevels $((FIN + 1))
+    setEntry objectRefinements/baseEdge/additionalRefinementLevels $((FIN + 1))
+    setEntry objectRefinements/shoulder/additionalRefinementLevels "$FIN"
     setEntry objectRefinements/noseApex/additionalRefinementLevels $((FIN + 2))
 fi
 if [ -n "$Y1" ]; then
@@ -90,9 +93,10 @@ for p in cone walls tail; do
     [ -z "$TR" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/thicknessRatio "$TR"
 done
 
-EDGES=${SRC%.stl}_finEdges.obj
-[ -f "$EDGES" ] || { echo "!! no $EDGES: make it with makeRocket.py"; exit 1; }
-cp "$EDGES" finEdges.obj
+for E in finEdges finRoots; do
+    [ -f "${SRC%.stl}_$E.obj" ] || { echo "!! no ${SRC%.stl}_$E.obj: make it with makeRocket.py"; exit 1; }
+    cp "${SRC%.stl}_$E.obj" "$E.obj"
+done
 
 # STL solid names become patch names; the cases expect these four.
 sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \

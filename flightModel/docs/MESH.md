@@ -40,7 +40,7 @@ region changes.
 |---|---|---|---|---|
 | 1 | `cp` | `mesh/system/`, `mesh/meshInfo` | `<mesh-dir>/system/`, `<mesh-dir>/meshInfo` | Each mesh keeps a copy of its dictionaries. |
 | 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
-| 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
+| 2a | `cp` | `<stl>_finEdges.obj`, `<stl>_finRoots.obj` | `finEdges.obj`, `finRoots.obj` | The fin edges and fin roots for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
 | 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain, symmetric about z = 0. Refer to §5. |
 | 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
@@ -202,6 +202,8 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 
 | Region | Type | Level | Cell size | Extent |
 |---|---|---|---|---|
+| `shoulder` | hollowCone | 9 (`--finLevel`) | 3.13 mm | x from 2.81 to 2.85 m, r from 0.065 to 0.090 m: the body-boattail shoulder |
+| `baseEdge` | hollowCone | 10 (`--finLevel` + 1) | 1.56 mm | x from 2.94 to 2.97 m, r from 0.045 to 0.065 m: the base edge, where the base shear layer starts |
 | `nearField` | box | 5 | 50 mm | x from −0.20 to 3.20 m, y and z ±0.50 m |
 | `baseWake` | cone | 8 | 6.25 mm | x from 2.94 to 3.30 m, radius 0.08 m |
 | `nearWake` | cone | 7 | 12.5 mm | x from 2.90 to 3.80 m, radius 0.14 m |
@@ -307,6 +309,11 @@ Procedure to set y+:
 | `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
 | `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
+| `finRoots/edgeFile` | `"finRoots.obj"` | The root of each fin, LE to TE on the body. `makeRocket.py` writes it, so it follows `--finRoll`. |
+| `finRoots/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finRoots/refinementThickness` | 0.012 m | Covers the half thickness of the fin (5.85 mm) and the root fillet (3 mm). |
+
+On `h1`, `shoulder`, `baseEdge` and `finRoots` add 185 696 cells (1 583 757 → 1 769 453): non-orthogonality 67.7° → 65.2°, skewness 1.89 → 1.75, faces with interpolation weight below 0.05 250 → 294, 0 negative volumes.
 
 The oblique shock starts at the leading edge and the expansion at the
 trailing edge.
