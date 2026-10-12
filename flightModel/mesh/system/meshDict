@@ -83,8 +83,7 @@ objectRefinements
 {
     noseTip
     {
-        // stagnation point and the bow shock standoff; Allmesh --finLevel
-        // sets this level too, so it always matches the fins
+        // stagnation point and the bow shock standoff, at the fin level
         type        sphere;
         additionalRefinementLevels 9;      // 3.13 mm
         centre      (0 0 0);
@@ -190,7 +189,7 @@ objectRefinements
 // ------------------------------------------------------------------ edges --
 // Leading and trailing edges of the fins: the oblique shock starts at the LE,
 // the expansion at the TE.  finEdges.obj is written by makeRocket.py next to
-// the STL and copied by Allmesh; --finLevel n sets this to n + 1.
+// the STL and copied by Allmesh.
 edgeMeshRefinement
 {
     finEdges

@@ -39,7 +39,7 @@ region changes.
 | Step | Application | Input | Output | Function |
 |---|---|---|---|---|
 | 1 | `cp` | `mesh/system/`, `mesh/meshInfo` | `<mesh-dir>/system/`, `<mesh-dir>/meshInfo` | Each mesh keeps a copy of its dictionaries. |
-| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
+| 2 | `sed`, `foamDictionary` | `meshInfo`, `--maxCellSize`, `--nLayers`, `--thicknessRatio` | `system/meshDict` | Writes `lBody` and `rBody` of `meshInfo` (§4.3), then the options, into the copy. |
 | 2a | `cp` | `<stl>_finEdges.obj`, `<stl>_finRoots.obj` | `finEdges.obj`, `finRoots.obj` | The fin edges and fin roots for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
 | 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain, symmetric about z = 0. Refer to §5. |
@@ -50,7 +50,7 @@ region changes.
 | 7b | `mesh/snapPlane.py . oldInternalFaces` | `constant/polyMesh/points` | `constant/polyMesh/points` | Half mesh only: sets z = 0 on the cut. |
 | 7c | `createPatch -overwrite` | `createPatchDictHalf` | `constant/polyMesh` | Half mesh only: `oldInternalFaces` becomes `symm`, of type `symmetry`. Sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
-| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `y1`, `meshDir`. |
+| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
 
 ### 2.1 Function of the .fms file
@@ -193,7 +193,7 @@ distance, the cell size increases to `maxCellSize` one level at a time.
 | `cone` | 8 | 6.25 mm | 0.060 m | The bow shock is in this band. |
 | `walls` | 8 | 6.25 mm | 0.050 m | Body boundary layer. |
 | `tail` | 8 | 6.25 mm | 0.050 m | The expansion on the boattail sets the base pressure. |
-| `fins` | 9 | 3.13 mm | 0.020 m | Fin chord. `Allmesh --finLevel` changes this level. |
+| `fins` | 9 | 3.13 mm | 0.020 m | Fin chord. |
 
 ### 4.3 objectRefinements
 
@@ -202,16 +202,16 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 
 | Region | Type | Level | Cell size | Extent |
 |---|---|---|---|---|
-| `shoulder` | hollowCone | 9 (`--finLevel`) | 3.13 mm | x from 2.81 to 2.85 m, r from 0.065 to 0.090 m: the body-boattail shoulder |
-| `baseEdge` | hollowCone | 10 (`--finLevel` + 1) | 1.56 mm | x from 2.94 to 2.97 m, r from 0.045 to 0.065 m: the base edge, where the base shear layer starts |
+| `shoulder` | hollowCone | 9 | 3.13 mm | x from 2.81 to 2.85 m, r from 0.065 to 0.090 m: the body-boattail shoulder |
+| `baseEdge` | hollowCone | 10 | 1.56 mm | x from 2.94 to 2.97 m, r from 0.045 to 0.065 m: the base edge, where the base shear layer starts |
 | `nearField` | box | 5 | 50 mm | x from −0.20 to 3.20 m, y and z ±0.50 m |
 | `baseWake` | cone | 8 | 6.25 mm | x from 2.94 to 3.30 m, radius 0.08 m |
 | `nearWake` | cone | 7 | 12.5 mm | x from 2.90 to 3.80 m, radius 0.14 m |
 | `midWake` | cone | 6 | 25 mm | x from 2.85 to 5.00 m, radius 0.26 m |
 | `wake` | box | 4 | 100 mm | x from 1.0 to 9.0 m, y and z ±0.80 m |
 | `farWake` | box | 2 | 400 mm | x from 1.0 to 27.0 m, y and z ±2.0 m |
-| `noseTip` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.040 m |
-| `noseApex` | sphere | 11 (`--finLevel` + 2) | 0.78 mm | Centre (0 0 0), radius 0.010 m |
+| `noseTip` | sphere | 9 | 3.13 mm | Centre (0 0 0), radius 0.040 m |
+| `noseApex` | sphere | 11 | 0.78 mm | Centre (0 0 0), radius 0.010 m |
 
 `noseTip` has the level of the fins on each mesh. `noseApex` makes the curve
 of the tip. The layer thickness follows the surface cell size, so it also
@@ -261,10 +261,6 @@ dictionary does not set a y+ target.
 The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
 cell size, r the `thicknessRatio` and n the `nLayers`.
 
-`Allmesh --y1 <m>` sets t₁ directly: it takes the fewest layers that keep
-r ≤ 1.2 on the body cell (`maxCellSize` / 2^level of `walls`), then solves r
-for that number of layers. It writes `y1` into `meshInfo`.
-
 The meshes of the sweep use the layers of the full meshes, t₁ = 0.241 mm:
 
 | Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
@@ -290,10 +286,6 @@ At M 0.3 and 0.6 the first cell is in the buffer layer. `nut` is
 `nutUSpaldingWallFunction`, which follows Spalding's law through the buffer,
 so it holds there. These are estimates: measure y+ on each case.
 
-With t₁ = 0.7 mm (`--y1 0.0007`) y+ is above 30 on the whole sweep, and the
-smallest cell of the half `h1` went from 3.5 µm to 8.8 µm (with `noseApex`
-and `finEdges` at the fin level).
-
 Procedure to set y+:
 
 1. Make the mesh.
@@ -307,10 +299,10 @@ Procedure to set y+:
 | Entry | Value | Function |
 |---|---|---|
 | `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
-| `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finEdges/additionalRefinementLevels` | 10 | 1.56 mm with `maxCellSize 1.6`. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
 | `finRoots/edgeFile` | `"finRoots.obj"` | The root of each fin, LE to TE on the body. `makeRocket.py` writes it, so it follows `--finRoll`. |
-| `finRoots/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finRoots/additionalRefinementLevels` | 10 | 1.56 mm with `maxCellSize 1.6`. |
 | `finRoots/refinementThickness` | 0.012 m | Covers the half thickness of the fin (5.85 mm) and the root fillet (3 mm). |
 
 On `h1`, `shoulder`, `baseEdge` and `finRoots` add 185 696 cells (1 583 757 → 1 769 453): non-orthogonality 67.7° → 65.2°, skewness 1.89 → 1.75, faces with interpolation weight below 0.05 250 → 294, 0 negative volumes.
