@@ -43,6 +43,7 @@ flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
 flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
+flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV)
 ```
 
 El Python es `mesh/makeRocket.py`, que escribe el STL, y `mesh/snapPlane.py`,

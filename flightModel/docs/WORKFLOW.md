@@ -336,6 +336,29 @@ with its start time.
 
 `purgeWrite 1` keeps only the last time directory. MEASUREMENTS.md lists all the outputs, `run.info` and the notification.
 
+### 8.1 Monitor a run
+
+```bash
+./post/monitor.sh <run-dir> [seconds]     # default 30 s
+```
+
+It plots `Cd` and `Cl` against time and the initial residuals in log
+scale, and draws them again every `[seconds]`. It joins the directories of
+a continued run. Without a display, for example over ssh, it writes
+`<run-dir>/monitor.png`. It needs gnuplot (`sudo apt install gnuplot`).
+
+### 8.2 Table of a sweep
+
+```bash
+./post/sweepTable.sh [runs-dir] > sweep.csv    # default ~/runs
+```
+
+One line for each run: `case`, `mesh`, `nCells`, `Minf`, `pInf`, `Tinf`,
+`alpha`, the last record of `run.info` (`status`, `steps`, `tEnd`,
+`wallSeconds`), `Cd`, `Cl` and `CmPitch` of the last line of
+`forceCoeffs1`, and the smallest and largest y+ on the wall patches at the
+last time. A run that has not started has empty fields.
+
 ## 9. Typical studies
 
 ### 9.1 Mach sweep
