@@ -43,7 +43,7 @@ region changes.
 | 2a | `cp` | `<stl>_finEdges.obj`, `<stl>_finRoots.obj` | `finEdges.obj`, `finRoots.obj` | The fin edges and fin roots for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
 | 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain, symmetric about z = 0. Refer to §5. |
-| 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
+| 5 | `surfaceFeatureEdges -angle 60` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
 | 7 | `createPatch -overwrite` | `createPatchDict` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box`. |
 | 7a | `topoSet`, `subsetMesh upper -overwrite` | `topoSetDictHalf` | `constant/polyMesh` | Half mesh only: keeps the cells with the centre at z ≥ 0. The cut faces go to `oldInternalFaces`. Refer to §5.1. |
@@ -60,24 +60,15 @@ edges. The `.fms` file contains the triangles, the patches and the feature
 edges.
 
 `surfaceFeatureEdges` marks an edge as a feature edge when the angle between
-the two adjacent triangles is more than 30°. `cartesianMesh` then moves the
+the two adjacent triangles is more than 60°. `cartesianMesh` then moves the
 mesh vertices onto these edges.
 
-If an edge is not a feature edge, the mesh cuts it at the cell size. The
-edge then becomes round or chamfered. These edges have an effect on the
-results:
-
-- The leading and trailing edges and the tips of the fins. They set the
-  position of the shocks and the flow separation on the fins.
-- The fin-body junction (90°).
-- The edge of the base. It sets the separation point and thus the base
-  pressure.
-
-> **NOTE** An edge with an angle of less than 30° is not a feature edge. The
-> boattail shoulder has the angle of the boattail, which is usually less
-> than 30°. A round leading edge made of small facets also has small angles.
-> To find the feature edges, run `surfaceFeatureEdges` with a smaller angle
-> and look at the result in ParaView.
+The rocket has no sharp edge left: the fin edges, the fin root, the shoulder
+and the base edge are rounded (§3.3), and each round is made of facets of
+less than 30°. With 30°, small triangles where the root fillet meets the
+body gave 172 false feature edges (56 at the foot of the leading-edge
+fillet, 64 at the fin tips), and `cartesianMesh` bent the cells along them.
+With 60° only the edges of the domain box (12) and the nose (88) remain.
 
 `cartesianMesh` also accepts an STL file in `surfaceFile`. In that case, the
 mesh has no feature edges.
@@ -302,10 +293,12 @@ Procedure to set y+:
 | `finEdges/additionalRefinementLevels` | 10 | 1.56 mm with `maxCellSize 1.6`. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
 | `finRoots/edgeFile` | `"finRoots.obj"` | The root of each fin, LE to TE on the body. `makeRocket.py` writes it, so it follows `--finRoll`. |
-| `finRoots/additionalRefinementLevels` | 10 | 1.56 mm with `maxCellSize 1.6`. |
-| `finRoots/refinementThickness` | 0.012 m | Covers the half thickness of the fin (5.85 mm) and the root fillet (3 mm). |
+| `finRoots/additionalRefinementLevels` | 11 | 0.78 mm with `maxCellSize 1.6`. |
+| `finRoots/refinementThickness` | 0.008 m | Width of the band around each root. |
 
-On `h1`, `shoulder`, `baseEdge` and `finRoots` add 185 696 cells (1 583 757 → 1 769 453): non-orthogonality 67.7° → 65.2°, skewness 1.89 → 1.75, faces with interpolation weight below 0.05 250 → 294, 0 negative volumes.
+On `h1`, with `finRoots` at level 10 and 0.012 m, `shoulder`, `baseEdge` and `finRoots` added 185 696 cells (1 583 757 → 1 769 453). With `finRoots` at level 11 and 0.008 m, and `surfaceFeatureEdges -angle 60`, `h1` has 2 198 939 cells: non-orthogonality 66.0°, skewness 1.72, 388 faces with interpolation weight below 0.05, 0 negative volumes.
+
+> **CAUTION** `finRoots` refines the body wall as well. The layer thickness follows the surface cell, so at level 11 the first body layer near the root is about 0.014 mm, against 0.10 mm on the rest of the body, and y+ there is about 7 times lower. 98 % of the edges below 20 µm of `h1` are in this band.
 
 The oblique shock starts at the leading edge and the expansion at the
 trailing edge.

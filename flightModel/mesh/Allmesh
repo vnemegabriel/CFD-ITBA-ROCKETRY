@@ -87,7 +87,7 @@ set -- $(awk -v w=11.775 '$1 == "vertex" {
 runApplication surfaceGenerateBoundingBox surface.stl geometry.stl 17.73 38.415 "$@"
 check surfaceGenerateBoundingBox
 
-runApplication surfaceFeatureEdges -angle 30 geometry.stl geometry.fms
+runApplication surfaceFeatureEdges -angle 60 geometry.stl geometry.fms
 check surfaceFeatureEdges
 
 runApplication cartesianMesh

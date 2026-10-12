@@ -116,7 +116,7 @@ objectRefinements
     {
         // the base shear layer leaves from this edge
         type        hollowCone;
-        additionalRefinementLevels 10;     // 1.56 mm, as finEdges
+        additionalRefinementLevels 10;     // 1.56 mm
         p0          (#eval{ 2.940*$sx } 0 0);
         p1          (#eval{ 2.970*$sx } 0 0);
         radius0_Inner #eval{ 0.045*$sr };
@@ -201,11 +201,11 @@ edgeMeshRefinement
 
     finRoots
     {
-        // the root of each fin, LE to TE on the body; the band covers the
-        // half thickness (5.85 mm) and the root fillet (3 mm)
+        // the root of each fin, LE to TE on the body.  It refines the body
+        // wall too, so the body layers here are about 7 times thinner
         edgeFile    "finRoots.obj";
-        additionalRefinementLevels 10;     // 1.56 mm
-        refinementThickness 0.012;
+        additionalRefinementLevels 11;     // 0.78 mm
+        refinementThickness 0.008;
     }
 }
 
