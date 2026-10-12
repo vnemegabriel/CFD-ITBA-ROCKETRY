@@ -80,13 +80,6 @@ acoplarse a nada más.
 
 ## Trampas conocidas
 
-- **La repo vive adentro de OneDrive y OneDrive revierte archivos.** Pasó: una
-  restauración de sync dejó un archivo fuente en una versión anterior a dos
-  commits, y el archivo igual parseaba, así que no se notaba leyéndolo. Después
-  de cualquier interrupción, `git diff --stat` antes de confiar en el working
-  tree; un archivo con cientos de líneas borradas que vos no borraste es esto.
-  Se recupera con `git checkout HEAD -- <archivo>`. El mitigante real es
-  commitear seguido.
 - **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
   f-string se convierte en salto de línea real y rompe el archivo.
 - **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL

@@ -45,8 +45,8 @@ All scripts stop with the message `source the OpenFOAM bashrc first` if you
 do not do this step.
 
 > **CAUTION** Put the mesh directories and the case directories outside
-> OneDrive and outside `/mnt/c`. These file systems make the OpenFOAM input
-> and output several times slower.
+> `/mnt/c`. That file system makes the OpenFOAM input and output several
+> times slower.
 
 ## 3. Make a mesh
 
@@ -285,8 +285,8 @@ at the same time, one with `--socket 0` and one with `--socket 1`
 > old byte offset of the new content. Stop `runCase.sh` (the solver can go
 > on), edit, and run it again; it skips the cases that exist.
 
-> **CAUTION** If your home directory is in OneDrive or in `/mnt/c`, give a
-> `runs-dir` and a `meshes-dir` outside them.
+> **CAUTION** If your home directory is in `/mnt/c`, give a `runs-dir` and a
+> `meshes-dir` outside it.
 
 ## 7. Refine the mesh near the fins (optional)
 
@@ -478,8 +478,7 @@ pad is at 896 m MSL. The data is in `fin_flutter/data/midland_telemega_data.csv`
   Put the STL and `meshDict` in the repository.
 - When a change to `meshDict` changes the mesh, commit it with the number
   of cells and the `checkMesh` output of the new mesh.
-- Put case directories outside the repository, outside OneDrive and outside
-  `/mnt/c`.
+- Put case directories outside the repository and outside `/mnt/c`.
 
 ## 11. Quick reference
 

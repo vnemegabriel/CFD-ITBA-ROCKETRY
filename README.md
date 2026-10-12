@@ -32,8 +32,8 @@ flightModel/runMesh.sh
 flightModel/runCase.sh
 ```
 
-Los directorios de corrida van **fuera de OneDrive y fuera de `/mnt/c`**: las
-dos cosas hacen la E/S de OpenFOAM varias veces más lenta.
+Los directorios de corrida van **fuera de `/mnt/c`**: hace la E/S de OpenFOAM
+varias veces más lenta.
 
 ## Qué leer
 

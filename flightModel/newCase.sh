@@ -8,7 +8,7 @@
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --init ~/runs/m18
 #
 # Copies case-central plus a mesh built by mesh/Allmesh.  See docs/WORKFLOW.md.
-# Keep run directories out of OneDrive and out of /mnt/c.
+# Keep run directories out of /mnt/c.
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
