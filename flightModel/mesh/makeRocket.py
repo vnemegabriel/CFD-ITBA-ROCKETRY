@@ -18,8 +18,7 @@ on coplanar caps with rings offset half a facet.  Body and fins are one
 shell: the fin root is cut into the cylinder, so the fin-body junction is a
 real edge of the surface.  All lengths in metres.
 Nothing is written unless the parameters are consistent and every shell is
-closed and outward-facing.  --half then cuts every shell at z = 0 and keeps
-z >= 0: the cut surface is open, closed by the zMin face of the domain box.
+closed and outward-facing.
 
 Next to out.stl goes out_finEdges.obj: the leading and trailing edges of the
 fins as lines, for edgeMeshRefinement in meshDict.
@@ -48,7 +47,6 @@ p.add_argument('--nChord',        type=int,   default=24,      help='facets per 
 p.add_argument('--nRound',        type=int,   default=6,       help='facets on each edge round')
 p.add_argument('--nSpan',         type=int,   default=8,       help='fin span stations')
 p.add_argument('--finRoll',       type=float, default=0.0,     help='angle of the first fin about the axis, deg')
-p.add_argument('--half', action='store_true', help='keep z >= 0 only, for a mesh with a symmetry plane at z = 0')
 
 pre, _ = p.parse_known_args()
 if pre.dims:
@@ -83,8 +81,6 @@ errors = [m for bad, m in [
     (a.nTheta % 4 != 0,              'nTheta must be a multiple of 4'),
     (not 0 < a.finEdgeRadius < t / 2, 'finEdgeRadius must be between 0 and finThickness/2'),
     (t >= 0.5 * a.finTipChord,       'finThickness too large for the tip chord'),
-    (a.half and abs(math.sin(math.radians(a.finRoll) * 2)) < 0.5,
-                                     '--half needs the fins away from z = 0: use --finRoll 45'),
 ] if bad]
 if errors:
     sys.exit('\n'.join(errors))
@@ -274,38 +270,6 @@ for sol in solids:
         groups[name].append([sol.pts[i] for i in tri])
 
 
-def clip(tris):
-    """The part of each triangle with z >= 0.  An edge crossing z = 0 is cut
-    at the same point from both of its triangles, so the shells stay
-    conforming along the cut."""
-    def zero(p):
-        return (p[0], p[1], 0.0) if abs(p[2]) < 1e-12 else p
-
-    def cut(p, q):
-        p, q = sorted((p, q))
-        f = p[2] / (p[2] - q[2])
-        return (p[0] + f * (q[0] - p[0]), p[1] + f * (q[1] - p[1]), 0.0)
-
-    kept = []
-    for tri in tris:
-        tri = [zero(p) for p in tri]
-        if all(p[2] >= 0 for p in tri):
-            kept.append(tri)
-            continue
-        poly = []
-        for i in range(3):
-            p, q = tri[i], tri[(i + 1) % 3]
-            if p[2] >= 0:
-                poly.append(p)
-            if (p[2] > 0 > q[2]) or (p[2] < 0 < q[2]):
-                poly.append(cut(p, q))
-        kept += [[poly[0], poly[j], poly[j + 1]] for j in range(1, len(poly) - 1)]
-    return [t for t in kept if len(set(t)) == 3 and any(p[2] > 0 for p in t)]
-
-
-if a.half:
-    groups = {n: clip(t) for n, t in groups.items()}
-
 with open(a.out, 'w') as out:
     for name, tris in groups.items():
         out.write(f'solid {name}\n')
@@ -326,8 +290,6 @@ with open(edges, 'w') as out:
     for k in range(4):
         phi = roll + k * 0.5 * math.pi
         c, s_ = math.cos(phi), math.sin(phi)
-        if a.half and s_ < 0:
-            continue
         for x0, x1 in ((xRootLE, xRootLE + a.finSweep), (xRootTE, xRootLE + a.finSweep + a.finTipChord)):
             out.write('v %.9g %.9g %.9g\nv %.9g %.9g %.9g\n' % (x0, R * c, R * s_, x1, rTip * c, rTip * s_))
             out.write(f'l {n + 1} {n + 2}\n')

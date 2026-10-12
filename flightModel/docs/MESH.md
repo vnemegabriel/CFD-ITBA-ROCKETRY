@@ -42,10 +42,13 @@ region changes.
 | 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
 | 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
-| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain. On the half mesh (default), `zMin` is on z = 0. Refer to §5. |
+| 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain, symmetric about z = 0. Refer to §5. |
 | 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
-| 7 | `createPatch -overwrite` | `createPatchDictHalf`, or `createPatchDict` with `--full` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box` (and `symm`). On the half mesh, sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
+| 7 | `createPatch -overwrite` | `createPatchDict` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box`. |
+| 7a | `topoSet`, `subsetMesh upper -overwrite` | `topoSetDictHalf` | `constant/polyMesh` | Half mesh only: keeps the cells with the centre at z ≥ 0. The cut faces go to `oldInternalFaces`. Refer to §5.1. |
+| 7b | `mesh/snapPlane.py . oldInternalFaces` | `constant/polyMesh/points` | `constant/polyMesh/points` | Half mesh only: sets z = 0 on the cut. |
+| 7c | `createPatch -overwrite` | `createPatchDictHalf` | `constant/polyMesh` | Half mesh only: `oldInternalFaces` becomes `symm`, of type `symmetry`. Sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
 | 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `y1`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
@@ -135,14 +138,12 @@ dimensions (`--dims`).
 The geometry of the half meshes (§5.1) comes from the same script:
 
 ```bash
-python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117_half.stl --finRoll 45 --half
+python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117_roll45.stl --finRoll 45
 ```
 
 `--finRoll 45` turns the fins to 45, 135, 225 and 315°, so that the plane
-z = 0 passes between two fins. `--half` cuts every shell at z = 0 and keeps
-z ≥ 0; an edge that crosses z = 0 is cut at the same point from both of its
-triangles. The cut is open, and the `zMin` face of the domain closes it.
-`--half` stops if a fin is near z = 0.
+z = 0 passes between two fins. The STL is the whole rocket: the half mesh is
+cut from the full one (§5.1).
 
 | Part | Shape | Solid name |
 |---|---|---|
@@ -321,21 +322,36 @@ Aconcagua.
 ### 5.1 Half mesh
 
 At α = 0 the flow has the symmetry of the fins. By default `Allmesh` meshes
-z ≥ 0 with the half geometry of §3.3; `--full` meshes the whole rocket:
+the whole rocket with the fins at 45° (§3.3) and keeps the half z ≥ 0;
+`--full` meshes the whole rocket with the fins at 0°.
 
 ```
-surfaceGenerateBoundingBox surface.stl geometry.stl  17.73 38.415 11.6085 11.6085 0 11.6048
+surfaceGenerateBoundingBox surface.stl geometry.stl  17.73 38.415 11.604756 11.604756 11.604756 11.604756
 ```
 
-The walls of the box are those of the full mesh, and `zMin` is on z = 0.
-`createPatchDictHalf` makes it the patch `symm`, of type `symmetry`, which
-`0.orig/` already has. `meshInfo` gets `sector half`, `symmetryFraction 0.5`
-and `Aref` = π·rBody²/2, so the coefficients are those of the full rocket.
-`Allrun` then permits α but not β.
+The box is symmetric about z = 0, so the octree splits on z = 0 and the
+cells of the full mesh do not cross it, except for about 0.1 % near the wall.
+`topoSet` selects the cells with the centre at z ≥ 0, and `subsetMesh` keeps
+them; the faces of the cut go to `oldInternalFaces`. The smoothing of
+`cartesianMesh` leaves the cut up to 1.7 mm off the plane, in cells of 50 to
+400 mm, and up to 0.2 mm in the layers. `snapPlane.py` sets z = 0 on every
+point of the cut, and `createPatchDictHalf` makes it the patch `symm`, of type
+`symmetry`, which `0.orig/` already has. `meshInfo` gets `sector half`,
+`symmetryFraction 0.5` and `Aref` = π·rBody²/2, so the coefficients are those
+of the full rocket. `Allrun` then permits α but not β.
 
-On `h1` the half mesh has 66 % of the cells of the full one, not 50 %: the
-fins at 45° are diagonal to the octree and need more cells each. It does not
-change the time step, which the smallest cell sets. At M 1.8 the Mach angle is 33.7°, and the Mach cone from the nose
+The half mesh is the full one cut in two. On `h1` the full mesh at 45° has
+3 152 544 cells and the half 1 577 819, with skewness 3.58, 156 faces above
+70° and 478 faces with interpolation weight below 0.05, half of those of the
+full mesh. `cartesianMesh` makes the full mesh, so a half mesh takes the
+meshing time and memory of the full one.
+
+> **CAUTION** Do not mesh z ≥ 0 directly with `zMin` on z = 0. `cartesianMesh`
+> then treats `zMin` as a domain face that touches the wall: it gives `zMin`
+> the layers of the wall, and the wall layers fan out at the corner. On `h1`
+> this gave 9 002 faces with interpolation weight below 0.05. The type
+> `symmetryPlane` in the `.fms`, `boundaryLayers/excludedPatches` and
+> `allowDiscontinuity` did not correct it. At M 1.8 the Mach angle is 33.7°, and the Mach cone from the nose
 crosses the lateral boundary at approximately x = 17.6 m. The pressure
 boundary condition on `box` must thus let the wave go out. Refer to
 SOLVERS.md §9.
@@ -351,8 +367,8 @@ patches with fixed names. `createPatch` merges them:
 | `outlet` | `patch` | `xMax` |
 | `box` | `patch` | `yMin`, `yMax`, `zMin`, `zMax` |
 
-`createPatchDictHalf`, for the half mesh, takes `zMin` out of `box` and makes it
-`symm`, of type `symmetry`.
+`createPatchDictHalf`, for the half mesh, makes the faces of the cut at z = 0
+(`oldInternalFaces`, from `subsetMesh`) the patch `symm`, of type `symmetry`.
 
 `pointSync false`. The file does not change the wall patches.
 
