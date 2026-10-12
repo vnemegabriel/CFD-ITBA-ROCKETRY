@@ -113,6 +113,7 @@ again, remove the directory or use a new name.
 | `--np <N>` | Number of subdomains in `system/decomposeParDict`. |
 | `--socket <S>` | Pins the parallel run to socket `S`, one process per physical core. Refer to MEASUREMENTS.md §2. |
 | `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
+| `--init <run-dir>` | Starts from the latest time of another run instead of the uniform free stream. Refer to §5.6. |
 
 The flow options change entries in `system/flowConditions`. The options that
 you do not give keep the template values.
@@ -133,6 +134,8 @@ you do not give keep the template values.
    entry does not exist in the file.
 8. It writes `--np` into `system/decomposeParDict`.
 9. It runs `./Allrefine` if you give `--refine`.
+10. With `--init`, it writes the path of that run into `initFrom` and into
+    `run.info`.
 
 > **NOTE** In `newCase.sh`, `--mesh` is a path. Only `runCase.sh` accepts a
 > mesh name without a path.
@@ -154,6 +157,8 @@ cd <run-dir>
 2. It compares `alpha` and `beta` in `system/flowConditions` with `sector`
    in `constant/meshInfo`. It stops if the mesh cannot show the flow angle.
 3. It copies `0.orig/` to `0/` (`restore0Dir`).
+   If `initFrom` exists, it maps the latest time of that run onto `0/`.
+   Refer to §5.6.
 4. In parallel: it runs `decomposePar -force`, then `rhoCentralFoam`, then
    `reconstructPar -latestTime`. In serial: it runs `rhoCentralFoam`.
 5. It shows the last line of the force coefficients.
@@ -193,6 +198,25 @@ sure that it is the last time and not 0.
 
 `./Allclean` also removes `constant/polyMesh`. After `./Allclean`, make a new
 case with `newCase.sh`.
+
+### 5.6 Start from another run
+
+`newCase.sh --init <run-dir>` starts the case from the solution of another
+run, for example the previous Mach number of a sweep, instead of the
+uniform free stream. `Allrun` then does, after `restore0Dir`:
+
+1. It reads the value of each `fixedValue` patch in `0/`. These are the
+   values of this run: in a supersonic case, `p` on `inlet`.
+2. `mapFields <run-dir> -consistent -sourceTime latestTime`. It maps the
+   internal field and the patch values. The other run can have another
+   mesh of the same domain and patches.
+3. `changeDictionary -dict system/changeDictionaryDict.init` writes back the
+   values of step 1.
+
+The free-stream entries of the patches (`freestreamValue`, `inletValue`,
+`fieldInf`) are not mapped, so they keep the values of this run. The other
+run must have a time directory with the solution: in parallel, `Allrun` runs
+`reconstructPar -latestTime`.
 
 ## 6. Meshes and sweeps
 
@@ -236,6 +260,9 @@ m18-h2  --mesh h2 --Minf 1.8 --pInf 80127 --Tinf 275.56
 - Lines that start with `#`, and empty lines, have no effect.
 - `--mesh` is mandatory on each line. A name without `/` is a directory in
   `<meshes-dir>`.
+- `--init` is optional. A name without `/` is a directory in `<runs-dir>`.
+  The run must come earlier in the file, because the cases run in order:
+  `m12-h1 --mesh h1 --Minf 1.2 ... --init m18-h1`.
 
 ```bash
 ./runCase.sh [sweep-file] [runs-dir] [meshes-dir]   # default: sweep.txt, ~/runs, ~/meshes
