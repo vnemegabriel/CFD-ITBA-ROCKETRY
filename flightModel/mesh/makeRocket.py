@@ -13,10 +13,11 @@ the command line win over the file, the file over the defaults.
 
 Solids: nosecone (von Karman), body (cylinder), boattail (cone + base), fins
 (four, at finRoll + 0/90/180/270 deg, biconvex circular-arc section of constant
-thickness, LE, TE and tip rounded with finEdgeRadius).  Nose, body+fins and boattail are three closed shells that meet
-on coplanar caps with rings offset half a facet.  Body and fins are one
-shell: the fin root is cut into the cylinder, so the fin-body junction is a
-real edge of the surface.  All lengths in metres.
+thickness, LE, TE and tip rounded with finEdgeRadius).  The shoulder and the
+base edge are rounded with shoulderRadius and baseEdgeRadius, and a fillet of
+finRootRadius runs all round each fin root.  Nose and body+fins+boattail are
+two closed shells that meet on coplanar caps with rings offset half a facet.
+All lengths in metres.
 Nothing is written unless the parameters are consistent and every shell is
 closed and outward-facing.
 
@@ -47,6 +48,10 @@ p.add_argument('--nChord',        type=int,   default=24,      help='facets per 
 p.add_argument('--nRound',        type=int,   default=6,       help='facets on each edge round')
 p.add_argument('--nSpan',         type=int,   default=8,       help='fin span stations')
 p.add_argument('--finRoll',       type=float, default=0.0,     help='angle of the first fin about the axis, deg')
+p.add_argument('--finRootRadius', type=float, default=0.003,   help='fillet where the fin meets the body, all round the root')
+p.add_argument('--shoulderRadius', type=float, default=0.003,  help='round between the cylinder and the boattail')
+p.add_argument('--baseEdgeRadius', type=float, default=0.003,  help='round between the boattail and the base')
+p.add_argument('--nFillet',       type=int,   default=6,       help='facets on a quarter circle of the fillet and the rounds')
 
 pre, _ = p.parse_known_args()
 if pre.dims:
@@ -71,8 +76,18 @@ t = a.finThickness
 rTip = R + a.finSpan
 xRootTE = xBase - a.finFromBase
 xRootLE = xRootTE - a.finRootChord
+rf, rs, rb = a.finRootRadius, a.shoulderRadius, a.baseEdgeRadius
+thTail = math.atan2(R - Rb, a.tailLength)
+L1 = rs * math.tan(thTail / 2)
+L2 = rb * math.tan((0.5 * math.pi - thTail) / 2)
 
 errors = [m for bad, m in [
+    (min(rf, rs, rb) < 0,            'finRootRadius, shoulderRadius and baseEdgeRadius must be >= 0'),
+    (rf >= a.finSpan / a.nSpan,      'finRootRadius must be below the first span station'),
+    (rf >= xRootLE - Ln,             'finRootRadius runs onto the nose'),
+    (L1 + L2 >= a.tailLength / math.cos(thTail), 'shoulderRadius and baseEdgeRadius do not fit on the boattail'),
+    (L2 >= Rb,                       'baseEdgeRadius too large for the base'),
+    (xRootTE + rf >= xBase - L2 * math.cos(thTail), 'finRootRadius runs onto the base edge'),
     (Rb >= R,                        'baseDiameter must be smaller than diameter'),
     (a.finTipChord > a.finRootChord, 'finTipChord larger than finRootChord'),
     (a.finFromBase < a.tailLength,   'fin root runs onto the boattail: finFromBase < tailLength'),
@@ -120,6 +135,36 @@ class Solid:
 
 
 roll = math.radians(a.finRoll)
+
+
+def rBody(x):
+    """Radius of the body of revolution from the nose to the start of the
+    base edge round: cylinder, shoulder round, cone."""
+    if x <= xTail - L1:
+        return R
+    if x <= xTail + L1 * math.cos(thTail):
+        return R - rs + math.sqrt(max(rs * rs - (x - xTail + L1) ** 2, 0.0))
+    return R - (x - xTail) * math.tan(thTail)
+
+
+def arc(cx, cr, rad, q0, q1):
+    """Points (x, r) on a circle, q0 to q1 inclusive, about nFillet per quarter."""
+    n = max(1, math.ceil(a.nFillet * abs(q1 - q0) / (0.5 * math.pi)))
+    return [(cx + rad * math.cos(q0 + (q1 - q0) * j / n), cr + rad * math.sin(q0 + (q1 - q0) * j / n))
+            for j in range(n + 1)]
+
+
+# The profile aft of the shoulder: shoulder round, cone, base edge round, base.
+aftProfile = []
+if rs > 0:
+    aftProfile += arc(xTail - L1, R - rs, rs, 0.5 * math.pi, 0.5 * math.pi - thTail)
+else:
+    aftProfile.append((xTail, R))
+if rb > 0:
+    q0 = math.atan2(Rb + L2 * math.sin(thTail) - (Rb - L2), xBase - L2 * math.cos(thTail) - (xBase - rb))
+    aftProfile += arc(xBase - rb, Rb - L2, rb, q0, 0.0)
+else:
+    aftProfile.append((xBase, Rb))
 
 
 def ring(s, x, r, offset):
@@ -179,26 +224,44 @@ for r0, r1 in zip(rings, rings[1:]):
     strip(nose, r0, r1, 'nosecone')
 cap(nose, rings[-1], True, 'nosecone')
 
-tail = Solid('boattail')
-rA, rB = ring(tail, xTail, R, 0.5), ring(tail, xBase, Rb, 0.5)
-strip(tail, rA, rB, 'boattail')
-cap(tail, rA, False, 'boattail')
-cap(tail, rB, True, 'boattail')
-
-# Body and fins, one shell.  Each fin root contour lies on the cylinder; the
-# body between two fins is a sector of nq columns bounded by those contours.
+# Body, boattail and fins, one shell.  Each fin stands on a fillet: a ring of
+# arcs from the fin surface at height finRootRadius down to the body, a
+# finRootRadius off the root contour.  The body between two fins is a sector
+# of nq columns bounded by the outer edges of the two fillets.
 body = Solid('body')
 nq = a.nTheta // 4
 root = section(a.finRootChord)
 nc = len(root) // 2
-zRoot = [q[1] for q in root[:nc + 1]]
+xFoot = [xRootLE + q[0] + rf * q[2] for q in root[:nc + 1]]
+zFoot = [q[1] + rf * q[3] for q in root[:nc + 1]]
+fF = rf / a.finSpan
+secF = section(a.finRootChord + fF * (a.finTipChord - a.finRootChord))
 fins = []
 for k in range(4):
     phi = roll + k * 0.5 * math.pi
     er, et = (math.cos(phi), math.sin(phi)), (-math.sin(phi), math.cos(phi))
+
+    def at(x, r, z):
+        return body.pt(x, r * er[0] + z * et[0], r * er[1] + z * et[1])
+
+    # the fillet, from the body (q = pi/2) up to the fin (q = 0), in (x, r, z)
+    # about this fin: P = K + (F - K)(1 - sin q) + (B - K)(1 - cos q), K on the
+    # root contour, F on the fin at height rf, B on the body
     stations = []
+    if rf > 0:
+        arcs = []
+        for (x, z, nx, nz), (xf, zf, _, _) in zip(root, secF):
+            K = (xRootLE + x, math.sqrt(rBody(xRootLE + x) ** 2 - z * z), z)
+            F = (xRootLE + fF * a.finSweep + xf, R + rf, zf)
+            xb, zb = xRootLE + x + rf * nx, z + rf * nz
+            B = (xb, math.sqrt(rBody(xb) ** 2 - zb * zb), zb)
+            arcs.append((K, F, B))
+        for n in range(a.nFillet, -1, -1):
+            q = 0.5 * math.pi * n / a.nFillet
+            stations.append([at(*(K[d] + (F[d] - K[d]) * (1 - math.sin(q)) + (B[d] - K[d]) * (1 - math.cos(q))
+                                  for d in range(3))) for K, F, B in arcs])
     rho = a.finEdgeRadius
-    for i in range(a.nSpan + a.nRound):
+    for i in range(1 if rf > 0 else 0, a.nSpan + a.nRound):
         if i <= a.nSpan:
             f = i / a.nSpan * (a.finSpan - rho) / a.finSpan
             r, off = R + f * a.finSpan, 0.0
@@ -210,8 +273,7 @@ for k in range(4):
         pts = []
         for x, z, nx, nz in sec:
             x, z = x - off * nx, z - off * nz
-            rr = math.sqrt(R * R - z * z) if i == 0 else r
-            pts.append(body.pt(xLE + x, rr * er[0] + z * et[0], rr * er[1] + z * et[1]))
+            pts.append(at(xLE + x, math.sqrt(R * R - z * z) if i == 0 else r, z))
         stations.append(pts)
     fins.append(stations)
     m = len(stations[0])
@@ -236,30 +298,34 @@ def lower(k, i):
 
 columns = []
 for i in range(nc + 1):
-    x = xRootLE + root[i][0]
-    w = math.asin(zRoot[i] / R)
+    x, r = xFoot[i], rBody(xFoot[i])
+    w = math.asin(zFoot[i] / r)
     col = []
     for k in range(4):
         phi0 = roll + k * 0.5 * math.pi + w
         dphi = (0.5 * math.pi - 2 * w) / nq
-        col.append([upper(k, i)] + [body.pt(x, R * math.cos(phi0 + j * dphi), R * math.sin(phi0 + j * dphi))
+        col.append([upper(k, i)] + [body.pt(x, r * math.cos(phi0 + j * dphi), r * math.sin(phi0 + j * dphi))
                                     for j in range(1, nq)] + [lower((k + 1) % 4, i)])
     columns.append(col)
 ringLE = [v for col in columns[0] for v in col[:-1]]
 ringTE = [v for col in columns[-1] for v in col[:-1]]
 r0 = ring(body, xBody, R, 0.0)
-r1 = ringTE if abs(xRootTE - xTail) < 1e-9 else ring(body, xTail, R, 0.0)
 strip(body, r0, ringLE, 'body')
-for c0, c1 in zip(columns, columns[1:]):
+for i in range(nc):
+    name = 'boattail' if xFoot[i] >= xTail - 1e-9 else 'body'
     for k in range(4):
         for j in range(nq):
-            body.quad(c0[k][j], c1[k][j], c1[k][j + 1], c0[k][j + 1], 'body')
-if r1 is not ringTE:
-    strip(body, ringTE, r1, 'body')
+            body.quad(columns[i][k][j], columns[i + 1][k][j], columns[i + 1][k][j + 1], columns[i][k][j + 1], name)
+last = ringTE
+for x, r in aftProfile:
+    if x > xFoot[-1] + 1e-9:
+        rg = ring(body, x, r, 0.0)
+        strip(body, last, rg, 'boattail' if x > xTail else 'body')
+        last = rg
 cap(body, r0, False, 'body')
-cap(body, r1, True, 'body')
+cap(body, last, True, 'boattail')
 
-solids = [nose, body, tail]
+solids = [nose, body]
 
 for s in solids:
     s.check()

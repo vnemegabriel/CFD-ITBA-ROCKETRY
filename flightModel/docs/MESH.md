@@ -149,8 +149,8 @@ cut from the full one (§5.1).
 |---|---|---|
 | Nose | Von Kármán, 0.8 m long | `nosecone` |
 | Body | Cylinder, d = 0.151 m | `body` |
-| Fins | 4 fins, biconvex section of constant thickness 11.7 mm, edges rounded with 1 mm | `fins` |
-| Boattail | Cone to d = 0.110 m, and the base | `boattail` |
+| Fins | 4 fins, biconvex section of constant thickness 11.7 mm, edges rounded with 1 mm, a 3 mm fillet all round the root | `fins` |
+| Boattail | Cone to d = 0.110 m, and the base; shoulder and base edge rounded with 3 mm | `boattail` |
 
 The script writes a file only if the surface is closed and all the normals
 point out. These properties of the surface come from measurements with
@@ -158,9 +158,11 @@ point out. These properties of the surface come from measurements with
 
 | Property | Reason, measured with the same `meshDict` |
 |---|---|
-| Nose, body + fins and boattail are three closed shells that touch on coplanar caps. The rings of adjacent shells are turned by half a facet. | One continuous hull gave 12 to 87 negative cell volumes at the body-boattail shoulder. |
+| Nose and body + fins + boattail are two closed shells that touch on coplanar caps. The rings of the two shells are turned by half a facet. | With a sharp shoulder, one continuous hull gave 12 to 87 negative cell volumes at the body-boattail shoulder, so the boattail was a third shell. With the shoulder rounded (`--shoulderRadius`, 3 mm) the continuous hull gave 0 on `h1`. The boattail must be in the body shell, because the root fillet of the trailing edge runs 3 mm onto the cone. |
 | Body and fins are one shell: the fin root is cut into the cylinder. | With the fins as separate shells sunk into the body, the fin-body junction was not an edge of the surface. The layers of the two surfaces met at one node in the corner. |
 | The leading edge, the trailing edge and the tip of the fins have a radius (`--finEdgeRadius`, 1 mm). | With sharp edges, the layers of the two fin faces met at the edge: maximum skewness 25 to 33, non-orthogonality up to 176°. With the radius: skewness 3.7, non-orthogonality 77° to 82°. |
+| A fillet of 3 mm all round each fin root (`--finRootRadius`), from the fin surface at a height of 3 mm to the body 3 mm off the root. | Without it the fin face and the body met at about 90°, and the 3 fin layers and the 10 body layers closed to one node along the root. With it, on `h1`: non-orthogonality 81.9° → 67.7° (0 faces above 70°, 156 before), skewness 3.58 → 1.89, faces with interpolation weight below 0.05 478 → 250, smallest cell 2.6 → 6.9 × 10⁻¹³ m³, 1 577 819 → 1 583 757 cells. Refinement spheres at the root corners did not help: the corner was already at the level of `finEdges`. |
+| The base edge is rounded with 3 mm (`--baseEdgeRadius`). | |
 | The root trailing edge is on the shoulder (`--finFromBase` = `--tailLength`). | |
 | 44 facets around the axis (`--nTheta`). | With 96 facets the continuous hull had more negative volumes. |
 

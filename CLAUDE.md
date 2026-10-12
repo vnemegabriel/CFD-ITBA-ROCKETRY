@@ -67,6 +67,9 @@ acoplarse a nada más.
   y bordes con radio de 1 mm, y no se volvió a medir.
 - **Los cantos de las aletas llevan radio.** Con filo, las capas de las dos
   caras chocan en el borde (skewness 25–33). Está en `docs/MESH.md` §3.3.
+- **La raíz de las aletas lleva un filete de 3 mm** (`makeRocket.py
+  --finRootRadius`). Sin él las capas de la aleta y del cuerpo se cierran en
+  la esquina. Está en `docs/MESH.md` §3.3.
 - Antes de cortar o cambiar algo, grepeá `docs/` además del código.
 - Una tarea por sesión. Un commit por tarea.
 
