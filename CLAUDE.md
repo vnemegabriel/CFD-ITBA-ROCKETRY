@@ -26,10 +26,11 @@ resolver bien la malla, en orden:
 Todo el barrido es a α = 0. No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas (h1, h2, h3) para todo el barrido.** Media malla,
-con plano de simetría en z = 0 y aletas a 45°, e y1 = 0.7 mm fijado con
-`Allmesh --y1`: da y+ > 30 a M 0.3 y sube con la velocidad (~330 a M 1.8),
-así que se trabaja con wall functions. No armes mallas por Mach. El y+ real
-medilo en cada corrida.
+con plano de simetría en z = 0 y aletas a 45°: `Allmesh` malla el cohete
+completo y lo corta en z = 0 con `subsetMesh`, con los mismos niveles y las
+mismas capas (y1 = 0.241 mm). Da y+ ~13 a M 0.3 y ~115 a M 1.8;
+`nutUSpaldingWallFunction` cubre el buffer. No armes mallas por Mach. El y+
+real medilo en cada corrida.
 
 ---
 
@@ -42,12 +43,14 @@ flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
 flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
+flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV)
 ```
 
-El único Python es `mesh/makeRocket.py`, que escribe el STL; sólo usa la
-biblioteca estándar. La malla se define en `mesh/system/meshDict` y todo
-ahí es un **nivel**: un entero que parte una celda al medio, local a un patch o
-a una caja, sin acoplarse a nada más.
+El Python es `mesh/makeRocket.py`, que escribe el STL, y `mesh/snapPlane.py`,
+que aplana el corte de la media malla; sólo usan la biblioteca estándar. La
+malla se define en `mesh/system/meshDict` y todo ahí es un **nivel**: un
+entero que parte una celda al medio, local a un patch o a una caja, sin
+acoplarse a nada más.
 
 ---
 

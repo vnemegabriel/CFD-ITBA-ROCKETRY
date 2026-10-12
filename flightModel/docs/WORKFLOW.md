@@ -60,13 +60,13 @@ mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
 | Argument | Default | Function |
 |---|---|---|
 | `<mesh-dir>` | none, mandatory | Directory for the new mesh. It must not exist. |
-| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117_half.stl`, or `Aconcagua_biconvex117.stl` with `--full` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
+| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117_roll45.stl`, or `Aconcagua_biconvex117.stl` with `--full` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
 | `--maxCellSize <m>` | value in `meshDict` (1.6 m) | Sets `maxCellSize` in the copy of `meshDict`. |
 | `--finLevel <n>` | value in `meshDict` (9) | Sets the level of the `fins` patch, `noseTip`, `noseApex` and `finEdges` to n. |
 | `--nLayers <n>` | value in `meshDict` (10) | Sets `nLayers` of `cone`, `walls` and `tail`. |
 | `--thicknessRatio <r>` | value in `meshDict` (1.2) | Sets `thicknessRatio` of `cone`, `walls` and `tail`. |
 | `--y1 <m>` | none | First layer thickness on the body. Sets `nLayers` and `thicknessRatio`; do not give them too. MESH.md §4.4. |
-| `--full` | half mesh | Mesh of the whole rocket, fins at 0, 90, 180 and 270°. Without it the mesh is the half z ≥ 0, with the patch `symm` on z = 0 and the fins at 45° (MESH.md §5.1). |
+| `--full` | half mesh | Mesh of the whole rocket, fins at 0, 90, 180 and 270°. Without it the mesh is the half z ≥ 0, cut from the full mesh with the fins at 45°, with the patch `symm` on z = 0 (MESH.md §5.1). |
 
 ### 3.2 Procedure
 
@@ -113,6 +113,7 @@ again, remove the directory or use a new name.
 | `--np <N>` | Number of subdomains in `system/decomposeParDict`. |
 | `--socket <S>` | Pins the parallel run to socket `S`, one process per physical core. Refer to MEASUREMENTS.md §2. |
 | `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
+| `--init <run-dir>` | Starts from the latest time of another run instead of the uniform free stream. Refer to §5.6. |
 
 The flow options change entries in `system/flowConditions`. The options that
 you do not give keep the template values.
@@ -133,6 +134,8 @@ you do not give keep the template values.
    entry does not exist in the file.
 8. It writes `--np` into `system/decomposeParDict`.
 9. It runs `./Allrefine` if you give `--refine`.
+10. With `--init`, it writes the path of that run into `initFrom` and into
+    `run.info`.
 
 > **NOTE** In `newCase.sh`, `--mesh` is a path. Only `runCase.sh` accepts a
 > mesh name without a path.
@@ -154,6 +157,8 @@ cd <run-dir>
 2. It compares `alpha` and `beta` in `system/flowConditions` with `sector`
    in `constant/meshInfo`. It stops if the mesh cannot show the flow angle.
 3. It copies `0.orig/` to `0/` (`restore0Dir`).
+   If `initFrom` exists, it maps the latest time of that run onto `0/`.
+   Refer to §5.6.
 4. In parallel: it runs `decomposePar -force`, then `rhoCentralFoam`, then
    `reconstructPar -latestTime`. In serial: it runs `rhoCentralFoam`.
 5. It shows the last line of the force coefficients.
@@ -194,6 +199,25 @@ sure that it is the last time and not 0.
 `./Allclean` also removes `constant/polyMesh`. After `./Allclean`, make a new
 case with `newCase.sh`.
 
+### 5.6 Start from another run
+
+`newCase.sh --init <run-dir>` starts the case from the solution of another
+run, for example the previous Mach number of a sweep, instead of the
+uniform free stream. `Allrun` then does, after `restore0Dir`:
+
+1. It reads the value of each `fixedValue` patch in `0/`. These are the
+   values of this run: in a supersonic case, `p` on `inlet`.
+2. `mapFields <run-dir> -consistent -sourceTime latestTime`. It maps the
+   internal field and the patch values. The other run can have another
+   mesh of the same domain and patches.
+3. `changeDictionary -dict system/changeDictionaryDict.init` writes back the
+   values of step 1.
+
+The free-stream entries of the patches (`freestreamValue`, `inletValue`,
+`fieldInf`) are not mapped, so they keep the values of this run. The other
+run must have a time directory with the solution: in parallel, `Allrun` runs
+`reconstructPar -latestTime`.
+
 ## 6. Meshes and sweeps
 
 Meshes and cases are two steps. `runMesh.sh` builds the meshes;
@@ -205,8 +229,8 @@ Meshes and cases are two steps. `runMesh.sh` builds the meshes;
 `mesh/Allmesh`.
 
 ```
-h1  --maxCellSize 1.6    --y1 0.0007
-h2  --maxCellSize 1.1314 --y1 0.0007
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 ```
 
 ```bash
@@ -236,6 +260,9 @@ m18-h2  --mesh h2 --Minf 1.8 --pInf 80127 --Tinf 275.56
 - Lines that start with `#`, and empty lines, have no effect.
 - `--mesh` is mandatory on each line. A name without `/` is a directory in
   `<meshes-dir>`.
+- `--init` is optional. A name without `/` is a directory in `<runs-dir>`.
+  The run must come earlier in the file, because the cases run in order:
+  `m12-h1 --mesh h1 --Minf 1.2 ... --init m18-h1`.
 
 ```bash
 ./runCase.sh [sweep-file] [runs-dir] [meshes-dir]   # default: sweep.txt, ~/runs, ~/meshes
@@ -309,6 +336,29 @@ with its start time.
 
 `purgeWrite 1` keeps only the last time directory. MEASUREMENTS.md lists all the outputs, `run.info` and the notification.
 
+### 8.1 Monitor a run
+
+```bash
+./post/monitor.sh <run-dir> [seconds]     # default 30 s
+```
+
+It plots `Cd` and `Cl` against time and the initial residuals in log
+scale, and draws them again every `[seconds]`. It joins the directories of
+a continued run. Without a display, for example over ssh, it writes
+`<run-dir>/monitor.png`. It needs gnuplot (`sudo apt install gnuplot`).
+
+### 8.2 Table of a sweep
+
+```bash
+./post/sweepTable.sh [runs-dir] > sweep.csv    # default ~/runs
+```
+
+One line for each run: `case`, `mesh`, `nCells`, `Minf`, `pInf`, `Tinf`,
+`alpha`, the last record of `run.info` (`status`, `steps`, `tEnd`,
+`wallSeconds`), `Cd`, `Cl` and `CmPitch` of the last line of
+`forceCoeffs1`, and the smallest and largest y+ on the wall patches at the
+last time. A run that has not started has empty fields.
+
 ## 9. Typical studies
 
 ### 9.1 Mach sweep
@@ -329,9 +379,9 @@ with its start time.
 
 ```
 # meshes.txt
-h1  --maxCellSize 1.6    --y1 0.0007
-h2  --maxCellSize 1.1314 --y1 0.0007
-h3  --maxCellSize 0.8    --y1 0.0007
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep.txt
 m03-h1  --mesh h1 --Minf 0.3
@@ -339,9 +389,9 @@ m03-h2  --mesh h2 --Minf 0.3
 m03-h3  --mesh h3 --Minf 0.3
 ```
 
-`--y1` keeps the first layer thickness the same on the three meshes, so that
-y+ does not change between them. MESH.md §4.4 gives the calculation and the
-y+ that t₁ = 0.7 mm gives at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
+`nLayers` and `thicknessRatio` keep the first layer thickness at 0.241 mm on
+the three meshes, so that y+ does not change between them. MESH.md §4.4 gives
+the calculation and the y+ at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
 gives the analysis.
 
 ### 9.3 Angle-of-attack sweep

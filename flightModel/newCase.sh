@@ -5,20 +5,21 @@
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --np 16
 #     ./newCase.sh ~/runs/a05 --mesh ~/meshes/base --Minf 0.8 --alpha 5 --refine tip
 #     ./newCase.sh ~/runs/m06 --mesh ~/meshes/base --Minf 0.6 --np 8 --socket 1
+#     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --init ~/runs/m18
 #
 # Copies case-central plus a mesh built by mesh/Allmesh.  See docs/WORKFLOW.md.
 # Keep run directories out of OneDrive and out of /mnt/c.
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
-usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 RUN=$1; shift
 OPTIONS="$*"
 
 [ -n "$WM_PROJECT_DIR" ] || { echo "source the OpenFOAM bashrc first"; exit 1; }
 declare -A SET
-NP=""; SOCKET=""; REFINE=""; MESH=""; TEMPLATE=case-central
+NP=""; SOCKET=""; REFINE=""; MESH=""; INIT=""; TEMPLATE=case-central
 while [ $# -gt 0 ]; do
     case "$1" in
         --alpha|--beta|--Ti|--nuRatio|--Minf|--pInf|--Tinf)
@@ -27,6 +28,7 @@ while [ $# -gt 0 ]; do
         --np)     NP=$2;     shift 2 ;;
         --socket) SOCKET=$2; shift 2 ;;
         --refine) REFINE=$2; shift 2 ;;
+        --init)   INIT=$2;   shift 2 ;;
         *) echo "unknown option $1"; usage ;;
     esac
 done
@@ -35,6 +37,10 @@ done
 [ -d "$MESH/constant/polyMesh" ] || { echo "no mesh in $MESH: run mesh/Allmesh $MESH first"; exit 1; }
 
 case "$REFINE" in ''|tip|fins) ;; *) echo "--refine takes tip or fins"; usage ;; esac
+if [ -n "$INIT" ]; then
+    [ -d "$INIT/system" ] || { echo "--init $INIT is not a run directory"; exit 1; }
+    INIT=$(cd "$INIT" && pwd)
+fi
 
 [ -e "$RUN" ] && { echo "!! $RUN exists -- pick a new directory"; exit 1; }
 mkdir -p "$RUN"
@@ -62,6 +68,7 @@ mesh        "$MESH";
 nCells      $(foamDictionary -entry nCells -value constant/meshInfo);
 options     "$OPTIONS";
 EOF
+[ -n "$INIT" ] && echo "$INIT" > initFrom && echo "init        \"$INIT\";" >> run.info
 
 TEMPLATES=$(find . -name '*.j2')
 if [ -n "$TEMPLATES" ]; then

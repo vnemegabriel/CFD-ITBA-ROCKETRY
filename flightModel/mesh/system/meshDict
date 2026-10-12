@@ -71,6 +71,14 @@ localRefinement
 // ------------------------------------------------------------------ boxes --
 // Volume refinement, which is the thing the structured mesher could not do
 // locally: its radial zone was a cylinder running the whole 59 m of domain.
+// The numbers are for the Aconcagua (lBody 2.955 m, rBody 0.0755 m); the
+// regions scale with the rocket, axially by sx and radially by sr.  Allmesh
+// writes lBody and rBody from meshInfo.
+lBody       2.955;
+rBody       0.0755;
+sx          #eval{ $lBody/2.955 };
+sr          #eval{ $rBody/0.0755 };
+
 objectRefinements
 {
     noseTip
@@ -80,90 +88,89 @@ objectRefinements
         type        sphere;
         additionalRefinementLevels 9;      // 3.13 mm
         centre      (0 0 0);
-        radius      0.040;
+        radius      #eval{ 0.040*$sr };
     }
 
     noseApex
     {
-        // the curve of the tip itself, at the fin level: two levels above
-        // left 4 um cells at the apex that set the time step
+        // the curve of the tip itself; two levels above the fins
         type        sphere;
-        additionalRefinementLevels 9;      // 3.13 mm
+        additionalRefinementLevels 11;     // 0.78 mm
         centre      (0 0 0);
-        radius      0.010;
+        radius      #eval{ 0.010*$sr };
     }
 
     nearField
     {
         type        box;
         additionalRefinementLevels 5;      // 50 mm
-        centre      (1.500 0 0);
-        lengthX     3.400;
-        lengthY     1.000;
-        lengthZ     1.000;
+        centre      (#eval{ 1.500*$sx } 0 0);
+        lengthX     #eval{ 3.400*$sx };
+        lengthY     #eval{ 1.000*$sr };
+        lengthZ     #eval{ 1.000*$sr };
     }
 
     baseWake
     {
         type        cone;
         additionalRefinementLevels 8;      // 6.25 mm, same as the tail wall
-        p0          (2.940 0 0);
-        p1          (3.300 0 0);
-        radius0     0.080;
-        radius1     0.080;
+        p0          (#eval{ 2.940*$sx } 0 0);
+        p1          (#eval{ 3.300*$sx } 0 0);
+        radius0     #eval{ 0.080*$sr };
+        radius1     #eval{ 0.080*$sr };
     }
 
     nearWake
     {
         type        cone;
         additionalRefinementLevels 7;      // 12.5 mm
-        p0          (2.900 0 0);
-        p1          (3.800 0 0);
-        radius0     0.140;
-        radius1     0.140;
+        p0          (#eval{ 2.900*$sx } 0 0);
+        p1          (#eval{ 3.800*$sx } 0 0);
+        radius0     #eval{ 0.140*$sr };
+        radius1     #eval{ 0.140*$sr };
     }
 
     midWake
     {
         type        cone;
         additionalRefinementLevels 6;      // 25 mm
-        p0          (2.850 0 0);
-        p1          (5.000 0 0);
-        radius0     0.260;
-        radius1     0.260;
+        p0          (#eval{ 2.850*$sx } 0 0);
+        p1          (#eval{ 5.000*$sx } 0 0);
+        radius0     #eval{ 0.260*$sr };
+        radius1     #eval{ 0.260*$sr };
     }
 
     wake
     {
         type        box;
         additionalRefinementLevels 4;      // 100 mm
-        centre      (5.000 0 0);
-        lengthX     8.000;
-        lengthY     1.600;
-        lengthZ     1.600;
+        centre      (#eval{ 5.000*$sx } 0 0);
+        lengthX     #eval{ 8.000*$sx };
+        lengthY     #eval{ 1.600*$sr };
+        lengthZ     #eval{ 1.600*$sr };
     }
 
     farWake
     {
         type        box;
         additionalRefinementLevels 2;      // 400 mm
-        centre      (14.00 0 0);
-        lengthX     26.00;
-        lengthY     4.000;
-        lengthZ     4.000;
+        centre      (#eval{ 14.00*$sx } 0 0);
+        lengthX     #eval{ 26.00*$sx };
+        lengthY     #eval{ 4.000*$sr };
+        lengthZ     #eval{ 4.000*$sr };
     }
 }
 
 // ------------------------------------------------------------------ edges --
 // Leading and trailing edges of the fins: the oblique shock starts at the LE,
 // the expansion at the TE.  finEdges.obj is written by makeRocket.py next to
-// the STL and copied by Allmesh; --finLevel n sets this to n.
+// the STL and copied by Allmesh; --finLevel n sets this to n + 1.
 edgeMeshRefinement
 {
     finEdges
     {
         edgeFile    "finEdges.obj";
-        additionalRefinementLevels 9;      // 3.13 mm, the fin level
+        additionalRefinementLevels 10;     // 1.56 mm
         refinementThickness 0.010;
     }
 }

@@ -5,7 +5,8 @@
 # Makes and runs every case in the sweep file, one after the other.  Each line
 # names its mesh with --mesh; a bare name lives in meshes-dir.  The meshes must
 # exist: build them first with runMesh.sh.  A case whose directory already
-# exists is skipped, so re-running resumes.
+# exists is skipped, so re-running resumes.  --init names the run whose
+# solution starts this one; a bare name lives in runs-dir.
 #
 # The script reads the sweep file while it runs: do not edit it in place until
 # it ends.
@@ -33,6 +34,9 @@ while read -r NAME REST; do
     while [ $# -gt 0 ]; do
         case "$1" in
             --mesh) MESH=$2; shift 2 ;;
+            --init) I=${2/#\~/$HOME}
+                    case "$I" in */*) ;; *) I=$RUNS/$I ;; esac
+                    OPTS+=(--init "$I"); shift 2 ;;
             *)      OPTS+=("$1"); shift ;;
         esac
     done

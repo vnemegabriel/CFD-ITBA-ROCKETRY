@@ -40,6 +40,31 @@ NP=$(getNumberOfProcessors)
 
 restore0Dir
 
+# ---- initial field from another run ------------------------------------------
+# mapFields brings the internal field and the patch values of that run's latest
+# time.  A fixedValue patch must keep this run's value, so changeDictionary
+# puts it back.
+if [ -f initFrom ]; then
+    SRC=$(cat initFrom)
+    TSRC=$(foamListTimes -case "$SRC" -latestTime 2>/dev/null)
+    [ -n "$TSRC" ] || { echo "!! $SRC has no solution to start from"; exit 1; }
+    {
+        echo 'FoamFile { version 2.0; format ascii; class dictionary; object changeDictionaryDict; }'
+        for f in 0/*; do
+            for P in $(foamDictionary -entry entry0 -keywords constant/polyMesh/boundary); do
+                [ "$(foamDictionary -entry "boundaryField/$P/type" -value "$f" 2>/dev/null)" = fixedValue ] || continue
+                echo "${f#0/} { boundaryField { $P { value $(foamDictionary -entry "boundaryField/$P/value" -value "$f"); } } }"
+            done
+        done
+    } > system/changeDictionaryDict.init
+    runApplication -overwrite mapFields "$SRC" -consistent -sourceTime latestTime
+    runApplication -overwrite changeDictionary -dict system/changeDictionaryDict.init -time 0
+    if grep -q "FOAM FATAL" log.mapFields log.changeDictionary; then
+        echo "!! starting from $SRC failed: see log.mapFields, log.changeDictionary"; exit 1
+    fi
+    echo "initial field: $SRC, time $TSRC"
+fi
+
 APP=$(getApplication)
 
 BINDING=none

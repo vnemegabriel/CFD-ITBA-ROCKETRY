@@ -8,8 +8,9 @@
 #     ./Allmesh ~/meshes/h1 --y1 0.0007
 #     ./Allmesh ~/meshes/h1full --full
 #
-# The default is the half mesh, z >= 0, with a symmetry plane on z = 0;
-# --full meshes the whole rocket.
+# The default is the half mesh, z >= 0, with a symmetry plane on z = 0: the
+# full rocket with the fins at 45 deg, meshed whole and cut at z = 0.
+# --full meshes the whole rocket with the fins at 0 deg.
 # Builds the mesh in <mesh-dir> with a copy of system/ and meshInfo, so every
 # mesh keeps the meshDict that made it.  The options are set on that copy.
 # Never overwrites an existing directory.
@@ -41,7 +42,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$DIR" ] || usage
 if [ $HALF = 1 ]; then
-    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117_half.stl}
+    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117_roll45.stl}
 else
     SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117.stl}
 fi
@@ -58,12 +59,17 @@ setEntry() {
     foamDictionary -entry "$1" -set "$2" system/meshDict > /dev/null 2>&1 ||
         { echo "!! cannot set $1 in meshDict"; exit 1; }
 }
+# Before any foamDictionary -set: it evaluates the #eval of the regions and
+# writes the numbers, so lBody and rBody must already be those of meshInfo.
+for v in lBody rBody; do
+    sed -i "s/^$v .*;/$v $(foamDictionary -entry $v -value meshInfo);/" system/meshDict
+done
 [ -z "$H" ] || setEntry maxCellSize "$H"
 if [ -n "$FIN" ]; then
     setEntry localRefinement/fins/additionalRefinementLevels "$FIN"
     setEntry objectRefinements/noseTip/additionalRefinementLevels "$FIN"
-    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels "$FIN"
-    setEntry objectRefinements/noseApex/additionalRefinementLevels "$FIN"
+    setEntry edgeMeshRefinement/finEdges/additionalRefinementLevels $((FIN + 1))
+    setEntry objectRefinements/noseApex/additionalRefinementLevels $((FIN + 2))
 fi
 if [ -n "$Y1" ]; then
     [ -z "$NL$TR" ] || { echo "!! --y1 sets nLayers and thicknessRatio: give one or the other"; exit 1; }
@@ -94,11 +100,12 @@ sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
     -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
     "$SRC" > surface.stl
 
-# Metres out from the model bounding box, not multiples of it.  The half
-# keeps the walls of the full box (|y|, z <= 11.775 m) and puts zMin on z = 0.
+# Metres out from the model bounding box, not multiples of it.  Both put the
+# side walls on |y|, |z| = 11.775 m; the half needs the box symmetric in z, so
+# that the octree has faces on z = 0 to cut along.
 if [ $HALF = 1 ]; then
     runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
-        17.73 38.415 11.6085 11.6085 0 11.6048
+        17.73 38.415 11.604756 11.604756 11.604756 11.604756
 else
     runApplication surfaceGenerateBoundingBox surface.stl geometry.stl \
         17.73 38.415 11.5395 11.5395 11.5395 11.5395
@@ -111,15 +118,21 @@ check surfaceFeatureEdges
 runApplication cartesianMesh
 check cartesianMesh
 
+runApplication createPatch -overwrite
+check createPatch
+
 if [ $HALF = 1 ]; then
-    runApplication createPatch -overwrite -dict system/createPatchDictHalf
+    runApplication topoSet -dict system/topoSetDictHalf
+    check topoSet
+    runApplication subsetMesh upper -overwrite
+    check subsetMesh
+    python3 "$HERE/snapPlane.py" . oldInternalFaces > log.snapPlane
+    runApplication -s half createPatch -overwrite -dict system/createPatchDictHalf
+    check createPatch.half
     foamDictionary -entry sector -set half meshInfo > /dev/null
     foamDictionary -entry symmetryFraction -set 0.5 meshInfo > /dev/null
     foamDictionary -entry Aref -set 0.00895405 meshInfo > /dev/null
-else
-    runApplication createPatch -overwrite
 fi
-check createPatch
 
 for P in $(foamDictionary -entry wallPatches -value meshInfo | tr -d '()'); do
     T=$(foamDictionary -entry "entry0/$P/type" -value constant/polyMesh/boundary 2>/dev/null) || T=missing
