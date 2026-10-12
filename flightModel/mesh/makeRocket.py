@@ -21,8 +21,9 @@ All lengths in metres.
 Nothing is written unless the parameters are consistent and every shell is
 closed and outward-facing.
 
-Next to out.stl goes out_finEdges.obj: the leading and trailing edges of the
-fins as lines, for edgeMeshRefinement in meshDict.
+Next to out.stl go out_finEdges.obj, the leading and trailing edges of the
+fins as lines, and out_finRoots.obj, the fin roots, for edgeMeshRefinement in
+meshDict.
 """
 import argparse, math, re, sys
 from collections import Counter
@@ -350,17 +351,25 @@ with open(a.out, 'w') as out:
             out.write('  endloop\n endfacet\n')
         out.write(f'endsolid {name}\n')
 
-edges = a.out[:-4] + '_finEdges.obj' if a.out.endswith('.stl') else a.out + '_finEdges.obj'
-with open(edges, 'w') as out:
-    n = 0
-    for k in range(4):
-        phi = roll + k * 0.5 * math.pi
-        c, s_ = math.cos(phi), math.sin(phi)
-        for x0, x1 in ((xRootLE, xRootLE + a.finSweep), (xRootTE, xRootLE + a.finSweep + a.finTipChord)):
-            out.write('v %.9g %.9g %.9g\nv %.9g %.9g %.9g\n' % (x0, R * c, R * s_, x1, rTip * c, rTip * s_))
-            out.write(f'l {n + 1} {n + 2}\n')
-            n += 2
+def writeLines(suffix, segments):
+    """segments: ((x0, r0), (x1, r1)) in the plane of each fin."""
+    path = (a.out[:-4] if a.out.endswith('.stl') else a.out) + suffix
+    with open(path, 'w') as out:
+        n = 0
+        for k in range(4):
+            phi = roll + k * 0.5 * math.pi
+            c, s_ = math.cos(phi), math.sin(phi)
+            for (x0, r0), (x1, r1) in segments:
+                out.write('v %.9g %.9g %.9g\nv %.9g %.9g %.9g\n' % (x0, r0 * c, r0 * s_, x1, r1 * c, r1 * s_))
+                out.write(f'l {n + 1} {n + 2}\n')
+                n += 2
+    return path
 
-print(f'{a.out} + {edges}: ' + ', '.join(f'{n} {len(t)} tris' for n, t in groups.items()))
+
+edges = writeLines('_finEdges.obj', (((xRootLE, R), (xRootLE + a.finSweep, rTip)),
+                                     ((xRootTE, R), (xRootLE + a.finSweep + a.finTipChord, rTip))))
+roots = writeLines('_finRoots.obj', (((xRootLE, R), (xRootTE, R)),))
+
+print(f'{a.out} + {edges} + {roots}: ' + ', '.join(f'{n} {len(t)} tris' for n, t in groups.items()))
 print(f'length {xBase:.5f}  fins x {xRootLE:.5f}..{xRootLE + a.finSweep + a.finTipChord:.5f}  '
       f'r {R:.5f}..{rTip:.5f}  t {t * 1e3:.2f} mm  edge radius {a.finEdgeRadius * 1e3:.2f} mm')

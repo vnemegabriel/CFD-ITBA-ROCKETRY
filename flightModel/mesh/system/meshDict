@@ -83,8 +83,7 @@ objectRefinements
 {
     noseTip
     {
-        // stagnation point and the bow shock standoff; Allmesh --finLevel
-        // sets this level too, so it always matches the fins
+        // stagnation point and the bow shock standoff, at the fin level
         type        sphere;
         additionalRefinementLevels 9;      // 3.13 mm
         centre      (0 0 0);
@@ -98,6 +97,32 @@ objectRefinements
         additionalRefinementLevels 11;     // 0.78 mm
         centre      (0 0 0);
         radius      #eval{ 0.010*$sr };
+    }
+
+    shoulder
+    {
+        // the expansion where the boattail starts
+        type        hollowCone;
+        additionalRefinementLevels 9;      // 3.13 mm
+        p0          (#eval{ 2.810*$sx } 0 0);
+        p1          (#eval{ 2.850*$sx } 0 0);
+        radius0_Inner #eval{ 0.065*$sr };
+        radius0_Outer #eval{ 0.090*$sr };
+        radius1_Inner #eval{ 0.065*$sr };
+        radius1_Outer #eval{ 0.090*$sr };
+    }
+
+    baseEdge
+    {
+        // the base shear layer leaves from this edge
+        type        hollowCone;
+        additionalRefinementLevels 10;     // 1.56 mm
+        p0          (#eval{ 2.940*$sx } 0 0);
+        p1          (#eval{ 2.970*$sx } 0 0);
+        radius0_Inner #eval{ 0.045*$sr };
+        radius0_Outer #eval{ 0.065*$sr };
+        radius1_Inner #eval{ 0.045*$sr };
+        radius1_Outer #eval{ 0.065*$sr };
     }
 
     nearField
@@ -164,7 +189,7 @@ objectRefinements
 // ------------------------------------------------------------------ edges --
 // Leading and trailing edges of the fins: the oblique shock starts at the LE,
 // the expansion at the TE.  finEdges.obj is written by makeRocket.py next to
-// the STL and copied by Allmesh; --finLevel n sets this to n + 1.
+// the STL and copied by Allmesh.
 edgeMeshRefinement
 {
     finEdges
@@ -172,6 +197,15 @@ edgeMeshRefinement
         edgeFile    "finEdges.obj";
         additionalRefinementLevels 10;     // 1.56 mm
         refinementThickness 0.010;
+    }
+
+    finRoots
+    {
+        // the root of each fin, LE to TE on the body.  It refines the body
+        // wall too, so the body layers here are about 7 times thinner
+        edgeFile    "finRoots.obj";
+        additionalRefinementLevels 11;     // 0.78 mm
+        refinementThickness 0.008;
     }
 }
 

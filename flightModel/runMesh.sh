@@ -20,12 +20,11 @@ while read -r NAME REST; do
     case "$NAME" in ''|'#'*) continue ;; esac
     MESH=$MESHES/$NAME
 
-    H=""; FIN=""; NL=""; TR=""
+    H=""; NL=""; TR=""
     set -- $REST
     while [ $# -gt 0 ]; do
         case "$1" in
             --maxCellSize)    H=$2;   shift 2 ;;
-            --finLevel)       FIN=$2; shift 2 ;;
             --nLayers)        NL=$2;  shift 2 ;;
             --thicknessRatio) TR=$2;  shift 2 ;;
             *)                shift ;;
@@ -34,7 +33,6 @@ while read -r NAME REST; do
 
     if [ -d "$MESH/constant/polyMesh" ]; then
         if { [ -n "$H" ] && [ "$(meshValue "$MESH" maxCellSize)" != "$H" ]; } ||
-           { [ -n "$FIN" ] && [ "$(meshValue "$MESH" localRefinement/fins/additionalRefinementLevels)" != "$FIN" ]; } ||
            { [ -n "$NL" ] && [ "$(meshValue "$MESH" boundaryLayers/patchBoundaryLayers/walls/nLayers)" != "$NL" ]; } ||
            { [ -n "$TR" ] && [ "$(meshValue "$MESH" boundaryLayers/patchBoundaryLayers/walls/thicknessRatio)" != "$TR" ]; }; then
             echo "!! $MESH was built with other options than the line asks, stopping"

@@ -53,19 +53,17 @@ do not do this step.
 ### 3.1 Command
 
 ```bash
-mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--finLevel <n>]
-             [--nLayers <n>] [--thicknessRatio <r>] [--y1 <m>] [--full]
+mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>]
+             [--nLayers <n>] [--thicknessRatio <r>] [--full]
 ```
 
 | Argument | Default | Function |
 |---|---|---|
 | `<mesh-dir>` | none, mandatory | Directory for the new mesh. It must not exist. |
-| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117_roll45.stl`, or `Aconcagua_biconvex117.stl` with `--full` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` must exist next to it. |
+| `[stl-file]` | `mesh/stl/Aconcagua_biconvex117_roll45.stl`, or `Aconcagua_biconvex117.stl` with `--full` | Geometry. MESH.md §3 gives the requirements. `<stl-file>` without `.stl` plus `_finEdges.obj` and `_finRoots.obj` must exist next to it. |
 | `--maxCellSize <m>` | value in `meshDict` (1.6 m) | Sets `maxCellSize` in the copy of `meshDict`. |
-| `--finLevel <n>` | value in `meshDict` (9) | Sets the level of the `fins` patch, `noseTip`, `noseApex` and `finEdges` to n. |
 | `--nLayers <n>` | value in `meshDict` (10) | Sets `nLayers` of `cone`, `walls` and `tail`. |
 | `--thicknessRatio <r>` | value in `meshDict` (1.2) | Sets `thicknessRatio` of `cone`, `walls` and `tail`. |
-| `--y1 <m>` | none | First layer thickness on the body. Sets `nLayers` and `thicknessRatio`; do not give them too. MESH.md §4.4. |
 | `--full` | half mesh | Mesh of the whole rocket, fins at 0, 90, 180 and 270°. Without it the mesh is the half z ≥ 0, cut from the full mesh with the fins at 45°, with the patch `symm` on z = 0 (MESH.md §5.1). |
 
 ### 3.2 Procedure
@@ -407,7 +405,7 @@ done
 
 Use one of these two methods:
 
-- Make a new mesh with `--finLevel 10`.
+- Raise the levels of `fins`, `finEdges` and `finRoots` in `mesh/system/meshDict` and make a new mesh.
 - Run `./Allrefine tip` in the case, before `./Allrun`.
 
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers

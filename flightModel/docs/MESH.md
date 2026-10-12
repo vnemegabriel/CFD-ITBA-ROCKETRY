@@ -39,18 +39,18 @@ region changes.
 | Step | Application | Input | Output | Function |
 |---|---|---|---|---|
 | 1 | `cp` | `mesh/system/`, `mesh/meshInfo` | `<mesh-dir>/system/`, `<mesh-dir>/meshInfo` | Each mesh keeps a copy of its dictionaries. |
-| 2 | `foamDictionary` | `--maxCellSize`, `--finLevel`, `--nLayers`, `--thicknessRatio`, `--y1` | `system/meshDict` | Writes the options into the copy. `--y1` gives `nLayers` and `thicknessRatio` (§4.4). |
-| 2a | `cp` | `<stl>_finEdges.obj` | `finEdges.obj` | The fin edges for `edgeMeshRefinement`. Refer to §4.5. |
+| 2 | `sed`, `foamDictionary` | `meshInfo`, `--maxCellSize`, `--nLayers`, `--thicknessRatio` | `system/meshDict` | Writes `lBody` and `rBody` of `meshInfo` (§4.3), then the options, into the copy. |
+| 2a | `cp` | `<stl>_finEdges.obj`, `<stl>_finRoots.obj` | `finEdges.obj`, `finRoots.obj` | The fin edges and fin roots for `edgeMeshRefinement`. Refer to §4.5. |
 | 3 | `sed` | STL | `surface.stl` | Changes the solid names to the patch names. Refer to §3. |
 | 4 | `surfaceGenerateBoundingBox` | `surface.stl` | `geometry.stl` | Adds the six faces of the domain, symmetric about z = 0. Refer to §5. |
-| 5 | `surfaceFeatureEdges -angle 30` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
+| 5 | `surfaceFeatureEdges -angle 60` | `geometry.stl` | `geometry.fms` | Finds the feature edges. Refer to §2.1. |
 | 6 | `cartesianMesh` | `geometry.fms`, `system/meshDict` | `constant/polyMesh` | Makes the mesh. |
 | 7 | `createPatch -overwrite` | `createPatchDict` | `constant/polyMesh` | Merges the six domain faces into `inlet`, `outlet` and `box`. |
 | 7a | `topoSet`, `subsetMesh upper -overwrite` | `topoSetDictHalf` | `constant/polyMesh` | Half mesh only: keeps the cells with the centre at z ≥ 0. The cut faces go to `oldInternalFaces`. Refer to §5.1. |
 | 7b | `mesh/snapPlane.py . oldInternalFaces` | `constant/polyMesh/points` | `constant/polyMesh/points` | Half mesh only: sets z = 0 on the cut. |
 | 7c | `createPatch -overwrite` | `createPatchDictHalf` | `constant/polyMesh` | Half mesh only: `oldInternalFaces` becomes `symm`, of type `symmetry`. Sets `sector`, `symmetryFraction` and `Aref` in `meshInfo`. |
 | 8 | `checkMesh -allTopology -allGeometry` | mesh | `log.checkMesh` | Measures the mesh quality. |
-| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `y1`, `meshDir`. |
+| 9 | `foamDictionary` | `log.checkMesh`, `meshDict` | `meshInfo` | Writes `nCells`, `maxCellSize`, `finLevel`, `nLayers`, `thicknessRatio`, `meshDir`. |
 | 10 | `grep` | `log.checkMesh` | screen | Shows the summary. Stops if there are negative cell volumes. |
 
 ### 2.1 Function of the .fms file
@@ -60,24 +60,15 @@ edges. The `.fms` file contains the triangles, the patches and the feature
 edges.
 
 `surfaceFeatureEdges` marks an edge as a feature edge when the angle between
-the two adjacent triangles is more than 30°. `cartesianMesh` then moves the
+the two adjacent triangles is more than 60°. `cartesianMesh` then moves the
 mesh vertices onto these edges.
 
-If an edge is not a feature edge, the mesh cuts it at the cell size. The
-edge then becomes round or chamfered. These edges have an effect on the
-results:
-
-- The leading and trailing edges and the tips of the fins. They set the
-  position of the shocks and the flow separation on the fins.
-- The fin-body junction (90°).
-- The edge of the base. It sets the separation point and thus the base
-  pressure.
-
-> **NOTE** An edge with an angle of less than 30° is not a feature edge. The
-> boattail shoulder has the angle of the boattail, which is usually less
-> than 30°. A round leading edge made of small facets also has small angles.
-> To find the feature edges, run `surfaceFeatureEdges` with a smaller angle
-> and look at the result in ParaView.
+The rocket has no sharp edge left: the fin edges, the fin root, the shoulder
+and the base edge are rounded (§3.3), and each round is made of facets of
+less than 30°. With 30°, small triangles where the root fillet meets the
+body gave 172 false feature edges (56 at the foot of the leading-edge
+fillet, 64 at the fin tips), and `cartesianMesh` bent the cells along them.
+With 60° only the edges of the domain box (12) and the nose (88) remain.
 
 `cartesianMesh` also accepts an STL file in `surfaceFile`. In that case, the
 mesh has no feature edges.
@@ -193,7 +184,7 @@ distance, the cell size increases to `maxCellSize` one level at a time.
 | `cone` | 8 | 6.25 mm | 0.060 m | The bow shock is in this band. |
 | `walls` | 8 | 6.25 mm | 0.050 m | Body boundary layer. |
 | `tail` | 8 | 6.25 mm | 0.050 m | The expansion on the boattail sets the base pressure. |
-| `fins` | 9 | 3.13 mm | 0.020 m | Fin chord. `Allmesh --finLevel` changes this level. |
+| `fins` | 9 | 3.13 mm | 0.020 m | Fin chord. |
 
 ### 4.3 objectRefinements
 
@@ -202,14 +193,16 @@ Volume refinement in regions. A `box` has a centre and three lengths. A
 
 | Region | Type | Level | Cell size | Extent |
 |---|---|---|---|---|
+| `shoulder` | hollowCone | 9 | 3.13 mm | x from 2.81 to 2.85 m, r from 0.065 to 0.090 m: the body-boattail shoulder |
+| `baseEdge` | hollowCone | 10 | 1.56 mm | x from 2.94 to 2.97 m, r from 0.045 to 0.065 m: the base edge, where the base shear layer starts |
 | `nearField` | box | 5 | 50 mm | x from −0.20 to 3.20 m, y and z ±0.50 m |
 | `baseWake` | cone | 8 | 6.25 mm | x from 2.94 to 3.30 m, radius 0.08 m |
 | `nearWake` | cone | 7 | 12.5 mm | x from 2.90 to 3.80 m, radius 0.14 m |
 | `midWake` | cone | 6 | 25 mm | x from 2.85 to 5.00 m, radius 0.26 m |
 | `wake` | box | 4 | 100 mm | x from 1.0 to 9.0 m, y and z ±0.80 m |
 | `farWake` | box | 2 | 400 mm | x from 1.0 to 27.0 m, y and z ±2.0 m |
-| `noseTip` | sphere | 9 (`--finLevel`) | 3.13 mm | Centre (0 0 0), radius 0.040 m |
-| `noseApex` | sphere | 11 (`--finLevel` + 2) | 0.78 mm | Centre (0 0 0), radius 0.010 m |
+| `noseTip` | sphere | 9 | 3.13 mm | Centre (0 0 0), radius 0.040 m |
+| `noseApex` | sphere | 11 | 0.78 mm | Centre (0 0 0), radius 0.010 m |
 
 `noseTip` has the level of the fins on each mesh. `noseApex` makes the curve
 of the tip. The layer thickness follows the surface cell size, so it also
@@ -259,10 +252,6 @@ dictionary does not set a y+ target.
 The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
 cell size, r the `thicknessRatio` and n the `nLayers`.
 
-`Allmesh --y1 <m>` sets t₁ directly: it takes the fewest layers that keep
-r ≤ 1.2 on the body cell (`maxCellSize` / 2^level of `walls`), then solves r
-for that number of layers. It writes `y1` into `meshInfo`.
-
 The meshes of the sweep use the layers of the full meshes, t₁ = 0.241 mm:
 
 | Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
@@ -288,10 +277,6 @@ At M 0.3 and 0.6 the first cell is in the buffer layer. `nut` is
 `nutUSpaldingWallFunction`, which follows Spalding's law through the buffer,
 so it holds there. These are estimates: measure y+ on each case.
 
-With t₁ = 0.7 mm (`--y1 0.0007`) y+ is above 30 on the whole sweep, and the
-smallest cell of the half `h1` went from 3.5 µm to 8.8 µm (with `noseApex`
-and `finEdges` at the fin level).
-
 Procedure to set y+:
 
 1. Make the mesh.
@@ -305,8 +290,15 @@ Procedure to set y+:
 | Entry | Value | Function |
 |---|---|---|
 | `finEdges/edgeFile` | `"finEdges.obj"` | Leading and trailing edges of the fins. `Allmesh` copies it from the STL directory. |
-| `finEdges/additionalRefinementLevels` | 10 (`--finLevel` + 1) | 1.56 mm with `maxCellSize 1.6`. |
+| `finEdges/additionalRefinementLevels` | 10 | 1.56 mm with `maxCellSize 1.6`. |
 | `finEdges/refinementThickness` | 0.010 m | Width of the refined band around each edge. |
+| `finRoots/edgeFile` | `"finRoots.obj"` | The root of each fin, LE to TE on the body. `makeRocket.py` writes it, so it follows `--finRoll`. |
+| `finRoots/additionalRefinementLevels` | 11 | 0.78 mm with `maxCellSize 1.6`. |
+| `finRoots/refinementThickness` | 0.008 m | Width of the band around each root. |
+
+On `h1`, with `finRoots` at level 10 and 0.012 m, `shoulder`, `baseEdge` and `finRoots` added 185 696 cells (1 583 757 → 1 769 453). With `finRoots` at level 11 and 0.008 m, and `surfaceFeatureEdges -angle 60`, `h1` has 2 198 939 cells: non-orthogonality 66.0°, skewness 1.72, 388 faces with interpolation weight below 0.05, 0 negative volumes.
+
+> **CAUTION** `finRoots` refines the body wall as well. The layer thickness follows the surface cell, so at level 11 the first body layer near the root is about 0.014 mm, against 0.10 mm on the rest of the body, and y+ there is about 7 times lower. 98 % of the edges below 20 µm of `h1` are in this band.
 
 The oblique shock starts at the leading edge and the expansion at the
 trailing edge.
