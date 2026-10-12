@@ -59,6 +59,11 @@ setEntry() {
     foamDictionary -entry "$1" -set "$2" system/meshDict > /dev/null 2>&1 ||
         { echo "!! cannot set $1 in meshDict"; exit 1; }
 }
+# Before any foamDictionary -set: it evaluates the #eval of the regions and
+# writes the numbers, so lBody and rBody must already be those of meshInfo.
+for v in lBody rBody; do
+    sed -i "s/^$v .*;/$v $(foamDictionary -entry $v -value meshInfo);/" system/meshDict
+done
 [ -z "$H" ] || setEntry maxCellSize "$H"
 if [ -n "$FIN" ]; then
     setEntry localRefinement/fins/additionalRefinementLevels "$FIN"

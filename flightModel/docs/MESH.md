@@ -116,8 +116,8 @@ grep -E '^ *solid ' mesh/stl/<file>.stl
 2. Make sure that the STL agrees with the requirements in §3.
 3. Change the distances in `surfaceGenerateBoundingBox` in `Allmesh`. Refer
    to §5.
-4. Change the positions of the regions in `objectRefinements` in
-   `meshDict`. Refer to §4.3.
+4. Write `lBody` and `rBody` of the new rocket in `mesh/meshInfo`. The
+   regions in `objectRefinements` scale with them. Refer to §4.3.
 5. Change `mesh/meshInfo`. Refer to §7.
 6. Run `mesh/Allmesh <mesh-dir> mesh/stl/<file>.stl`.
 
@@ -222,8 +222,17 @@ On the full `h1`, `noseApex` gave cells of 4 µm at the apex. With
 keeps the levels of the full one: it is the full mesh cut in two.
 
 The wake regions decrease the cell size one level at a time behind the base.
-The positions are for the Aconcagua (body length 2.955 m). For a different
-geometry, change them.
+The numbers are for the Aconcagua (length 2.955 m, body radius 0.0755 m).
+Each region is written as `#eval{ <value>*$sx }` along x and
+`#eval{ <value>*$sr }` across, with `sx = lBody/2.955` and
+`sr = rBody/0.0755`. `Allmesh` writes `lBody` and `rBody` from `meshInfo`
+into the copy of `meshDict`, so a rocket of another size gets the regions
+moved and scaled with it, and the Aconcagua gets the values of the table.
+
+> **CAUTION** `foamDictionary -set` evaluates the `#eval` entries and writes
+> the numbers. `Allmesh` writes `lBody` and `rBody` with `sed` before the
+> first `foamDictionary -set`, so the numbers are those of `meshInfo`. Do not
+> set `lBody` with `foamDictionary` in a copy that was already written.
 
 ### 4.4 boundaryLayers
 
@@ -397,8 +406,8 @@ File: `mesh/meshInfo`. `Allmesh` copies it into the mesh directory.
 | `nCells` | from `checkMesh` | `Allmesh`, `Allrefine` | no script | Number of cells. |
 | `Aref` | 0.0179081 m² | user, `Allmesh` (half) | `controlDictBase` | Reference area: π·rBody² for the full rocket, half of it for a half mesh. |
 | `lRef` | 0.151 m | user | `controlDictBase` | Reference length: body diameter. |
-| `rBody` | 0.0755 m | user | no script | Body radius. |
-| `lBody` | 2.955 m | user | no script | Body length. |
+| `rBody` | 0.0755 m | user | `Allmesh` → `meshDict` | Body radius. Scales the regions across the axis (§4.3). |
+| `lBody` | 2.955 m | user | `Allmesh` → `meshDict` | Rocket length. Scales the regions along the axis (§4.3). |
 | `finRootR` | 0.075 m | user | no script | Radius of the fin root. |
 | `finTipR` | 0.2355 m | user | `topoSetDict`, `Allrefine` | Radius of the fin tip. |
 | `finTipSmear` | 0.004 m | user | no script | Width of the tip chamfer. |
