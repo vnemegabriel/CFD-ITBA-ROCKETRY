@@ -20,7 +20,7 @@ Do the procedures in this sequence:
 | `CmRoll` at α = 0 | ≈ 0 | The fin meshes are not equal. |
 | y+ on each wall patch | Most values from 20 to 100 | Change `nLayers` or `thicknessRatio`. MESH.md §4.4. |
 | Minimum and maximum of T | Physically possible: near the stagnation temperature at most, not near 0 | The transient is not resolved. SOLVERS.md §8. |
-| Physical time of the run | Several flow-through times (2.955 m / `Uinf`) | The run stopped before the flow was steady. SOLVERS.md §5.5. |
+| Iterations of the run | More than `minIter` and the stop criterion met | The run stopped before the flow was steady. SOLVERS.md §5.4. |
 | `CN` from α = 2° to 6° | Linear in α | The run is not converged, or y+ on the fins is out of range. |
 
 ## 2. Subsonic flow: Barrowman

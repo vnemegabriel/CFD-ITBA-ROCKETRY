@@ -1,12 +1,13 @@
 # CFD-ITBA-ROCKETRY
 
-Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, un solo
-solver (`rhoCentralFoam`) para todo el barrido de Mach, en serie.
+Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, `rhoPimpleFoam`
+para M < 1 y `rhoCentralFoam` para M > 1, barrido de Mach en serie.
 
 ```
 flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshDict — la malla
 flightModel/common/       Allrun, Allrefine — los scripts que va a usar cada corrida
-flightModel/case-central/ la plantilla de caso
+flightModel/case-central/ plantilla rhoCentralFoam, M > 1
+flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 (sólo lo que difiere)
 flightModel/newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
 flightModel/runMesh.sh    construye las mallas de meshes.txt
 flightModel/runCase.sh    corre todo sweep.txt en serie, sobre mallas ya hechas

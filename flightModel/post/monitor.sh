@@ -1,7 +1,7 @@
 #!/bin/sh
 # ./post/monitor.sh <run-dir> [seconds]
 #
-# Cd and Cl against time, and the initial residuals, from postProcessing/ of a
+# Cd and Cl against the iteration, and the initial residuals, from postProcessing/ of a
 # running case; redrawn every [seconds] (default 30).  Joins the directories
 # of a continued run.  Without a display it writes <run-dir>/monitor.png.
 # Needs gnuplot.
@@ -37,7 +37,7 @@ rcols = '$RCOLS'; rnames = '$RNAMES';
 $TERM_SET;
 while (1) {
     set multiplot layout 2,1 title '$(basename "$RUN")';
-    unset logscale y; set xlabel 't [s]'; set ylabel 'coefficient'; set grid;
+    unset logscale y; set xlabel 'iteration'; set ylabel 'coefficient'; set grid;
     plot coef using 1:$CD with lines title 'Cd', coef using 1:$CL with lines title 'Cl';
     set logscale y; set ylabel 'initial residual';
     plot for [i = 1:words(rcols)] res using 1:(column(int(word(rcols, i)))) with lines title word(rnames, i);

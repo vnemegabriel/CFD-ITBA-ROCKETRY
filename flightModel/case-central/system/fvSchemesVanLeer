@@ -32,22 +32,9 @@ fluxScheme      Kurganov;
 
 ddtSchemes
 {
-    // Transient march to a steady state, with the global time step set from
-    // maxCo in controlDict.  This is the configuration that the shipped
-    // rhoCentralFoam tutorials use for external flow, and it is stable here.
-    //
-    // IT IS ALSO THE EXPENSIVE ONE.  The step is the acoustic limit of the
-    // smallest cell.  On the 2.3 M full mesh it is tauCo = 2e-10 s at Co 1,
-    // so at maxCo 0.3 the step is 6e-11 s, and ten flow-through times at
-    // M 1.8 (48 ms) are ~1e9 steps.  See docs/SOLVERS.md §2.3.
-    //
-    // `localEuler` (local time stepping) is the standard acceleration and is
-    // what $FOAM_TUTORIALS/.../biconic25-55Run35 uses.  In testing on this
-    // case it did NOT limit the step -- the solver kept reporting Courant
-    // numbers of order 1e6 and diverged within ten iterations -- so it is not
-    // shipped enabled.  If you get it working, it is the single biggest win
-    // available here.  See docs/SOLVERS.md.
-    default         Euler;
+    // Local time stepping: each cell at maxCo, pseudo-steady.  The Courant
+    // number in the log uses controlDict deltaT (1), not the local step.
+    default         localEuler;
 }
 
 gradSchemes

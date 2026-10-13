@@ -1,0 +1,89 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - shared function objects  |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+    // -- Force coefficients ------------------------------------------------
+    //  Compressible: p is in Pa, so the force integration uses the rho FIELD.
+    //  rhoInf is still needed for the dynamic pressure that normalises the
+    //  coefficients.  Aref, lRef and the wall patches come from
+    //  constant/meshInfo, so they always match the mesh.
+    forceCoeffs1
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   50;
+        log             no;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        dragDir         ($dx $dy $dz);
+        liftDir         ($lx $ly $lz);
+        CofR            (0 0 0);
+        pitchAxis       (0 0 1);
+        magUInf         $Uinf;
+        lRef            $lRef;
+        Aref            $Aref;
+    }
+
+    forces1
+    {
+        type            forces;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   50;
+        log             no;
+        patches         $wallPatches;
+        rho             rho;
+        rhoInf          $rhoInf;
+        CofR            (0 0 0);
+    }
+
+    // -- Mach number: the field to look at.  The bow shock, the expansion
+    //    over the boattail and the Mach cone all show up here first.
+    MachNo
+    {
+        type            MachNo;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    wallShearStress
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        patches         $wallPatches;
+    }
+    Cp
+    {
+        type            pressure;
+        libs            (fieldFunctionObjects);
+        mode            staticCoeff;
+        rho             rhoInf;
+        rhoInf          $rhoInf;
+        pInf            $pInf;
+        UInf            ($Ux $Uy $Uz);
+        writeControl    writeTime;
+    }
+
+    timeInfo
+    {
+        type            timeInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   50;
+        perTimeStep     yes;
+    }
+
+// ************************************************************************* //

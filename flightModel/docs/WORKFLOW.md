@@ -19,7 +19,8 @@ does, and the result.
 | `mesh/stl/Aconcagua.stl` | Previous geometry: 6 mm fins with bevelled edges. |
 | `mesh/system/` | `meshDict`, `createPatchDict`, and the `controlDict`, `fvSchemes`, `fvSolution` that the mesh applications need. |
 | `mesh/meshInfo` | Reference values and fin geometry of the mesh. |
-| `case-central/` | Case template for `rhoCentralFoam`. |
+| `case-central/` | Case template for `rhoCentralFoam`, M > 1. |
+| `case-pimple/` | Case template for `rhoPimpleFoam`, M < 1. It holds only the files that differ from `case-central/`. SOLVERS.md §16. |
 | `common/Allrun`, `common/Allrefine` | Scripts that `newCase.sh` copies into each case. |
 | `newCase.sh` | Script that makes one case from the template and one mesh. |
 | `runMesh.sh`, `meshes.txt` | Script and input file that build the meshes. |
@@ -112,6 +113,7 @@ again, remove the directory or use a new name.
 | `--socket <S>` | Pins the parallel run to socket `S`, one process per physical core. Refer to MEASUREMENTS.md §2. |
 | `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
 | `--init <run-dir>` | Starts from the latest time of another run instead of the uniform free stream. Refer to §5.6. |
+| `--solver central` or `--solver pimple` | Template: `case-central/` (default) or `case-pimple/`. SOLVERS.md §1. |
 
 The flow options change entries in `system/flowConditions`. The options that
 you do not give keep the template values.
@@ -122,6 +124,8 @@ you do not give keep the template values.
    `constant/polyMesh`, or if `<run-dir>` exists.
 2. It copies `case-central/` into `<run-dir>`. It does not copy the mesh,
    the logs, `0/`, `processor*`, `postProcessing/` or the time directories.
+   With `--solver pimple` it leaves out the files listed in
+   `case-pimple/central.exclude` and then copies `case-pimple/` on top.
 3. It links `<run-dir>/constant/polyMesh` to `<mesh-dir>/constant/polyMesh/`. With `--refine` it copies it. Refer to MEASUREMENTS.md §3.
 4. It copies `<mesh-dir>/meshInfo` to `<run-dir>/constant/meshInfo`. This
    file replaces the `meshInfo` of the template.
@@ -200,8 +204,11 @@ case with `newCase.sh`.
 ### 5.6 Start from another run
 
 `newCase.sh --init <run-dir>` starts the case from the solution of another
-run, for example the previous Mach number of a sweep, instead of the
-uniform free stream. `Allrun` then does, after `restore0Dir`:
+run instead of the uniform free stream. The sweep uses it from a coarse mesh
+to the next finer one at the same Mach number (h1 → h2 → h3), as in the
+OpenFOAM ToolChain (report §5.4): the fine mesh starts with the shock, the
+wake and the boundary layer already in place, and skips the impulsive start.
+The two runs can use different solvers. `Allrun` then does, after `restore0Dir`:
 
 1. It reads the value of each `fixedValue` patch in `0/`. These are the
    values of this run: in a supersonic case, `p` on `inlet`.
@@ -251,8 +258,8 @@ For each line:
 `newCase.sh`.
 
 ```
-m18-h1  --mesh h1 --Minf 1.8 --pInf 80127 --Tinf 275.56
-m18-h2  --mesh h2 --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h1  --mesh h1 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h2  --mesh h2 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-h1
 ```
 
 - Lines that start with `#`, and empty lines, have no effect.
@@ -340,7 +347,7 @@ with its start time.
 ./post/monitor.sh <run-dir> [seconds]     # default 30 s
 ```
 
-It plots `Cd` and `Cl` against time and the initial residuals in log
+It plots `Cd` and `Cl` against the iteration and the initial residuals in log
 scale, and draws them again every `[seconds]`. It joins the directories of
 a continued run. Without a display, for example over ssh, it writes
 `<run-dir>/monitor.png`. It needs gnuplot (`sudo apt install gnuplot`).
@@ -383,10 +390,10 @@ h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep.txt
-m03-h0  --mesh h0 --Minf 0.3
-m03-h1  --mesh h1 --Minf 0.3 --init m03-h0
-m03-h2  --mesh h2 --Minf 0.3 --init m03-h1
-m03-h3  --mesh h3 --Minf 0.3 --init m03-h2
+m03-h0  --mesh h0 --solver pimple --Minf 0.3
+m03-h1  --mesh h1 --solver pimple --Minf 0.3  --init m03-h0
+m03-h2  --mesh h2 --solver pimple --Minf 0.3  --init m03-h1
+m03-h3  --mesh h3 --solver pimple --Minf 0.3  --init m03-h2
 ```
 
 4. Keep the first cell the same on every mesh. `nLayers` and
@@ -425,7 +432,12 @@ Use one of these two methods:
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
 
 `meshes.txt` holds the three meshes of the study plus `h0` to start them,
-and `sweep.txt` the cases. To make the same results on another
+and `sweep.txt` the cases. Each Mach number is a chain h0 → h1 → h2 → h3,
+each run started from the previous one (`--init`). M 0.3, 0.6 and 0.8 run
+`pimple` on all the meshes. M 1.2 and 1.8 start with a `pimple` run on `h0`
+(`m18-h0-pimple`, `m12-h0-pimple`) and run `central` from it on, because
+`central` from the uniform free stream crashes at the base (SOLVERS.md §17).
+To make the same results on another
 computer:
 
 1. Do the steps of §2.

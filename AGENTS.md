@@ -1,7 +1,8 @@
 # AGENTS.md — Aconcagua CFD
 
 Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, una
-plantilla de caso con `rhoCentralFoam`, barrido de Mach en serie.
+plantilla `rhoPimpleFoam` para M < 1 y una `rhoCentralFoam` para M > 1 que
+arranca desde una corrida pimple al mismo Mach, barrido de Mach en serie.
 
 Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
 queda en inglés (mesh, solver, y+, wall function, skewness). Los `docs/` están
@@ -42,7 +43,8 @@ en cada corrida.
 ```
 flightModel/mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine
-flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
+flightModel/case-central/ plantilla rhoCentralFoam, M > 1
+flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
 flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
@@ -75,6 +77,10 @@ acoplarse a nada más.
 
 ## Cuidados
 
+- **Con `localEuler` el Courant del log no significa nada.** rhoCentralFoam lo
+  calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
+  escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
+  central en `Euler` global hasta 2026-10-12. `docs/SOLVERS.md` §5.1.
 - **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
   f-string se convierte en salto de línea real y rompe el archivo.
 - **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL
