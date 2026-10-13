@@ -401,6 +401,7 @@ because the solved fields differ.
 | `residuals` | `solverInfo` | Residuals of `U`, `e`, `k`, `omega` (and `p` in pimple) | 50 time steps |
 | `wallShearStress` | `wallShearStress` | Wall shear stress on `wallPatches` | write time |
 | `Cp` | `pressure`, `staticCoeff` | Static pressure coefficient | write time |
+| `surfaces` | `surfaces`, VTK | p, U, T, ρ, Mach, Cp, τw, y+ on `symm` and on the wall patches | end of the run |
 
 **Reference values of the force coefficients.**
 

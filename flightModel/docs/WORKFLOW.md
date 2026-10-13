@@ -334,6 +334,7 @@ give `--refine` to `newCase.sh`.
 | Residuals of `U`, `e`, `k`, `omega` | `postProcessing/residuals/<start-time>/solverInfo.dat` |
 | y+ for each wall patch | `postProcessing/yPlus/<start-time>/yPlus.dat`, and the field `yPlus` in the last written time |
 | Mach number, pressure coefficient, wall shear stress | Fields in each written time |
+| p, U, T, ρ, Mach, Cp, wall shear stress, y+ on the symmetry plane and on the rocket skin | `postProcessing/surfaces/<end-time>/{symm,skin}.vtp`, written at the end of the run |
 | ParaView | `paraview case.foam`. `newCase.sh` makes `case.foam`. |
 
 `<start-time>` is `0` for a new run. A continued run writes a new directory
@@ -358,11 +359,21 @@ a continued run. Without a display, for example over ssh, it writes
 ./post/sweepTable.sh [runs-dir] > sweep.csv    # default ~/runs
 ```
 
-One line for each run: `case`, `mesh`, `nCells`, `Minf`, `pInf`, `Tinf`,
-`alpha`, the last record of `run.info` (`status`, `steps`, `tEnd`,
-`wallSeconds`), `Cd`, `Cl` and `CmPitch` of the last line of
-`forceCoeffs1`, and the smallest and largest y+ on the wall patches at the
-last time. A run that has not started has empty fields.
+One line for each run. A run that has not started has empty fields.
+
+| Columns | Source |
+|---|---|
+| `case`, `mesh`, `nCells` | `run.info` |
+| `solver` | `application` in `system/controlDict` |
+| `Minf`, `pInf`, `Tinf`, `alpha` | `system/flowConditions` |
+| `status`, `steps`, `tEnd`, `wallSeconds` | Last record of `run.info` |
+| `Cd`, `Cl`, `CmPitch` | Last line of `forceCoeffs1` |
+| `window`, `CdMean`, `ClMean`, `CmPitchMean` | Mean over the last `coeffs_window` iterations (`config.json`), the window of the stop criterion |
+| `resUx` … `resOmega` | Last initial residuals of `residuals`; `resP` is empty for `rhoCentralFoam`, which solves no pressure equation |
+| `yPlusMin`, `yPlusMax`, `yPlusAvgWalls`, `yPlusAvgFins` | `yPlus` at the last time: over all the wall patches, and the mean on `walls` and on `fins` |
+
+With a continued run, the coefficients and residuals come from the last
+start-time directory only.
 
 ## 9. Typical studies
 

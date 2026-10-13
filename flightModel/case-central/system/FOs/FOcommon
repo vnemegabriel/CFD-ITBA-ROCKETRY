@@ -86,4 +86,28 @@
         perTimeStep     yes;
     }
 
+    surfaces
+    {
+        type            surfaces;
+        libs            (sampling);
+        writeControl    onEnd;
+        surfaceFormat   vtk;
+        fields          (p U T rho Ma static(p)_coeff wallShearStress yPlus);
+        surfaces
+        {
+            symm
+            {
+                type        patch;
+                patches     (symm);
+                interpolate false;
+            }
+            skin
+            {
+                type        patch;
+                patches     $wallPatches;
+                interpolate false;
+            }
+        }
+    }
+
 // ************************************************************************* //
