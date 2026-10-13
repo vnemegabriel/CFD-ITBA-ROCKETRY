@@ -89,6 +89,9 @@ acoplarse a nada más.
   calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
   escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
   central en `Euler` global hasta 2026-10-12. `docs/SOLVERS.md` §5.1.
+- **Los scripts que hacen cuentas con `awk` fijan `LC_ALL=C`.** Con
+  `es_ES` (newton) `awk` lee y escribe números con coma: `Allmesh` le pasó
+  `11,775` a `surfaceGenerateBoundingBox` y armó un dominio equivocado.
 - **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
   f-string se convierte en salto de línea real y rompe el archivo.
 - **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL

@@ -16,6 +16,9 @@
 set -e
 HERE=$(cd "${0%/*}" && pwd)
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
+# awk reads and writes numbers with the locale's decimal sign: es_ES gave
+# 11,775 to surfaceGenerateBoundingBox and a wrong domain
+LC_ALL=C; export LC_ALL
 
 check() {
     grep -q "FOAM FATAL" "log.$1" 2>/dev/null && {

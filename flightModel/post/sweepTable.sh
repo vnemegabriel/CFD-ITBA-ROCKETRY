@@ -5,6 +5,7 @@
 # record, the coefficients of the last line of forceCoeffs1 and their mean over
 # the stop-criterion window, the last initial residuals, and y+ on the walls at
 # the last time.  A run that has not started has empty fields.
+LC_ALL=C; export LC_ALL
 RUNS=${1:-$HOME/runs}
 
 value() { awk -v k="$1" '$1 == k { v = $2 } END { gsub(/[";]/, "", v); print v }' "$2" 2>/dev/null; }

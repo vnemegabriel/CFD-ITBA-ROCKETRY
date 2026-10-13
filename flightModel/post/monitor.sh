@@ -5,6 +5,7 @@
 # running case; redrawn every [seconds] (default 30).  Joins the directories
 # of a continued run.  Without a display it writes <run-dir>/monitor.png.
 # Needs gnuplot.
+LC_ALL=C; export LC_ALL
 RUN=${1:?usage: monitor.sh <run-dir> [seconds]}
 EVERY=${2:-30}
 PP=$RUN/postProcessing
