@@ -1,7 +1,7 @@
 # Solver and models
 
-This document gives the dictionaries of the case template `case-central/`,
-the models that they select, and the references. Use it to calculate the
+This document gives the dictionaries of the case templates `case-central/`
+and `case-pimple/`, the models that they select, and the references. Use it to calculate the
 case values by hand and to compare them with the case.
 
 > **CAUTION** The template is not validated. Do not use the results before
@@ -11,22 +11,35 @@ case values by hand and to compare them with the case.
 
 | Item | Value |
 |---|---|
-| Template | `case-central/` |
-| Solver | `rhoCentralFoam` |
-| Formulation | Compressible, density-based, explicit |
-| Range | M 0.3 to M 1.8, one template |
-| Time | `Euler`, global time step from `maxCo`, Courant ramp (§5) |
+| Templates | `case-central/` (M > 1, started from pimple, §17), `case-pimple/` (M < 1, §16) |
+| Solvers | `rhoCentralFoam`; `rhoPimpleFoam` |
+| Formulation | Compressible. Central: density-based, explicit. Pimple: pressure-based, `transonic` |
+| Time | `localEuler` in both, time in iterations (§5). Central: Courant ramp (§5.2) |
 | Fields in `0.orig/` | `U`, `p`, `T`, `k`, `omega`, `nut`, `alphat` |
 | Turbulence | k-ω SST with wall functions |
 | Gas | Air, perfect gas, constant Cp, Sutherland viscosity |
 | Input | `Minf`, `pInf`, `Tinf`, `alpha`, `beta`, `Ti`, `nuRatio` |
 | Initial condition | Uniform free stream |
 
-One solver for all Mach numbers. With three solvers, the discretization
-changes between flow regimes. A step in the Cd–Mach curve is then not
-separable from the physics.
+Two solvers, split at M = 1. The central-upwind flux of `rhoCentralFoam`
+scales its numerical dissipation with the speed of sound, not with the flow
+speed, so it is too dissipative at low Mach. The OpenFOAM ToolChain report
+(Martí Valverde and Stemmer, 2026, doi:10.5281/zenodo.19823943, §6) measured
+a CA error of about 100 % against wind-tunnel data with `rhoCentralFoam` at
+low Mach, and better results with `rhoPimpleFoam` for M < 0.8. Above
+M 1.5 `rhoPimpleFoam` gave nonphysical results at the nose tip.
+
+The price is a change of discretization at M = 1: a step in the Cd–Mach
+curve there is not separable from the physics. To measure it, run one Mach
+number with both solvers on the same mesh (§16.6).
+
+The models, the gas, the boundary conditions, the function objects and the
+flight condition are the same files in both templates.
 
 ## 2. Files of the template
+
+This section lists `case-central/`. `case-pimple/` holds only the files that
+differ; §16.1 lists them.
 
 | File | Edit | Function |
 |---|---|---|
@@ -37,7 +50,8 @@ separable from the physics.
 | `constant/thermophysicalProperties` | no | Gas model. §7. |
 | `constant/turbulenceProperties` | no | Turbulence model. §6. |
 | `constant/meshInfo` | no | `newCase.sh` replaces it with the `meshInfo` of the mesh. MESH.md §7. |
-| `system/controlDictBase.j2` | yes, with care | Time control and function objects. §5, §10. |
+| `system/controlDictBase.j2` | yes, with care | Time control. §5, §10. |
+| `system/FOs/FOcommon` | yes, with care | Function objects of both templates, except `residuals`. §10. |
 | `system/controlDict` | no | Includes `controlDictBase` and adds `maxCo 0.01`. |
 | `system/fileUpdaterControlDict/controlDict_{1..7,final}.j2` | no | Steps of the Courant ramp. §5. |
 | `system/fileUpdater.j2` | no | Schedule of the Courant ramp. §5. |
@@ -131,110 +145,98 @@ scheme to first order. In smooth regions the scheme stays second order.
 `vanLeerV` limits in the direction of the largest gradient. van Leer (1979),
 *J. Comput. Phys.* **32**, 101–136.
 
-## 5. Courant ramp and stop criterion
+## 5. Local time step, Courant ramp and stop criterion
 
-### 5.1 Function
+### 5.1 Local time step
+
+Both templates use `ddt localEuler`, as the OpenFOAM ToolChain does (report
+§5.3). Each cell advances with its own time step, the step that gives
+`maxCo` in that cell. The run is a pseudo-transient march to the steady
+state: the intermediate states are not physical, the converged state is.
+
+`deltaT 1` in `controlDict`, so the time counts iterations: `endTime`,
+`writeInterval`, the ramp and the stop criterion are all in iterations.
+
+On `h1` at M 1.8 the local step goes from 1.5e-10 s in the smallest cells to
+1.6e-5 s in the far field. With the global `Euler` step, which the template
+used before, all the domain advanced at 1.5e-10 s: about 6.8e5 steps per
+flow-through time, about two weeks per flow-through time on 8 cores.
+
+| Entry | Central: read from | Pimple: read from | Value |
+|---|---|---|---|
+| `maxCo` | `controlDict` (the ramp swaps it) | `fvSolution` `PIMPLE` | ramp to `final_Co`; pimple `maxCo` in `config.json` |
+| `maxDeltaT` | `controlDict` | `fvSolution` `PIMPLE` | 1 s, no limit |
+| `rDeltaTSmoothingCoeff` | `controlDict` | `fvSolution` `PIMPLE` | 0.1 |
+| `rDeltaTDampingCoeff` | not read | `fvSolution` `PIMPLE` | pimple 0.9 |
+
+Source: `applications/solvers/compressible/rhoCentralFoam/setRDeltaT.H` and
+`rhoPimpleFoam/setRDeltaT.H` of v2412.
+
+> **CAUTION** With `localEuler`, the "Mean and max Courant Numbers" line of
+> `rhoCentralFoam` uses `deltaT` of `controlDict` (1), not the local step.
+> Values of order 1e7 are normal. `rhoPimpleFoam` does not write the
+> Courant number. Look at `Flow time scale min/max` instead: the minimum is
+> the step of the most restrictive cell. A sudden drop shows a cell that
+> diverges.
+
+### 5.2 Courant ramp (central only)
 
 A uniform free stream on a no-slip wall causes a large transient. The ramp
-starts with a small `maxCo` (0.01) and first-order schemes. Then it increases
-`maxCo` step by step. The method comes from the OpenFOAM ToolChain
-(`templates/rhoCentralFoam`).
-
-The `timeActivatedFileUpdate` function objects in `system/fileUpdater` do the
-ramp. At each time step they compare the time with a schedule. At each
-switch time they copy a file on `system/controlDict` or on
-`system/fvSchemes`. `runTimeModifiable yes` makes the solver read the new
-file.
-
-### 5.2 config.json
-
-`newCase.sh` renders all `*.j2` files with these values.
-
-| Key | Default | Function |
-|---|---|---|
-| `tauCo` | `3.3e-8` | Time step in s that gives Co = 1 in the worst cell. |
-| `vanLeer` | `2000` | Iteration of the change from upwind to van Leer. `-1` keeps upwind. |
-| `minIter` | `3000` | Iteration of the change to `controlDict_final`. |
-| `final_Co` | `0.5` | Maximum `maxCo` of all the ramp. |
-| `coeffs_fields` | `["Cd"]` | Coefficients in the stop criterion. |
-| `coeffs_variation` | `[0.0001]` | Absolute tolerance of each coefficient. |
-| `coeffs_window` | `[2]` | Window of each coefficient, in flow-through times. |
-
-At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
-is absolute, so it also applies to a coefficient with an average near 0.
-
-### 5.3 Schedule
-
-The schedule is in iterations:
+of the ToolChain (report §5.4.1, `templates/rhoCentralFoam`) starts with
+`maxCo` 0.01 and first-order reconstruction, and doubles `maxCo` step by
+step. The `timeActivatedFileUpdate` function objects in `system/fileUpdater`
+copy a file on `system/controlDict` or on `system/fvSchemes` at each switch
+iteration. `runTimeModifiable yes` makes the solver read the new file.
 
 | Phase | Iterations | `maxCo` |
 |---|---|---|
 | Upwind | 0, 20, 35, 50, 65, 80, 100 | 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 |
 | van Leer | `vanLeer` + 0, 20, 35, 150, 300, 800, 2000 | 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 |
-| Final | `minIter` | `final_Co`, with `runTimeControl` |
+| Final | `minIter`, or the end of the ramp + 1 if later | `final_Co`, with `runTimeControl` |
 
-Each `maxCo` is limited to `final_Co`. The template removes the events after
-`minIter`.
+Each `maxCo` is limited to `final_Co`. The final step never comes before the
+end of the ramp: `rhoCentralFoam` has no damping of the local step, and a
+jump of `maxCo` from 0.04 to 0.5 gave a floating point exception in the
+thermophysical model six iterations later (`h1`, M 1.8). With the default
+values the ramp ends at iteration 4000, so the final step is at 4001.
 
-The case uses `Euler` in physical time, not `localEuler`. The template thus
-changes each iteration into a time:
+`rhoPimpleFoam` has no ramp: the ToolChain ran it without one, and it was
+stable from the uniform free stream on `h1` at M 0.3 (§16.6).
 
-```
-t = Σ nᵢ · maxCoᵢ · tauCo
-```
+### 5.3 config.json
 
-The initial time step is `deltaT = 0.01 · tauCo / 1.2`. `rhoCentralFoam`
-makes its first step at 1.2·`deltaT` and does not examine the Courant
-number.
+`newCase.sh` renders all `*.j2` files with these values.
 
-### 5.4 Measure tauCo
+| Key | Central | Pimple | Function |
+|---|---|---|---|
+| `maxCo` | – | 0.5 | Courant number of each cell. |
+| `vanLeer` | 2000 | – | Iteration of the change from upwind to van Leer. `-1` keeps upwind. |
+| `minIter` | 3000 | 1000 | Earliest iteration of the stop criterion. Central: change to `controlDict_final`, not before the end of the ramp (§5.2). |
+| `final_Co` | 0.5 | – | Maximum `maxCo` of the ramp. |
+| `endIter` | 20000 | 20000 | Last iteration if the criterion does not stop the run. |
+| `coeffs_fields` | `["Cd"]` | `["Cd"]` | Coefficients in the stop criterion. |
+| `coeffs_variation` | `[0.0001]` | `[0.0001]` | Absolute tolerance of each coefficient. |
+| `coeffs_window` | `[1000]` | `[1000]` | Window of each coefficient, in iterations. |
 
-`tauCo` depends on the mesh and a little on the Mach number. Values on the
-base mesh of `Allmesh` (2 144 494 cells), measured on the first steps from
-the uniform free stream:
+The sweep stops on `Cd` alone, also at α = 8 and 16°: check that `Cl` and
+`CmPitch` are flat in `coefficient.dat` too. A tolerance for `CmPitch` has
+not been chosen: about the nose tip with `lRef` = 0.151 m it is of order
+10 to 100 times `Cl`. You can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
+is absolute, so it also applies to a coefficient with an average near 0.
 
-| M | `tauCo` |
-|---|---|
-| 0.3 | 3.31e-8 s |
-| 1.8 | 2.71e-8 s |
+The values come from the ToolChain, which used another rocket and other
+meshes. Adjust them from the first runs on `h1`: the iteration where `Cd`
+becomes flat in upwind, and the iterations that van Leer needs.
 
-`config.json` has `3.3e-8`. A `tauCo` larger than the real value makes each
-phase of the ramp last more iterations than the schedule, which is the safe
-direction. `maxCo` still limits the Courant number.
+### 5.4 Stop criterion
 
-Measure `tauCo` again when you change the mesh:
-
-1. Make a case and run some time steps.
-2. In `log.rhoCentralFoam`, read `deltaT` and the max Courant number on the
-   next line. The solver calculates the Courant number with that `deltaT`.
-3. Calculate `tauCo = deltaT / Co_max`. All the steps from the uniform
-   free stream give the same value.
-4. Write the largest value in `case-central/config.json`.
-5. Make the cases again with `newCase.sh`.
-
-### 5.5 Stop criterion
-
-`controlDict_final` adds `runTimeControl1`. For each field in
-`coeffs_fields`, the `average` condition calculates a moving average with a
-window of `coeffs_window` flow-through times:
-
-```
-window = coeffs_window · lBody / Uinf
-```
-
-The window is in physical time. The condition starts when the run changes to
-`controlDict_final`, at `minIter`. The run stops when both are true:
-
-1. The physical time since `minIter` is more than the window.
-2. |average − current value| < `coeffs_variation`, for all the fields.
-
-`endTime = 10 · lBody / Uinf` is the second limit:
-
-| M | Flow-through time | `endTime` |
-|---|---|---|
-| 0.3 | 28.9 ms | 0.289 s |
-| 0.8 | 10.9 ms | 0.109 s |
-| 1.8 | 4.82 ms | 0.048 s |
+`system/FOs/FOrunTimeControl.j2`, the same file for both templates. For each
+field in `coeffs_fields`, the `average` condition calculates a moving
+average over `coeffs_window` iterations. `timeStart minIter` starts it at
+`minIter`; in the central template, `controlDict_final` also includes it
+only from `minIter`. The run stops when, for all the fields, the window is
+complete and |average − current value| < `coeffs_variation`. `endIter` is
+the second limit.
 
 ## 6. Turbulence
 
@@ -330,8 +332,9 @@ Above M 2.5, replace `hConst` with `janaf`. The coefficients for air are in
 
 ## 8. Temperature limits
 
-There are none. `rhoCentralFoam` in v2412 does not read `fvOptions`, so a
-`limitTemperature` entry has no effect.
+There are none in `case-central/`. `rhoCentralFoam` in v2412 does not read
+`fvOptions`, so a `limitTemperature` entry has no effect. `case-pimple/` has
+one (§16.4).
 
 The initial transient can move T out of range. With `perfectGas`, a negative
 T gives an imaginary speed of sound, and the solver stops with a floating
@@ -385,7 +388,9 @@ On a `full` mesh they have no effect.
 
 ## 10. Function objects
 
-File: `system/controlDictBase.j2`.
+File: `system/FOs/FOcommon`, included by both templates. `residuals` is in
+`controlDictBase.j2` and, for `rhoPimpleFoam`, in `case-pimple/system/controlDict.j2`,
+because the solved fields differ.
 
 | Name | Type | Output | Interval |
 |---|---|---|---|
@@ -393,9 +398,10 @@ File: `system/controlDictBase.j2`.
 | `forces1` | `forces` | Forces and moments, pressure and viscous parts | 50 time steps |
 | `MachNo` | `MachNo` | Mach number field | write time |
 | `yPlus` | `yPlus` | y+ on the wall patches | write time |
-| `residuals` | `solverInfo` | Residuals of `U`, `e`, `k`, `omega` | each time step |
+| `residuals` | `solverInfo` | Residuals of `U`, `e`, `k`, `omega` (and `p` in pimple) | 50 time steps |
 | `wallShearStress` | `wallShearStress` | Wall shear stress on `wallPatches` | write time |
 | `Cp` | `pressure`, `staticCoeff` | Static pressure coefficient | write time |
+| `surfaces` | `surfaces`, VTK | p, U, T, ρ, Mach, Cp, τw, y+ on `symm` and on the wall patches | end of the run |
 
 **Reference values of the force coefficients.**
 
@@ -416,11 +422,11 @@ File: `system/controlDictBase.j2`.
 | Entry | Value | Function |
 |---|---|---|
 | `startFrom` | `latestTime` | A new `./Allrun` continues the run. |
-| `endTime` | 10 · `lBody` / `Uinf` | Physical time limit: 10 flow-through times. |
-| `deltaT` | `0.01·tauCo/1.2` | Initial time step. §5.3. |
-| `adjustTimeStep` | yes | The time step follows `maxCo`. |
-| `maxDeltaT` | 1e-5 s | Maximum time step. |
-| `writeInterval` | 0.005 s, adjustable | Interval of the written times. |
+| `endTime` | `endIter` | Iteration limit. §5.3. |
+| `deltaT` | 1 | With `localEuler` the time counts iterations. §5.1. |
+| `adjustTimeStep` | no | Not used with `localEuler`. |
+| `maxDeltaT` | 1 s | Maximum local time step: no limit. |
+| `writeInterval` | 500 time steps | Interval of the written times. |
 | `purgeWrite` | 1 | Keeps the last written time. |
 | `writeFormat` | binary | |
 
@@ -437,7 +443,7 @@ and set the three `reconstruct` entries to `upwind`. The ramp copies
 | `fluxScheme` | `Kurganov` | §4 |
 | `reconstruct(rho)`, `reconstruct(T)` | `vanLeer` | §4 |
 | `reconstruct(U)` | `vanLeerV` | §4 |
-| `ddt` | `Euler` | Global time step. `localEuler` did not limit the step on the previous mesh. §14. |
+| `ddt` | `localEuler` | Local time step, pseudo-steady. §5.1. |
 | `grad` | `Gauss linear` | |
 | `div(tauMC)` | `Gauss linear` | Deviatoric part of the viscous stress. |
 | `div(phi,k)`, `div(phi,omega)` | `Gauss upwind` | k and ω must stay positive. |
@@ -475,7 +481,7 @@ Courant ramp of the OpenFOAM ToolChain. Differences from the tutorial:
 | Turbulence | laminar | `kOmegaSST` | The rocket flow is turbulent. |
 | Wall conditions | `maxwellSlipU`, `smoluchowskiJumpT` | `noSlip`, adiabatic | The tutorial is a low-density flow. The rocket flies at sea-level density. |
 | `laplacian`, `snGrad` | not limited | `limited corrected 0.33` | Non-orthogonal cells. |
-| `ddt` | `localEuler` | `Euler` | On the previous mesh, `localEuler` gave Courant numbers of 1e6 and diverged in less than ten iterations. That test had no ramp and had negative cell volumes. Do the test again on the cfMesh mesh. |
+| `ddt` | `localEuler` | `localEuler` | Until 2026-10-12 the template used `Euler`, because a test on the previous mesh printed Courant numbers of 1e6 and diverged. The Courant number is not meaningful with `localEuler` (§5.1); that test had no ramp and had negative cell volumes. On `h1` at M 1.8 with the ramp, `localEuler` is stable (§16.6). |
 
 ## 15. Open items
 
@@ -483,8 +489,128 @@ Courant ramp of the OpenFOAM ToolChain. Differences from the tutorial:
 |---|---|
 | Validation | Not done. VALIDATION.md. |
 | Wall patch types | `cartesianMesh` sets `wall`; `Allmesh` checks it. MESH.md §6.1. |
-| `tauCo` | Measured on the base mesh, from the uniform free stream. §5.4. |
-| Stop criterion | Window of 2 flow-through times. §5.5. |
-| Local time step | Not tested on the cfMesh mesh. §14. |
+| Stop criterion | Window of 1000 iterations, from the ToolChain. Adjust it from the `h1` runs. §5.3. |
+| Schedule of the ramp | `vanLeer`, `minIter` from the ToolChain. Adjust them from the `h1` runs. §5.3. |
+| Cold cell at the base | On `h1` at M 0.3, one cell near x = 2.925 m, r = 0.06 m goes to the 100 K limit of `limitTemperature`. §16.6. |
 | Motor jet | The base is a wall. A jet needs a `nozzle` patch and a total-pressure and total-temperature inlet. The base pressure with the motor on is different. |
 | y+ | Not set by the mesh. Measure it on each case. |
+
+## 16. rhoPimpleFoam template (M < 1)
+
+### 16.1 Files
+
+`case-pimple/` holds only the files that differ from `case-central/`.
+`newCase.sh --solver pimple` copies `case-central/` without the files in
+`case-pimple/central.exclude`, then copies `case-pimple/` on top. The other
+files, `0.orig/`, `constant/`, `flowConditions`, `flowDerived`,
+`decomposeParDict`, `FOs/FOcommon` and `FOs/FOrunTimeControl.j2`, are the
+ones of `case-central/`: change them there.
+
+| File | Function |
+|---|---|
+| `config.json` | `maxCo`, `minIter`, `endIter`, stop criterion. §5.3. |
+| `system/controlDict.j2` | Time in iterations, function objects, `residuals` with `p`. |
+| `system/fvSchemes` | §16.2. |
+| `system/fvSolution.j2` | §16.3. |
+| `system/fvOptions` | §16.4. |
+
+### 16.2 Schemes
+
+From `templates/rhoPimpleFoamTransonic` of the ToolChain, with the
+`laplacian` and `snGrad` of `case-central/` for the non-orthogonal cells.
+
+| Term | Scheme | Reason |
+|---|---|---|
+| `ddt` | `localEuler` | §5.1 |
+| `grad` | `cellLimited Gauss linear 1`; 0.333 for `p` and `e` | Bounded gradients for the second-order convection. |
+| `div(phi,U)` | `Gauss vanLeerV` | TVD, second order away from the shocks of M 0.8. |
+| `div(phi,e)`, `div(phid,p)` | `Gauss limitedLinear 1` | Bounded. `phid` is the convective flux of p in the `transonic` formulation. |
+| `div(phi,K)` | `Gauss linear` | Kinetic energy. |
+| `div(phiv,p)` | `Gauss upwind` | Pressure work in the e equation. |
+| `div(phi,k)`, `div(phi,omega)` | `Gauss upwind` | k and ω must stay positive. Same as central. |
+| `laplacian`, `snGrad` | `limited corrected 0.33` | Same as central. |
+
+### 16.3 PIMPLE
+
+| Entry | Value | Reason |
+|---|---|---|
+| `transonic` | yes | Density-weighted pressure equation, needed for the compressibility at M 0.6–0.8. Valid at M 0.3. |
+| `nOuterCorrectors` | 1 | Pseudo-steady march: one PISO pass per iteration. |
+| `nCorrectors` | 2 | |
+| `nNonOrthogonalCorrectors` | 1 | Maximum non-orthogonality 80°. |
+| `pMinFactor`, `pMaxFactor` | 0.05, 6 | Clip limits of p, relative to the boundary values. 6 covers the stagnation pressure behind a normal shock at M 1.8. |
+| `maxCo`, `rDeltaTSmoothingCoeff`, `rDeltaTDampingCoeff`, `maxDeltaT` | 0.5, 0.1, 0.9, 1 | §5.1. The ToolChain writes these in `controlDict`, where `rhoPimpleFoam` does not read them. |
+
+Linear solvers: `p` with `GAMG`, tolerance 1e-8, `relTol` 0.01; `rho`, `U`,
+`e`, `k`, `omega` with `smoothSolver` `symGaussSeidel`, `relTol` 0.1.
+
+### 16.4 Temperature limit
+
+`limitTemperature` between 100 K and 1000 K. `rhoPimpleFoam` reads
+`fvOptions`. The free stream is at 236–276 K and the stagnation
+temperature at M 1.8 is 475 K. The limit only protects the start: count the
+cells that it limits in the log (`LimitedCells`).
+
+### 16.5 Turbulence, gas, boundary conditions
+
+The same files as `case-central/`: §6, §7, §9. The `p` branch at
+`Minf > 1` also works with `rhoPimpleFoam`, but the sweep uses it only at
+M < 1.
+
+### 16.6 Tests on h1 (2026-10-12)
+
+`h1`: half mesh, 2 198 939 cells, 8 processes on a Ryzen 7 250.
+
+| Case | Result |
+|---|---|
+| Pimple, M 0.3, 150 iterations from the uniform free stream | Stable. 4.6 s per iteration, 90 s of start. `Cd` 0.61 at 100, 0.42 at 150, not converged. y+ mean (max): cone 6.6 (8.8), walls 3.1 (7.8), tail 2.1 (6.1), fins 11.1 (30.1). |
+| Pimple, M 0.3, `--init` from the case above, 50 iterations | `mapFields` and the run work. `mapFields` warns about tet decomposition on about 100 faces of the layer cells. It also maps `rDeltaT`. |
+| Pimple, M 0.3, 100 more iterations: original schemes, `div(phi,K)` upwind, `div(phi,e)` and `div(phi,K)` upwind | The same within 1 %: minimum of T 129 → 175 K, maximum 341 → 271 K, `Cd` 0.300. The schemes do not change the cold cell. |
+| Pimple, M 1.8, 800 iterations from the uniform free stream | §17. `Cd` 0.69 (50), 0.54 (300), 0.47 (500 to 800). |
+| Central, M 1.8, from the uniform free stream, three variants | Crash at iteration 74 to 256. §17. |
+| Central, M 1.8, `--init` from the pimple run at 800, 400 iterations through the whole ramp | Stable. Minimum of T 136–218 K at the fin tip and fin root, maximum 481 K. `Cd` 0.62 in upwind, 0.51–0.53 in van Leer, not converged. |
+
+At M 0.3, at iteration 1, `limitTemperature` limits 160 cells. After that,
+0 to 2 cells. The unlimited minimum of T is in a layer cell near
+x = 2.925 m, r = 0.06 m, between the fin trailing edge and the boattail
+(aspect ratio 28, determinant 2e-4), almost at rest (U ≈ 5 m/s) with p near
+the stagnation value. It rises slowly with the iterations, with any of the
+schemes above: it is the start transient in a region with almost no flow.
+
+### 16.7 Two solvers at the same Mach number
+
+The sweep runs M 1.2 and M 1.8 on `h0` with both solvers (§17), so it gives
+the difference between the solvers at those Mach numbers, on the coarse
+mesh. On `h1` at M 1.8, after the tests above: pimple 0.47, central 0.52,
+neither converged. To measure the step on a mesh of the study, add a pimple
+case on `h1` started from `m18-h0-pimple`, or a central case at M 0.8.
+
+## 17. Start of the supersonic cases
+
+From the uniform free stream, the flow behind the base starts at
+`Uinf`: the base acts as a piston and empties the region behind it. The
+cells there are thin layer cells with a small local time step, and they
+fill slowly. On `h1` at M 1.8, with the pimple template:
+
+| Iteration | p at the base [Pa] | T at the base [K] |
+|---|---|---|
+| 305 | 7 900 | 166 |
+| 455 | 57 000 | ~320 |
+| 755 | 46 000 | 350–414 |
+
+p∞ is 80 127 Pa. At the end p_base/p∞ ≈ 0.57, in the range of a power-off
+base at M 1.8, and T at the base goes to the recovery temperature of the
+adiabatic wall. During the first 300 iterations, T at the base stays at the
+100 K limit of `limitTemperature`.
+
+`rhoCentralFoam` reads no `fvOptions`, so it has no such limit. In three
+tests from the uniform free stream (default `rDeltaTSmoothingCoeff` 0.1;
+0.02; `maxDeltaT 1e-6`), T at the base fell to 0 and the solver stopped with
+a floating point exception in the thermophysical model, at iterations 74 to
+256. The parameters of the local time step do not change this.
+
+Thus, for M > 1, the sweep runs the pimple template first on `h0` and
+starts the central case from it with `--init` (WORKFLOW.md §5.6). `h1`, `h2`
+and `h3` start from the central solution of the coarser mesh. Tested on
+`h1`: pimple → central on the same mesh. Not tested yet: pimple on `h0`,
+and central from a central solution on another mesh.

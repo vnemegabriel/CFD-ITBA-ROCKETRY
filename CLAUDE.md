@@ -1,7 +1,8 @@
 # CLAUDE.md — Aconcagua CFD
 
 Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, una
-plantilla de caso con `rhoCentralFoam`, barrido de Mach en serie.
+plantilla `rhoPimpleFoam` para M < 1 y una `rhoCentralFoam` para M > 1 que
+arranca desde una corrida pimple al mismo Mach, barrido de Mach en serie.
 
 Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
 queda en inglés (mesh, solver, y+, wall function, skewness). Los `docs/` están
@@ -23,7 +24,10 @@ resolver bien la malla, en orden:
 2. La estela de base, que es una fracción grande del Cd de un cohete.
 3. La fricción de pared, que depende de y+.
 
-Todo el barrido es a α = 0. No pagues celdas por el vórtice de punta de aleta.
+El barrido va a α = 0, 8 y 16°, impuesto con el campo de velocidad
+(`--alpha`): la malla es la misma. Los conos de estela del `meshDict` siguen
+el eje x, y a 16° la estela sale de ellos a menos de 0.4 m de la base.
+No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas para todo el barrido:** h1, h2, h3 para la
 convergencia (sólo cambia `maxCellSize`, razón √2) y h0, más gruesa, para
@@ -42,7 +46,8 @@ en cada corrida.
 ```
 flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine
-flightModel/case-central/ la plantilla, rhoCentralFoam para todo Mach
+flightModel/case-central/ plantilla rhoCentralFoam, M > 1
+flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
 flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
@@ -80,13 +85,10 @@ acoplarse a nada más.
 
 ## Trampas conocidas
 
-- **La repo vive adentro de OneDrive y OneDrive revierte archivos.** Pasó: una
-  restauración de sync dejó un archivo fuente en una versión anterior a dos
-  commits, y el archivo igual parseaba, así que no se notaba leyéndolo. Después
-  de cualquier interrupción, `git diff --stat` antes de confiar en el working
-  tree; un archivo con cientos de líneas borradas que vos no borraste es esto.
-  Se recupera con `git checkout HEAD -- <archivo>`. El mitigante real es
-  commitear seguido.
+- **Con `localEuler` el Courant del log no significa nada.** rhoCentralFoam lo
+  calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
+  escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
+  central en `Euler` global hasta 2026-10-12. `docs/SOLVERS.md` §5.1.
 - **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
   f-string se convierte en salto de línea real y rompe el archivo.
 - **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL

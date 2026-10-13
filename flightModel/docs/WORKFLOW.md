@@ -19,7 +19,8 @@ does, and the result.
 | `mesh/stl/Aconcagua.stl` | Previous geometry: 6 mm fins with bevelled edges. |
 | `mesh/system/` | `meshDict`, `createPatchDict`, and the `controlDict`, `fvSchemes`, `fvSolution` that the mesh applications need. |
 | `mesh/meshInfo` | Reference values and fin geometry of the mesh. |
-| `case-central/` | Case template for `rhoCentralFoam`. |
+| `case-central/` | Case template for `rhoCentralFoam`, M > 1. |
+| `case-pimple/` | Case template for `rhoPimpleFoam`, M < 1. It holds only the files that differ from `case-central/`. SOLVERS.md §16. |
 | `common/Allrun`, `common/Allrefine` | Scripts that `newCase.sh` copies into each case. |
 | `newCase.sh` | Script that makes one case from the template and one mesh. |
 | `runMesh.sh`, `meshes.txt` | Script and input file that build the meshes. |
@@ -45,8 +46,8 @@ All scripts stop with the message `source the OpenFOAM bashrc first` if you
 do not do this step.
 
 > **CAUTION** Put the mesh directories and the case directories outside
-> OneDrive and outside `/mnt/c`. These file systems make the OpenFOAM input
-> and output several times slower.
+> `/mnt/c`. That file system makes the OpenFOAM input and output several
+> times slower.
 
 ## 3. Make a mesh
 
@@ -112,6 +113,7 @@ again, remove the directory or use a new name.
 | `--socket <S>` | Pins the parallel run to socket `S`, one process per physical core. Refer to MEASUREMENTS.md §2. |
 | `--refine tip` or `--refine fins` | Runs `./Allrefine` on the new case. Refer to §7. |
 | `--init <run-dir>` | Starts from the latest time of another run instead of the uniform free stream. Refer to §5.6. |
+| `--solver central` or `--solver pimple` | Template: `case-central/` (default) or `case-pimple/`. SOLVERS.md §1. |
 
 The flow options change entries in `system/flowConditions`. The options that
 you do not give keep the template values.
@@ -122,6 +124,8 @@ you do not give keep the template values.
    `constant/polyMesh`, or if `<run-dir>` exists.
 2. It copies `case-central/` into `<run-dir>`. It does not copy the mesh,
    the logs, `0/`, `processor*`, `postProcessing/` or the time directories.
+   With `--solver pimple` it leaves out the files listed in
+   `case-pimple/central.exclude` and then copies `case-pimple/` on top.
 3. It links `<run-dir>/constant/polyMesh` to `<mesh-dir>/constant/polyMesh/`. With `--refine` it copies it. Refer to MEASUREMENTS.md §3.
 4. It copies `<mesh-dir>/meshInfo` to `<run-dir>/constant/meshInfo`. This
    file replaces the `meshInfo` of the template.
@@ -200,8 +204,11 @@ case with `newCase.sh`.
 ### 5.6 Start from another run
 
 `newCase.sh --init <run-dir>` starts the case from the solution of another
-run, for example the previous Mach number of a sweep, instead of the
-uniform free stream. `Allrun` then does, after `restore0Dir`:
+run instead of the uniform free stream. The sweep uses it from a coarse mesh
+to the next finer one at the same Mach number (h1 → h2 → h3), as in the
+OpenFOAM ToolChain (report §5.4): the fine mesh starts with the shock, the
+wake and the boundary layer already in place, and skips the impulsive start.
+The two runs can use different solvers. `Allrun` then does, after `restore0Dir`:
 
 1. It reads the value of each `fixedValue` patch in `0/`. These are the
    values of this run: in a supersonic case, `p` on `inlet`.
@@ -251,8 +258,8 @@ For each line:
 `newCase.sh`.
 
 ```
-m18-h1  --mesh h1 --Minf 1.8 --pInf 80127 --Tinf 275.56
-m18-h2  --mesh h2 --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h1  --mesh h1 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-h2  --mesh h2 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-h1
 ```
 
 - Lines that start with `#`, and empty lines, have no effect.
@@ -285,8 +292,8 @@ at the same time, one with `--socket 0` and one with `--socket 1`
 > old byte offset of the new content. Stop `runCase.sh` (the solver can go
 > on), edit, and run it again; it skips the cases that exist.
 
-> **CAUTION** If your home directory is in OneDrive or in `/mnt/c`, give a
-> `runs-dir` and a `meshes-dir` outside them.
+> **CAUTION** If your home directory is in `/mnt/c`, give a `runs-dir` and a
+> `meshes-dir` outside it.
 
 ## 7. Refine the mesh near the fins (optional)
 
@@ -327,6 +334,7 @@ give `--refine` to `newCase.sh`.
 | Residuals of `U`, `e`, `k`, `omega` | `postProcessing/residuals/<start-time>/solverInfo.dat` |
 | y+ for each wall patch | `postProcessing/yPlus/<start-time>/yPlus.dat`, and the field `yPlus` in the last written time |
 | Mach number, pressure coefficient, wall shear stress | Fields in each written time |
+| p, U, T, ρ, Mach, Cp, wall shear stress, y+ on the symmetry plane and on the rocket skin | `postProcessing/surfaces/<end-time>/{symm,skin}.vtp`, written at the end of the run |
 | ParaView | `paraview case.foam`. `newCase.sh` makes `case.foam`. |
 
 `<start-time>` is `0` for a new run. A continued run writes a new directory
@@ -340,7 +348,7 @@ with its start time.
 ./post/monitor.sh <run-dir> [seconds]     # default 30 s
 ```
 
-It plots `Cd` and `Cl` against time and the initial residuals in log
+It plots `Cd` and `Cl` against the iteration and the initial residuals in log
 scale, and draws them again every `[seconds]`. It joins the directories of
 a continued run. Without a display, for example over ssh, it writes
 `<run-dir>/monitor.png`. It needs gnuplot (`sudo apt install gnuplot`).
@@ -351,11 +359,21 @@ a continued run. Without a display, for example over ssh, it writes
 ./post/sweepTable.sh [runs-dir] > sweep.csv    # default ~/runs
 ```
 
-One line for each run: `case`, `mesh`, `nCells`, `Minf`, `pInf`, `Tinf`,
-`alpha`, the last record of `run.info` (`status`, `steps`, `tEnd`,
-`wallSeconds`), `Cd`, `Cl` and `CmPitch` of the last line of
-`forceCoeffs1`, and the smallest and largest y+ on the wall patches at the
-last time. A run that has not started has empty fields.
+One line for each run. A run that has not started has empty fields.
+
+| Columns | Source |
+|---|---|
+| `case`, `mesh`, `nCells` | `run.info` |
+| `solver` | `application` in `system/controlDict` |
+| `Minf`, `pInf`, `Tinf`, `alpha` | `system/flowConditions` |
+| `status`, `steps`, `tEnd`, `wallSeconds` | Last record of `run.info` |
+| `Cd`, `Cl`, `CmPitch` | Last line of `forceCoeffs1` |
+| `window`, `CdMean`, `ClMean`, `CmPitchMean` | Mean over the last `coeffs_window` iterations (`config.json`), the window of the stop criterion |
+| `resUx` … `resOmega` | Last initial residuals of `residuals`; `resP` is empty for `rhoCentralFoam`, which solves no pressure equation |
+| `yPlusMin`, `yPlusMax`, `yPlusAvgWalls`, `yPlusAvgFins` | `yPlus` at the last time: over all the wall patches, and the mean on `walls` and on `fins` |
+
+With a continued run, the coefficients and residuals come from the last
+start-time directory only.
 
 ## 9. Typical studies
 
@@ -383,10 +401,10 @@ h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep.txt
-m03-h0  --mesh h0 --Minf 0.3
-m03-h1  --mesh h1 --Minf 0.3 --init m03-h0
-m03-h2  --mesh h2 --Minf 0.3 --init m03-h1
-m03-h3  --mesh h3 --Minf 0.3 --init m03-h2
+m03-h0  --mesh h0 --solver pimple --Minf 0.3
+m03-h1  --mesh h1 --solver pimple --Minf 0.3  --init m03-h0
+m03-h2  --mesh h2 --solver pimple --Minf 0.3  --init m03-h1
+m03-h3  --mesh h3 --solver pimple --Minf 0.3  --init m03-h2
 ```
 
 4. Keep the first cell the same on every mesh. `nLayers` and
@@ -422,10 +440,34 @@ Use one of these two methods:
 - Raise the levels of `fins`, `finEdges` and `finRoots` in `mesh/system/meshDict` and make a new mesh.
 - Run `./Allrefine tip` in the case, before `./Allrun`.
 
-### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
+### 9.5 The sweep of record: 3 meshes × 5 Mach numbers × 3 angles of attack
 
 `meshes.txt` holds the three meshes of the study plus `h0` to start them,
-and `sweep.txt` the cases. To make the same results on another
+and `sweep.txt` the 66 runs: 5 Mach numbers × α = 0, 8, 16° × 4 meshes,
+plus 6 `pimple` start runs. Each Mach number and angle is a chain
+h0 → h1 → h2 → h3, each run started from the previous one (`--init`). M 0.3,
+0.6 and 0.8 run `pimple` on all the meshes. M 1.2 and 1.8 start with a
+`pimple` run on `h0` (`m18-a16-h0-pimple`, ...) and run `central` from it
+on, because `central` from the uniform free stream crashes at the base
+(SOLVERS.md §17). The runs are in order of mesh, so all the `h0` results
+come first.
+
+`--alpha` turns the free stream in the x–y plane, the plane of the
+half-mesh symmetry; the mesh is the same for all the angles. The wake
+regions of `meshDict` (`baseWake`, `nearWake`, `midWake`) are cones on the x
+axis, but the wake follows the free stream and moves tan α per metre
+towards +y:
+
+| Region | Radius | Length behind the base | Offset at 8° | Offset at 16° |
+|---|---|---|---|---|
+| `baseWake` | 0.08 m | 0.36 m | 0.05 m | 0.10 m |
+| `nearWake` | 0.14 m | 0.85 m | 0.12 m | 0.24 m |
+| `midWake` | 0.26 m | 2.1 m | 0.30 m | 0.59 m |
+
+At 16° the wake leaves the 6.25 mm region less than 0.4 m behind the base.
+Take this into account for the base drag at 16°.
+
+To make the same results on another
 computer:
 
 1. Do the steps of §2.
@@ -478,8 +520,7 @@ pad is at 896 m MSL. The data is in `fin_flutter/data/midland_telemega_data.csv`
   Put the STL and `meshDict` in the repository.
 - When a change to `meshDict` changes the mesh, commit it with the number
   of cells and the `checkMesh` output of the new mesh.
-- Put case directories outside the repository, outside OneDrive and outside
-  `/mnt/c`.
+- Put case directories outside the repository and outside `/mnt/c`.
 
 ## 11. Quick reference
 

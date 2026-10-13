@@ -1,8 +1,10 @@
-# case-central/ — case template, M 0.3 to M 1.8
+# case-central/ — case template, M > 1
 
 `rhoCentralFoam` with the Kurganov central-upwind flux, `kOmegaSST` with wall
-functions, and air as a perfect gas with Sutherland viscosity. One template
-for all the sweep.
+functions, and air as a perfect gas with Sutherland viscosity. The sweep uses
+it for M 1.2 and 1.8, started from a `case-pimple/` run at the same Mach
+(docs/SOLVERS.md §17). M < 1 uses `case-pimple/`, which takes its shared
+files from here.
 
 > **CAUTION** The template is not validated. Do not use the results before
 > you do the procedures in [../docs/VALIDATION.md](../docs/VALIDATION.md).
@@ -10,7 +12,6 @@ for all the sweep.
 Do not run a case in this directory. Make a case with `../newCase.sh`:
 
 ```bash
-../newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
 ../newCase.sh ~/runs/m18 --mesh ~/meshes/base --Minf 1.8
 ```
 
