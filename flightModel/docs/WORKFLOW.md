@@ -429,14 +429,33 @@ Use one of these two methods:
 - Raise the levels of `fins`, `finEdges` and `finRoots` in `mesh/system/meshDict` and make a new mesh.
 - Run `./Allrefine tip` in the case, before `./Allrun`.
 
-### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
+### 9.5 The sweep of record: 3 meshes × 5 Mach numbers × 3 angles of attack
 
 `meshes.txt` holds the three meshes of the study plus `h0` to start them,
-and `sweep.txt` the cases. Each Mach number is a chain h0 → h1 → h2 → h3,
-each run started from the previous one (`--init`). M 0.3, 0.6 and 0.8 run
-`pimple` on all the meshes. M 1.2 and 1.8 start with a `pimple` run on `h0`
-(`m18-h0-pimple`, `m12-h0-pimple`) and run `central` from it on, because
-`central` from the uniform free stream crashes at the base (SOLVERS.md §17).
+and `sweep.txt` the 66 runs: 5 Mach numbers × α = 0, 8, 16° × 4 meshes,
+plus 6 `pimple` start runs. Each Mach number and angle is a chain
+h0 → h1 → h2 → h3, each run started from the previous one (`--init`). M 0.3,
+0.6 and 0.8 run `pimple` on all the meshes. M 1.2 and 1.8 start with a
+`pimple` run on `h0` (`m18-a16-h0-pimple`, ...) and run `central` from it
+on, because `central` from the uniform free stream crashes at the base
+(SOLVERS.md §17). The runs are in order of mesh, so all the `h0` results
+come first.
+
+`--alpha` turns the free stream in the x–y plane, the plane of the
+half-mesh symmetry; the mesh is the same for all the angles. The wake
+regions of `meshDict` (`baseWake`, `nearWake`, `midWake`) are cones on the x
+axis, but the wake follows the free stream and moves tan α per metre
+towards +y:
+
+| Region | Radius | Length behind the base | Offset at 8° | Offset at 16° |
+|---|---|---|---|---|
+| `baseWake` | 0.08 m | 0.36 m | 0.05 m | 0.10 m |
+| `nearWake` | 0.14 m | 0.85 m | 0.12 m | 0.24 m |
+| `midWake` | 0.26 m | 2.1 m | 0.30 m | 0.59 m |
+
+At 16° the wake leaves the 6.25 mm region less than 0.4 m behind the base.
+Take this into account for the base drag at 16°.
+
 To make the same results on another
 computer:
 

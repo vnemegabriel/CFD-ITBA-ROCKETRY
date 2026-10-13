@@ -218,7 +218,10 @@ stable from the uniform free stream on `h1` at M 0.3 (§16.6).
 | `coeffs_variation` | `[0.0001]` | `[0.0001]` | Absolute tolerance of each coefficient. |
 | `coeffs_window` | `[1000]` | `[1000]` | Window of each coefficient, in iterations. |
 
-At α ≠ 0 you can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
+The sweep stops on `Cd` alone, also at α = 8 and 16°: check that `Cl` and
+`CmPitch` are flat in `coefficient.dat` too. A tolerance for `CmPitch` has
+not been chosen: about the nose tip with `lRef` = 0.151 m it is of order
+10 to 100 times `Cl`. You can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance
 is absolute, so it also applies to a coefficient with an average near 0.
 
 The values come from the ToolChain, which used another rocket and other
