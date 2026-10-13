@@ -261,8 +261,8 @@ same t₁ on every mesh, but not its value. Measure it with
 |---|---|---|---|---|---|---|
 | `h0` | 2.2627 | 8.84 mm | 12 | 1.1878 | 0.241 mm | 0.097 mm |
 | `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm | 0.100 mm |
-| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm | |
-| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.241 mm | |
+| `h2` | 1.3454 | 5.26 mm | 9 | 1.211 | 0.241 mm | 0.107 mm |
+| `h3` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm | 0.096 mm |
 
 So y ≈ 0.05 mm on the body. Where a region refines the wall, the layer is
 thinner with it: under `finRoots` (level 11) t₁ is about 0.014 mm, and on

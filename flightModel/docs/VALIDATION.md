@@ -147,7 +147,8 @@ occurs.
 
 ### 4.1 Procedure
 
-1. Make three meshes. Change only `maxCellSize`, with the ratio r = √2.
+1. Make three meshes. Change only `maxCellSize`, with a constant ratio
+   (2^(1/4) for h1–h3). Take r from the number of cells, r = (N₁/N₂)^(1/3).
    Do not change the levels. Refer to WORKFLOW.md §9.2.
 2. Run the same Mach number on the three meshes.
 3. Measure y+ on each mesh. The first layer thickness follows the surface
