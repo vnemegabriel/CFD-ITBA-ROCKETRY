@@ -287,6 +287,26 @@ The cases run one after the other. To use both sockets, run two sweep files
 at the same time, one with `--socket 0` and one with `--socket 1`
 (MEASUREMENTS.md §2). Each chain of `--init` must stay in one file.
 
+A sweep runs for days. Start it with `nohup` and `&`:
+
+```bash
+nohup ./runCase.sh sweepSupersonic.txt > ~/log.sweepSupersonic 2>&1 &
+tail -f ~/log.sweepSupersonic
+```
+
+- `nohup` keeps `runCase.sh` alive when the terminal closes or the ssh
+  session drops. Without it, the shell sends SIGHUP and the sweep stops.
+- `> <log> 2>&1` writes the output and the errors into the log. Without it,
+  `nohup` writes `nohup.out` in the current directory.
+- `&` runs it in the background, so you can start the second sweep from the
+  same terminal.
+
+`tmux` or `screen` do the same and let you attach to the session again.
+
+To stop a sweep, kill `runCase.sh` (`pkill -f 'runCase.sh sweepSupersonic'`).
+The solver of the current case goes on until it ends; no new case starts.
+To stop the solver too, kill its `mpirun`.
+
 > **CAUTION** `runCase.sh` reads the sweep file line by line while it runs.
 > Do not edit the file in place until it ends: the next line is read from the
 > old byte offset of the new content. Stop `runCase.sh` (the solver can go
