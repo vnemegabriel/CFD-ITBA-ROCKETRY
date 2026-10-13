@@ -214,8 +214,9 @@ edgeMeshRefinement
 // and thicknessRatio against the local surface cell rather than solved for.
 // cfMesh splits the layer only on patches listed below: the global nLayers
 // reaches the domain faces too, so it stays at 1.  Allmesh --nLayers and
-// --thicknessRatio set cone, walls and tail so that y1 = 0.241 mm on every
-// maxCellSize.  The fins stay at 3 layers.
+// --thicknessRatio set cone, walls and tail; meshes.txt keeps the first cell
+// the same on every maxCellSize (t1 ~ 0.10 mm measured).  The fins stay at 3
+// layers.
 boundaryLayers
 {
     nLayers         1;

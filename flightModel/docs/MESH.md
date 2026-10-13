@@ -249,31 +249,38 @@ dictionary does not set a y+ target.
 > got no layers, and the faces of the domain got 10. Keep an entry for each
 > wall patch.
 
-The first layer thickness is t₁ = h (r − 1) / (rⁿ − 1), with h the surface
-cell size, r the `thicknessRatio` and n the `nLayers`.
+The layer rule is t₁ = h (r − 1) / (rⁿ − 1), with h the surface cell size, r
+the `thicknessRatio` and n the `nLayers`, if the whole layer were one surface
+cell thick. `cartesianMesh` makes it thinner: the measured first cell is
+0.41 times the rule, with 10 or 12 layers alike. The rule therefore sets the
+same t₁ on every mesh, but not its value. Measure it with
+`post/firstLayer.py <mesh-dir>`, which gives y (cell centre to wall face, as
+`yPlus` uses it) and t₁ = 2y per wall patch, weighted by face area.
 
-The meshes of the sweep use the layers of the full meshes, t₁ = 0.241 mm:
+| Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ by the rule | t₁ measured on `walls` |
+|---|---|---|---|---|---|---|
+| `h0` | 2.2627 | 8.84 mm | 12 | 1.1878 | 0.241 mm | 0.097 mm |
+| `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm | 0.100 mm |
+| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm | |
+| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.241 mm | |
 
-| Mesh | `maxCellSize` | h on the body | `nLayers` | `thicknessRatio` | t₁ |
-|---|---|---|---|---|---|
-| `h1` | 1.6 | 6.25 mm | 10 | 1.2 | 0.241 mm |
-| `h2` | 1.1314 | 4.42 mm | 8 | 1.229 | 0.241 mm |
-| `h3` | 0.8 | 3.13 mm | 7 | 1.2 | 0.241 mm |
-
-t₁ is the same on the three meshes, so y+ does not change between them.
+So y ≈ 0.05 mm on the body. Where a region refines the wall, the layer is
+thinner with it: under `finRoots` (level 11) t₁ is about 0.014 mm, and on
+the boattail (`shoulder`, `baseEdge`) about 0.04 mm.
 
 From the flat-plate friction at the aft body (x ≈ 2.8 m), where y+ is
 lowest, at the conditions of the sweep:
 
-| M | y+ per mm of t₁ | y+ at the cell centre, t₁ = 0.241 mm |
+| M | y+ per mm of y (u_τ/ν) | y+ at the cell centre, y = 0.05 mm |
 |---|---|---|
-| 0.3 | ~110 | ~13 |
-| 0.6 | ~230 | ~28 |
-| 0.8 | ~330 | ~40 |
-| 1.2 | ~550 | ~66 |
-| 1.8 | ~950 | ~115 |
+| 0.3 | ~110 | ~5.5 |
+| 0.6 | ~230 | ~11.5 |
+| 0.8 | ~330 | ~16.5 |
+| 1.2 | ~550 | ~27.5 |
+| 1.8 | ~950 | ~47.5 |
 
-At M 0.3 and 0.6 the first cell is in the buffer layer. `nut` is
+At M 0.6 to 1.2 the first cell is in the buffer layer, and at M 0.3 at its
+lower edge. `nut` is
 `nutUSpaldingWallFunction`, which follows Spalding's law through the buffer,
 so it holds there. These are estimates: measure y+ on each case.
 
