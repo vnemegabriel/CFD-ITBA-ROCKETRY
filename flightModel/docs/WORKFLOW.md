@@ -377,20 +377,34 @@ last time. A run that has not started has empty fields.
 
 ```
 # meshes.txt
+h0  --maxCellSize 2.2627 --nLayers 12 --thicknessRatio 1.1878
 h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
 h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep.txt
-m03-h1  --mesh h1 --Minf 0.3
-m03-h2  --mesh h2 --Minf 0.3
-m03-h3  --mesh h3 --Minf 0.3
+m03-h0  --mesh h0 --Minf 0.3
+m03-h1  --mesh h1 --Minf 0.3 --init m03-h0
+m03-h2  --mesh h2 --Minf 0.3 --init m03-h1
+m03-h3  --mesh h3 --Minf 0.3 --init m03-h2
 ```
 
-`nLayers` and `thicknessRatio` keep the first layer thickness at 0.241 mm on
-the three meshes, so that y+ does not change between them. MESH.md §4.4 gives
-the calculation and the y+ at each Mach number. Measure y+ on each mesh to confirm. VALIDATION.md §4
-gives the analysis.
+4. Keep the first cell the same on every mesh. `nLayers` and
+   `thicknessRatio` hold the layer rule of MESH.md §4.4 at 0.241 mm, which
+   `cartesianMesh` makes about 0.10 mm. Measure it on each new mesh:
+
+   ```bash
+   ./post/firstLayer.py ~/meshes/h2
+   ```
+
+   The median t₁ on `walls` must agree with that of `h1` (0.100 mm). If not,
+   y+ changes between the meshes and the study mixes the wall treatment with
+   the discretization error.
+5. `h0` is not part of the study. It is a coarser mesh to start the `h1`
+   runs (`--init`, §5.6); each run then starts from the coarser one.
+
+MESH.md §4.4 gives the y+ at each Mach number. Measure y+ on each run to
+confirm. VALIDATION.md §4 gives the analysis.
 
 ### 9.3 Angle-of-attack sweep
 
@@ -410,7 +424,8 @@ Use one of these two methods:
 
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers
 
-`meshes.txt` holds the three meshes and `sweep.txt` the 15 cases. To make the same results on another
+`meshes.txt` holds the three meshes of the study plus `h0` to start them,
+and `sweep.txt` the cases. To make the same results on another
 computer:
 
 1. Do the steps of §2.
@@ -421,7 +436,7 @@ computer:
    python3 mesh/makeRocket.py /tmp/check.stl && cmp /tmp/check.stl mesh/stl/Aconcagua_biconvex117.stl
    ```
 
-3. Make the three meshes and examine them:
+3. Make the meshes and examine them:
 
    ```bash
    ./runMesh.sh
@@ -429,11 +444,14 @@ computer:
 
    The meshes must agree with this table:
 
-   | Mesh | `maxCellSize` | Cells | Negative volumes | Max skewness | Max non-orthogonality |
-   |---|---|---|---|---|---|
-   | `h1` | 1.6 | 1 206 017 | 0 | 4.37 | 80.2 |
-   | `h2` | 1.1314 | 2 366 806 | 0 | 3.23 | 80.8 |
-   | `h3` | 0.8 | 6 008 963 | 0 | 3.35 | 71.3 |
+   | Mesh | `maxCellSize` | Cells | Negative volumes | Max skewness | Max non-orthogonality | t₁ on `walls` |
+   |---|---|---|---|---|---|---|
+   | `h0` | 2.2627 | 1 074 798 | 0 | 2.37 | 65.7 | 0.097 mm |
+   | `h1` | 1.6 | 2 198 939 | 0 | 1.72 | 66.0 | 0.100 mm |
+   | `h2` | 1.1314 | | | | | |
+   | `h3` | 0.8 | | | | | |
+
+   `h2` and `h3` are not built yet: fill the row when they are.
 
 4. Run the cases:
 
