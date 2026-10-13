@@ -1,6 +1,6 @@
 #!/bin/bash
-# ./runCase.sh [sweep.txt] [runs-dir] [meshes-dir]
-#                                    default: sweep.txt, ~/runs, ~/meshes
+# ./runCase.sh <sweep-file> [runs-dir] [meshes-dir]
+#                                    default: ~/runs, ~/meshes
 #
 # Makes and runs every case in the sweep file, one after the other.  Each line
 # names its mesh with --mesh; a bare name lives in meshes-dir.  The meshes must
@@ -12,7 +12,7 @@
 # it ends.
 set -u
 ROOT=$(cd "$(dirname "$0")" && pwd)
-SWEEP=${1:-$ROOT/sweep.txt}
+SWEEP=${1:?usage: runCase.sh <sweep-file> [runs-dir] [meshes-dir]}
 RUNS=${2:-$HOME/runs}
 MESHES=${3:-$HOME/meshes}
 

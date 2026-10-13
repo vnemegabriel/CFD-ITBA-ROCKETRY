@@ -24,7 +24,7 @@ does, and the result.
 | `common/Allrun`, `common/Allrefine` | Scripts that `newCase.sh` copies into each case. |
 | `newCase.sh` | Script that makes one case from the template and one mesh. |
 | `runMesh.sh`, `meshes.txt` | Script and input file that build the meshes. |
-| `runCase.sh`, `sweep.txt` | Script and input file for a sweep of cases on existing meshes. |
+| `runCase.sh`, `sweepSupersonic.txt`, `sweepSubsonic.txt` | Script and input files for a sweep of cases on existing meshes. |
 
 ## 2. Requirements
 
@@ -254,7 +254,7 @@ For each line:
 
 ### 6.2 Run the cases
 
-`sweep.txt` has one case on each line: a case name, then the options of
+A sweep file has one case on each line: a case name, then the options of
 `newCase.sh`.
 
 ```
@@ -270,7 +270,7 @@ m18-h2  --mesh h2 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56  --init
   `m12-h1 --mesh h1 --Minf 1.2 ... --init m18-h1`.
 
 ```bash
-./runCase.sh [sweep-file] [runs-dir] [meshes-dir]   # default: sweep.txt, ~/runs, ~/meshes
+./runCase.sh <sweep-file> [runs-dir] [meshes-dir]   # default: ~/runs, ~/meshes
 ```
 
 For each line:
@@ -285,7 +285,7 @@ For each line:
 
 The cases run one after the other. To use both sockets, run two sweep files
 at the same time, one with `--socket 0` and one with `--socket 1`
-(MEASUREMENTS.md §2).
+(MEASUREMENTS.md §2). Each chain of `--init` must stay in one file.
 
 > **CAUTION** `runCase.sh` reads the sweep file line by line while it runs.
 > Do not edit the file in place until it ends: the next line is read from the
@@ -379,8 +379,8 @@ start-time directory only.
 
 ### 9.1 Mach sweep
 
-1. Write one line for each Mach number in `sweep.txt`.
-2. Run `./runCase.sh`.
+1. Write one line for each Mach number in a sweep file.
+2. Run `./runCase.sh <sweep-file>`.
 3. Measure y+ in each case. The mesh does not set y+, and the velocity
    changes by a factor of 6 from M 0.3 to M 1.8.
 
@@ -400,7 +400,7 @@ h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
 h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
-# sweep.txt
+# sweep file
 m03-h0  --mesh h0 --solver pimple --Minf 0.3
 m03-h1  --mesh h1 --solver pimple --Minf 0.3  --init m03-h0
 m03-h2  --mesh h2 --solver pimple --Minf 0.3  --init m03-h1
@@ -443,8 +443,10 @@ Use one of these two methods:
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers × 3 angles of attack
 
 `meshes.txt` holds the three meshes of the study plus `h0` to start them,
-and `sweep.txt` the 66 runs: 5 Mach numbers × α = 0, 8, 16° × 4 meshes,
-plus 6 `pimple` start runs. Each Mach number and angle is a chain
+and two sweep files the 66 runs: 5 Mach numbers × α = 0, 8, 16° × 4 meshes,
+plus 6 `pimple` start runs. `sweepSupersonic.txt` has M 1.2 and 1.8 (30
+runs) on socket 0, `sweepSubsonic.txt` has M 0.3, 0.6 and 0.8 (36 runs) on
+socket 1, each with 14 processes, one per physical core. Each Mach number and angle is a chain
 h0 → h1 → h2 → h3, each run started from the previous one (`--init`). M 0.3,
 0.6 and 0.8 run `pimple` on all the meshes. M 1.2 and 1.8 start with a
 `pimple` run on `h0` (`m18-a16-h0-pimple`, ...) and run `central` from it
@@ -495,10 +497,11 @@ computer:
 
    `h2` and `h3` are not built yet: fill the row when they are.
 
-4. Run the cases:
+4. Run the two files at the same time:
 
    ```bash
-   ./runCase.sh
+   nohup ./runCase.sh sweepSupersonic.txt > ~/log.sweepSupersonic 2>&1 &
+   nohup ./runCase.sh sweepSubsonic.txt   > ~/log.sweepSubsonic   2>&1 &
    ```
 
 The flight conditions are those of the coast phase (t > 4 s) of the IREC
@@ -532,7 +535,7 @@ mesh/Allmesh ~/meshes/base                                   # mesh
 cd ~/runs/NAME && ./Allrun 8                                 # run
 
 ./runMesh.sh meshes.txt ~/meshes                             # meshes
-./runCase.sh sweep.txt ~/runs ~/meshes                       # sweep
+./runCase.sh sweepSupersonic.txt ~/runs ~/meshes             # sweep
 
 ./Allrefine tip                                              # before Allrun
 ./Allclean                                                   # removes mesh and results

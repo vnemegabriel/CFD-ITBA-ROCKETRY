@@ -1,0 +1,60 @@
+# One run per line:  <name> <newCase.sh options>
+# --mesh names the mesh (a bare name lives in ~/meshes); build it first with
+# ./runMesh.sh (meshes.txt).  Blank lines and # are ignored.
+# ./runCase.sh runs them in series, on socket 0 with 14 processes.
+# M 1.2 and 1.8.  sweepSubsonic.txt has M < 1 on socket 1; run both at once.
+#
+# Each Mach number and angle of attack (0, 8, 16 deg) is a chain
+# h0 -> h1 -> h2 -> h3, each run started from the previous one (--init,
+# mapFields).  h0 is not part of the mesh study.  --alpha turns the free
+# stream in the x-y plane; the mesh does not change.
+# M < 1 runs rhoPimpleFoam.  M > 1 runs rhoCentralFoam, started on h0 from a
+# rhoPimpleFoam run at the same Mach: from the uniform free stream the base
+# wake empties and rhoCentralFoam crashes (docs/SOLVERS.md section 17).
+#
+# Coast, t > 4 s: pInf and Tinf are ISA at the altitude where the TeleMega
+# passes each Mach (pad 896 m MSL).
+#   M 1.8  t  4.0 s  1936 m      M 0.8  t 13.5 s  5604 m      M 0.3  t 26.5 s  7901 m
+#   M 1.2  t  8.2 s  3913 m      M 0.6  t 18.3 s  6710 m
+
+m18-a00-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 0  --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-a00-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 0  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a00-h0-pimple
+m12-a00-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 0  --Minf 1.2 --pInf 62346 --Tinf 262.72
+m12-a00-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 0  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a00-h0-pimple
+
+m18-a08-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 8  --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-a08-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 8  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a08-h0-pimple
+m12-a08-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 8  --Minf 1.2 --pInf 62346 --Tinf 262.72
+m12-a08-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 8  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a08-h0-pimple
+
+m18-a16-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 16 --Minf 1.8 --pInf 80127 --Tinf 275.56
+m18-a16-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 16 --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a16-h0-pimple
+m12-a16-h0-pimple  --np 14 --socket 0 --mesh h0 --solver pimple  --alpha 16 --Minf 1.2 --pInf 62346 --Tinf 262.72
+m12-a16-h0         --np 14 --socket 0 --mesh h0 --solver central --alpha 16 --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a16-h0-pimple
+
+m18-a00-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 0  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a00-h0
+m12-a00-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 0  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a00-h0
+
+m18-a08-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 8  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a08-h0
+m12-a08-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 8  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a08-h0
+
+m18-a16-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 16 --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a16-h0
+m12-a16-h1         --np 14 --socket 0 --mesh h1 --solver central --alpha 16 --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a16-h0
+
+m18-a00-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 0  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a00-h1
+m12-a00-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 0  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a00-h1
+
+m18-a08-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 8  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a08-h1
+m12-a08-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 8  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a08-h1
+
+m18-a16-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 16 --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a16-h1
+m12-a16-h2         --np 14 --socket 0 --mesh h2 --solver central --alpha 16 --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a16-h1
+
+m18-a00-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 0  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a00-h2
+m12-a00-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 0  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a00-h2
+
+m18-a08-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 8  --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a08-h2
+m12-a08-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 8  --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a08-h2
+
+m18-a16-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 16 --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-a16-h2
+m12-a16-h3         --np 14 --socket 0 --mesh h3 --solver central --alpha 16 --Minf 1.2 --pInf 62346 --Tinf 262.72  --init m12-a16-h2
