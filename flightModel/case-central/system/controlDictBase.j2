@@ -1,0 +1,64 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDictBase;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+#include "${FOAM_CASE}/constant/meshInfo"
+
+// rhoCentralFoam: density-based, explicit, central-upwind shock capturing.
+application     rhoCentralFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+
+// localEuler: time counts iterations.
+deltaT          1;
+endTime         {{ endIter }};
+
+writeControl    timeStep;
+writeInterval   500;
+purgeWrite      1;
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+// Each cell steps at maxCo, capped at maxDeltaT [s].  maxCo is NOT set here:
+// system/controlDict and every fileUpdaterControlDict/controlDict_* include
+// this file and add their own, and system/fileUpdater swaps them.
+adjustTimeStep  no;
+maxDeltaT       1;
+rDeltaTSmoothingCoeff 0.1;
+
+functions
+{
+    #include "${FOAM_CASE}/system/FOs/FOcommon"
+
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   50;
+        fields          (U e k omega);
+        writeResidualFields no;
+    }
+
+    #include "${FOAM_CASE}/system/fileUpdater"
+}
+
+// ************************************************************************* //

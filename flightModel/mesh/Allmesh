@@ -1,0 +1,139 @@
+#!/bin/sh
+# ./Allmesh <mesh-dir> [source.stl] [--maxCellSize m]
+#           [--nLayers n] [--thicknessRatio r] [--full]
+#
+#     ./Allmesh ~/meshes/base
+#     ./Allmesh ~/meshes/h2 --maxCellSize 0.8
+#     ./Allmesh ~/meshes/otro stl/mi_cohete.stl
+#     ./Allmesh ~/meshes/h1full --full
+#
+# The default is the half mesh, z >= 0, with a symmetry plane on z = 0: the
+# full rocket with the fins at 45 deg, meshed whole and cut at z = 0.
+# --full meshes the whole rocket with the fins at 0 deg.
+# Builds the mesh in <mesh-dir> with a copy of system/ and meshInfo, so every
+# mesh keeps the meshDict that made it.  The options are set on that copy.
+# Never overwrites an existing directory.
+set -e
+HERE=$(cd "${0%/*}" && pwd)
+. "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
+# awk reads and writes numbers with the locale's decimal sign: es_ES gave
+# 11,775 to surfaceGenerateBoundingBox and a wrong domain
+LC_ALL=C; export LC_ALL
+
+check() {
+    grep -q "FOAM FATAL" "log.$1" 2>/dev/null && {
+        echo "!! $1 failed:"; grep -A4 "FOAM FATAL" "log.$1" | head -8; exit 1; }
+    return 0
+}
+
+usage() { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+DIR=""; SRC=""; H=""; NL=""; TR=""; HALF=1
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --maxCellSize) H=$2;   shift 2 ;;
+        --nLayers)     NL=$2;  shift 2 ;;
+        --thicknessRatio) TR=$2; shift 2 ;;
+        --full)        HALF=0; shift ;;
+        -*) echo "unknown option $1"; usage ;;
+        *)  if [ -z "$DIR" ]; then DIR=$1; elif [ -z "$SRC" ]; then SRC=$1; else usage; fi
+            shift ;;
+    esac
+done
+[ -n "$DIR" ] || usage
+if [ $HALF = 1 ]; then
+    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117_roll45.stl}
+else
+    SRC=${SRC:-$HERE/stl/Aconcagua_biconvex117.stl}
+fi
+[ -f "$SRC" ] || SRC=$HERE/$SRC
+[ -f "$SRC" ] || { echo "no such surface: $SRC"; exit 1; }
+SRC=$(realpath "$SRC")
+[ -e "$DIR" ] && { echo "!! $DIR exists -- pick a new directory"; exit 1; }
+
+mkdir -p "$DIR"
+cp -r "$HERE/system" "$HERE/meshInfo" "$DIR/"
+cd "$DIR"
+# foamDictionary -set echoes the entry on stderr
+setEntry() {
+    foamDictionary -entry "$1" -set "$2" system/meshDict > /dev/null 2>&1 ||
+        { echo "!! cannot set $1 in meshDict"; exit 1; }
+}
+# Before any foamDictionary -set: it evaluates the #eval of the regions and
+# writes the numbers, so lBody and rBody must already be those of meshInfo.
+for v in lBody rBody; do
+    sed -i "s/^$v .*;/$v $(foamDictionary -entry $v -value meshInfo);/" system/meshDict
+done
+[ -z "$H" ] || setEntry maxCellSize "$H"
+for p in cone walls tail; do
+    [ -z "$NL" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/nLayers "$NL"
+    [ -z "$TR" ] || setEntry boundaryLayers/patchBoundaryLayers/$p/thicknessRatio "$TR"
+done
+
+for E in finEdges finRoots; do
+    [ -f "${SRC%.stl}_$E.obj" ] || { echo "!! no ${SRC%.stl}_$E.obj: make it with makeRocket.py"; exit 1; }
+    cp "${SRC%.stl}_$E.obj" "$E.obj"
+done
+
+# STL solid names become patch names; the cases expect these four.
+sed -e 's/^\( *\(end\)\?solid \)nosecone\b/\1cone/' \
+    -e 's/^\( *\(end\)\?solid \)body\b/\1walls/' \
+    -e 's/^\( *\(end\)\?solid \)boattail\b/\1tail/' \
+    "$SRC" > surface.stl
+
+# surfaceGenerateBoundingBox takes metres out from the model bounding box.
+# Upstream and downstream are measured from the rocket; the side walls go on
+# |y|, |z| = 11.775 m whatever the rocket, so the box is symmetric in z and
+# the octree has faces on z = 0 for the half mesh to be cut along.
+set -- $(awk -v w=11.775 '$1 == "vertex" {
+        for (i = 3; i <= 4; i++) { if (!n || $i < lo[i]) lo[i] = $i; if (!n || $i > hi[i]) hi[i] = $i }; n = 1 }
+    END { printf "%.9g %.9g %.9g %.9g\n", w + lo[3], w - hi[3], w + lo[4], w - hi[4] }' surface.stl)
+runApplication surfaceGenerateBoundingBox surface.stl geometry.stl 17.73 38.415 "$@"
+check surfaceGenerateBoundingBox
+
+runApplication surfaceFeatureEdges -angle 60 geometry.stl geometry.fms
+check surfaceFeatureEdges
+
+runApplication cartesianMesh
+check cartesianMesh
+
+runApplication createPatch -overwrite
+check createPatch
+
+if [ $HALF = 1 ]; then
+    runApplication topoSet -dict system/topoSetDictHalf
+    check topoSet
+    runApplication subsetMesh upper -overwrite
+    check subsetMesh
+    python3 "$HERE/snapPlane.py" . oldInternalFaces > log.snapPlane
+    runApplication -s half createPatch -overwrite -dict system/createPatchDictHalf
+    check createPatch.half
+    foamDictionary -entry sector -set half meshInfo > /dev/null
+    foamDictionary -entry symmetryFraction -set 0.5 meshInfo > /dev/null
+    foamDictionary -entry Aref -set \
+        "$(awk -v a="$(foamDictionary -entry Aref -value meshInfo)" 'BEGIN { printf "%.9g", a / 2 }')" meshInfo > /dev/null
+fi
+
+for P in $(foamDictionary -entry wallPatches -value meshInfo | tr -d '()'); do
+    T=$(foamDictionary -entry "entry0/$P/type" -value constant/polyMesh/boundary 2>/dev/null) || T=missing
+    [ "$T" = wall ] || { echo "!! patch $P is $T, the wall functions need wall"; exit 1; }
+done
+
+runApplication checkMesh -allTopology -allGeometry
+check checkMesh
+
+N=$(awk '/^    cells:/{print $2; exit}' log.checkMesh)
+foamDictionary -entry nCells -set "$N" meshInfo > /dev/null
+foamDictionary -entry maxCellSize -add "$(foamDictionary -entry maxCellSize -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry finLevel -add \
+    "$(foamDictionary -entry localRefinement/fins/additionalRefinementLevels -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry nLayers -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/nLayers -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry thicknessRatio -add "$(foamDictionary -entry boundaryLayers/patchBoundaryLayers/walls/thicknessRatio -value system/meshDict)" meshInfo > /dev/null
+foamDictionary -entry meshDir -add "\"$(pwd)\"" meshInfo > /dev/null
+
+echo
+grep -E "cells:|hexahedra:|prisms:|polyhedra:|negative cell volume|non-orthogonality Max|Max skewness|Failed|Mesh OK" \
+     log.checkMesh | sed 's/^/   /'
+echo
+grep -q "negative cell volume" log.checkMesh && {
+    echo "!! negative cell volumes: this mesh is unusable"; exit 1; }
+echo "next: ./newCase.sh <run> --mesh $(pwd) --Minf 0.3"

@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, shared     |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+runTimeControl1
+{
+    type            runTimeControl;
+    libs            (utilityFunctionObjects);
+    timeStart       {{ minIter }};
+    conditions
+    {
+{%- for field in coeffs_fields %}
+        condition{{ loop.index0 }}
+        {
+            type            average;
+            functionObject  forceCoeffs1;
+            fields          ({{ field }});
+            tolerance       {{ coeffs_variation[loop.index0] }};
+            window          {{ coeffs_window[loop.index0] }};
+            windowType      approximate;
+            resetOnRestart  true;
+            groupID         1;
+        }
+{%- endfor %}
+    }
+}
+
+// ************************************************************************* //

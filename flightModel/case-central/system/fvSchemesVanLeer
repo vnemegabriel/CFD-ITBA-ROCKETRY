@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// ============================================================================
+//  rhoCentralFoam is DENSITY-BASED: it does not solve a pressure equation at
+//  all.  It advances rho, rhoU and rhoE with a central-upwind flux and then
+//  applies the diffusive corrections implicitly.  So this file looks nothing
+//  like the pressure-based one: the interesting entries are `fluxScheme` and
+//  the `reconstruct(...)` interpolations, not divSchemes.
+//
+//  Follows $FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35,
+//  the shipped supersonic external RANS case.  docs/SOLVERS.md gives the
+//  references for the flux scheme and the limiter.
+// ============================================================================
+
+// Kurganov-Tadmor / Kurganov-Noelle-Petrova central-upwind flux.  It splits
+// the face flux by the local wave speeds a+ and a-, so it captures a shock
+// without a Riemann solver and without tuned artificial viscosity.
+fluxScheme      Kurganov;
+
+ddtSchemes
+{
+    // Local time stepping: each cell at maxCo, pseudo-steady.  The Courant
+    // number in the log uses controlDict deltaT (1), not the local step.
+    default         localEuler;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+    // the only explicit divergence: the deviatoric part of the viscous stress
+    div(tauMC)      Gauss linear;
+    // turbulence transport, upwinded
+    div(phi,k)      Gauss upwind;
+    div(phi,omega)  Gauss upwind;
+}
+
+interpolationSchemes
+{
+    default         linear;
+
+    // MUSCL reconstruction of the primitive variables to the faces, with the
+    // van Leer limiter.  This is where the shock capturing happens: the
+    // limiter drops the scheme to first order at a discontinuity and keeps it
+    // second order in smooth regions, so the shock stays monotone.
+    // vanLeerV is the vector form, which limits on the direction of steepest
+    // change rather than component by component.
+    reconstruct(rho)    vanLeer;
+    reconstruct(U)      vanLeerV;
+    reconstruct(T)      vanLeer;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear limited corrected 0.33;
+}
+
+snGradSchemes
+{
+    default         limited corrected 0.33;
+}
+
+wallDist
+{
+    method          meshWave;
+}
+
+// ************************************************************************* //

@@ -1,0 +1,10 @@
+/README.md
+/config.json
+/system/controlDict
+/system/controlDictBase.j2
+/system/fileUpdater.j2
+/system/fileUpdaterControlDict/
+/system/fvSchemes
+/system/fvSchemesUpwind
+/system/fvSchemesVanLeer
+/system/fvSolution

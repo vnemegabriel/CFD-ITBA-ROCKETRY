@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - compressible external aero |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flowDerived;
+}
+// ============================================================================
+//  Derived from system/flowConditions -- nothing to edit here.
+//
+//  Every formula below is written out so the case is checkable by hand.
+//  References are in docs/SOLVERS.md; the short version:
+//
+//    a     = sqrt(gamma R T)            speed of sound, calorically perfect gas
+//    rho   = p / (R T)                  ideal gas law
+//    mu    = As sqrt(T) / (1 + Ts/T)    Sutherland's law, OpenFOAM's form
+//    k     = 3/2 (U Ti)^2               isotropic turbulence from an intensity
+//    omega = k / nut                    from the eddy-viscosity definition
+//                                       nut = k/omega  (Wilcox / Menter)
+//    alphat = rho nut / Prt             turbulent thermal diffusivity
+//
+//  R and gamma are consistent with constant/thermophysicalProperties:
+//  molWeight 28.96 kg/kmol gives R = 8314.46/28.96 = 287.05 J/(kg K), and
+//  Cp = 1005 J/(kg K) gives gamma = Cp/(Cp - R) = 1.400.
+// ============================================================================
+#include "${FOAM_CASE}/system/flowConditions"
+
+// ---- gas constants: keep consistent with thermophysicalProperties ----------
+Rgas            287.05;     // J/(kg K)   8314.46 / 28.96
+gammaGas        1.4;        // -          Cp/(Cp - R) with Cp = 1005
+Prt             0.85;       // -          turbulent Prandtl number
+
+// ---- free stream ------------------------------------------------------------
+aInf            #eval{ sqrt($gammaGas*$Rgas*$Tinf) };
+Uinf            #eval{ $Minf*$aInf };
+rhoInf          #eval{ $pInf/($Rgas*$Tinf) };
+muInf           #eval{ 1.4792e-06*sqrt($Tinf)/(1 + 116/$Tinf) };
+nuInf           #eval{ $muInf/$rhoInf };
+
+// ---- velocity vector --------------------------------------------------------
+Ux              #eval{ $Uinf*cos(degToRad($alpha))*cos(degToRad($beta)) };
+Uy              #eval{ $Uinf*sin(degToRad($alpha))*cos(degToRad($beta)) };
+Uz              #eval{ $Uinf*sin(degToRad($beta)) };
+
+// ---- unit vectors for the force coefficients --------------------------------
+// drag along the free stream, lift normal to it in the pitch (x-y) plane
+dx              #eval{ cos(degToRad($alpha))*cos(degToRad($beta)) };
+dy              #eval{ sin(degToRad($alpha))*cos(degToRad($beta)) };
+dz              #eval{ sin(degToRad($beta)) };
+lx              #eval{ -sin(degToRad($alpha)) };
+ly              #eval{ cos(degToRad($alpha)) };
+lz              0;
+
+// ---- inlet turbulence -------------------------------------------------------
+kInlet          #eval{ 1.5*sqr($Uinf*$Ti) };
+nutInlet        #eval{ $nuRatio*$nuInf };
+omegaInlet      #eval{ $kInlet/$nutInlet };
+alphatInlet     #eval{ $rhoInf*$nutInlet/$Prt };
+
+// ************************************************************************* //
