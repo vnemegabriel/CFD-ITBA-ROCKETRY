@@ -30,7 +30,7 @@ el eje x, y a 16° la estela sale de ellos a menos de 0.4 m de la base.
 No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas para todo el barrido:** h1, h2, h3 para la
-convergencia (sólo cambia `maxCellSize`, razón 2^(1/4)) y h0, más gruesa, para
+convergencia (sólo cambia `maxCellSize`, razón √2) y h0, más gruesa, para
 inicializar las corridas de h1 con `newCase.sh --init`. Media malla, con plano
 de simetría en z = 0 y aletas a 45°: `Allmesh` malla el cohete completo y lo
 corta en z = 0 con `subsetMesh`. Las capas dejan la primera celda del cuerpo

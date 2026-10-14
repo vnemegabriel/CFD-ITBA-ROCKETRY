@@ -34,7 +34,7 @@ does, and the result.
 | `jinja2` | `jinja2-cli`. Install it with `pipx install jinja2-cli`. |
 | Shell tools | `bash`, `rsync`, `awk`, GNU `sed`. |
 | Python 3 | Only for `mesh/makeRocket.py`. Standard library only. |
-| Memory | 32 GB. `checkMesh` used 12.7 GB on a mesh of 14.2 M cells. |
+| Memory | 32 GB. `checkMesh` used 12.7 GB on a mesh of 14.2 M cells; `h3` has 10.0 M. |
 
 Do this step before you use a script:
 
@@ -235,7 +235,7 @@ Meshes and cases are two steps. `runMesh.sh` builds the meshes;
 
 ```
 h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
-h2  --maxCellSize 1.3454 --nLayers 9  --thicknessRatio 1.211
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
 ```
 
 ```bash
@@ -408,21 +408,19 @@ start-time directory only.
 
 1. Change only `maxCellSize`, with a constant ratio. Do not change the
    levels. All cell sizes then change by the same ratio.
-2. The study uses the ratio 2^(1/4) ≈ 1.19 in `maxCellSize` from `h1` to
-   `h3`. With √2, the third mesh was too fine for the 66 runs, and the
-   mesh at `maxCellSize` 1.1314 (4.3 M cells) is now `h3`. Celik et al.
-   (2008) recommend a ratio larger than 1.3 in h = N^(−1/3). The mesh
-   does not refine uniformly: one step of √2 multiplied N by about 2,
-   not 2√2, so r in N^(−1/3) is about 1.26 with √2 and less with 2^(1/4).
-   Calculate r from the measured N of each pair, not from `maxCellSize`.
+2. Use the ratio √2. The method of Celik et al. (2008) requires a ratio
+   larger than 1.3. Each step multiplies the number of cells by up to
+   2√2 ≈ 2.8. The mesh does not refine uniformly: measured, N grows ×1.95
+   from `h1` to `h2` and ×2.34 from `h2` to `h3`, so r = (N_fine/N_coarse)^(1/3)
+   is 1.25 and 1.33. Use these values, not √2, in VALIDATION.md §4.2.
 3. Use the same Mach number for all meshes.
 
 ```
 # meshes.txt
 h0  --maxCellSize 2.2627 --nLayers 12 --thicknessRatio 1.1878
 h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
-h2  --maxCellSize 1.3454 --nLayers 9  --thicknessRatio 1.211
-h3  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
 
 # sweep file
 m03-h0  --mesh h0 --solver pimple --Minf 0.3
@@ -516,8 +514,8 @@ computer:
    |---|---|---|---|---|---|---|
    | `h0` | 2.2627 | 1 074 798 | 0 | 2.37 | 65.7 | 0.097 mm |
    | `h1` | 1.6 | 2 198 939 | 0 | 1.72 | 66.0 | 0.100 mm |
-   | `h2` | 1.3454 | 2 890 436 | 0 | 1.71 | 65.7 | 0.107 mm |
-   | `h3` | 1.1314 | 4 285 770 | 0 | 1.58 | 65.6 | 0.096 mm |
+   | `h2` | 1.1314 | 4 285 770 | 0 | 1.58 | 65.6 | 0.096 mm |
+   | `h3` | 0.8 | 10 020 768 | 0 | 1.41 | 65.9 | 0.101 mm |
 
 4. Run the two files at the same time:
 
