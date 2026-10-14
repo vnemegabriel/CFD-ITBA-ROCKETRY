@@ -10,9 +10,9 @@ flightModel/case-central/ plantilla rhoCentralFoam, M > 1
 flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 (sólo lo que difiere)
 flightModel/newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
 flightModel/runMesh.sh    construye las mallas de meshes.txt
-flightModel/runCase.sh    corre todo sweep.txt en serie, sobre mallas ya hechas
+flightModel/runCase.sh    corre un archivo de sweep en serie, sobre mallas ya hechas
 flightModel/meshes.txt    una malla por línea
-flightModel/sweep.txt     un punto de Mach por línea
+flightModel/sweep*.txt    una corrida por línea: M > 1 en el socket 0, M < 1 en el 1
 flightModel/docs/         cómo se usa y por qué
 ```
 

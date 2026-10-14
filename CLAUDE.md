@@ -50,7 +50,8 @@ flightModel/case-central/ plantilla rhoCentralFoam, M > 1
 flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
 flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
-flightModel/runCase.sh    sweep.txt en serie, sobre mallas ya hechas
+flightModel/runCase.sh    un sweep*.txt en serie, sobre mallas ya hechas: sweepSupersonic.txt
+                          en el socket 0 y sweepSubsonic.txt en el 1, a la vez
 flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
                           firstLayer.py (t1 e y de la primera celda)
 ```
