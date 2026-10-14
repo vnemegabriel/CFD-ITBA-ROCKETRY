@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+{#- Courant ramp from the OpenFOAM ToolChain (templates/rhoCentralFoam).
+    localEuler: time counts iterations. -#}
+{%- set ns = namespace(ev=[]) %}
+{%- for it, f in [(0,'1'),(20,'2'),(35,'3'),(50,'4'),(65,'5'),(80,'6'),(100,'7')] %}
+{%- set ns.ev = ns.ev + [(it, f)] %}
+{%- endfor %}
+{%- if vanLeer != -1 %}
+{%- for di, f in [(0,'1'),(20,'2'),(35,'3'),(150,'4'),(300,'5'),(800,'6'),(2000,'7')] %}
+{%- set ns.ev = ns.ev + [(vanLeer + di, f)] %}
+{%- endfor %}
+{%- endif %}
+{%- set ns.ev = ns.ev|sort(attribute='0') %}
+{#- final_Co only after the whole ramp: a jump in maxCo crashes rhoCentralFoam #}
+{%- set ns.ev = ns.ev + [([minIter, ns.ev[-1][0] + 1]|max, 'final')] %}
+
+fileUpdate1
+{
+    type            timeActivatedFileUpdate;
+    libs            (utilityFunctionObjects);
+    writeControl    timeStep;
+    writeInterval   1;
+    fileToUpdate    "$FOAM_CASE/system/controlDict";
+    timeVsFile
+    (
+{%- for it, f in ns.ev %}
+        ({{ -1 if loop.first else it }}  "$FOAM_CASE/system/fileUpdaterControlDict/controlDict_{{ f }}")
+{%- endfor %}
+    );
+}
+
+fileUpdate2
+{
+    type            timeActivatedFileUpdate;
+    libs            (utilityFunctionObjects);
+    writeControl    timeStep;
+    writeInterval   1;
+    fileToUpdate    "$FOAM_CASE/system/fvSchemes";
+    timeVsFile
+    (
+        (-1  "$FOAM_CASE/system/fvSchemesUpwind")
+{%- if vanLeer != -1 %}
+        ({{ vanLeer }}  "$FOAM_CASE/system/fvSchemesVanLeer")
+{%- endif %}
+    );
+}
+
+// ************************************************************************* //

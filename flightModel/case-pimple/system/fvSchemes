@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoPimple  |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+
+ddtSchemes
+{
+    default         localEuler;
+}
+
+gradSchemes
+{
+    default         cellLimited Gauss linear 1;
+    grad(p)         cellLimited Gauss linear 0.333;
+    grad(e)         cellLimited Gauss linear 0.333;
+}
+
+divSchemes
+{
+    default         none;
+    div(phi,U)      Gauss vanLeerV;
+    div(phi,e)      Gauss limitedLinear 1;
+    div(phi,K)      Gauss linear;
+    div(phiv,p)     Gauss upwind;
+    div(phid,p)     Gauss limitedLinear 1;
+    div(phi,k)      Gauss upwind;
+    div(phi,omega)  Gauss upwind;
+    div(((rho*nuEff)*dev2(T(grad(U)))))    Gauss linear;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear limited corrected 0.33;
+}
+
+snGradSchemes
+{
+    default         limited corrected 0.33;
+}
+
+wallDist
+{
+    method          meshWave;
+}
+
+// ************************************************************************* //

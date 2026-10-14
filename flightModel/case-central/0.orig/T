@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Case:     Aconcagua - external aero, rhoCentral |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform $Tinf;
+
+boundaryField
+{
+    "(inlet|outlet|box)"
+    {
+        type            inletOutlet;
+        inletValue      $internalField;
+        value           $internalField;
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    // adiabatic: a 4 s burn is too short for the airframe to follow the
+    // recovery temperature (about 470 K at M 1.8)
+    "(cone|walls|tail|fins)"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

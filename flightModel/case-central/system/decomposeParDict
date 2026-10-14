@@ -1,0 +1,23 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Version:  v2412 (ESI / OpenCFD)
+    \\  /    A nd           | Case:     Aconcagua - external aero, rhoCentral
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Physical cores, not SMT threads: rhoCentralFoam is memory-bandwidth bound.
+numberOfSubdomains  8;
+
+method              scotch;
+
+// ************************************************************************* //
