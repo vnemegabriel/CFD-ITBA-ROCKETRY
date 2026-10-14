@@ -1,8 +1,0 @@
-{
-    "maxCo": 0.5,
-    "minIter": 1000,
-    "endIter": 20000,
-    "coeffs_fields": ["Cd"],
-    "coeffs_variation": [0.0001],
-    "coeffs_window": [1000]
-}
