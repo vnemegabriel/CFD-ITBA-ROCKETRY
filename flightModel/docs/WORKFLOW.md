@@ -524,6 +524,14 @@ computer:
    nohup ./runCase.sh sweepSubsonic.txt   > ~/log.sweepSubsonic   2>&1 &
    ```
 
+   On a computer with one socket of 8 cores (nemepad, while newton is out
+   of service) use `sweepSubsonic.nemepad.txt` and
+   `sweepSupersonic.nemepad.txt`: the same runs with `--np 8` and no
+   `--socket`. Run one file, then the other, never both at once. On `h0`,
+   `m08-a00-h0` takes 2.3 s per step with 8 processes (20 steps, 2026-10-15),
+   against 1.77 s with 14 processes on one socket of newton. The memory is
+   about 3 GB per million cells: `h3` does not fit in the 28 GB of nemepad.
+
 The flight conditions are those of the coast phase (t > 4 s) of the IREC
 flight in Midland. For each Mach number, `pInf` and `Tinf` are the ISA
 values at the altitude where the TeleMega recorded that Mach number. The
