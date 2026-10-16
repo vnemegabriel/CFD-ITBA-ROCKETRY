@@ -215,7 +215,7 @@ stable from the uniform free stream on `h1` at M 0.3 (§16.6).
 | `final_Co` | 0.5 | – | Maximum `maxCo` of the ramp. |
 | `endIter` | 20000 | 20000 | Last iteration if the criterion does not stop the run. |
 | `coeffs_fields` | `["Cd"]` | `["Cd"]` | Coefficients in the stop criterion. |
-| `coeffs_variation` | `[0.0001]` | `[0.0001]` | Absolute tolerance of each coefficient. |
+| `coeffs_variation` | `[0.007]` | `[0.007]` | Absolute tolerance of each coefficient: 0.007 is 2 % of `Cd` = 0.35, that of `m08-a00-h0`. A higher `Cd` gets less than 2 %, a lower one more. |
 | `coeffs_window` | `[1000]` | `[1000]` | Window of each coefficient, in iterations. |
 
 The sweep stops on `Cd` alone, also at α = 8 and 16°: check that `Cl` and
@@ -237,6 +237,11 @@ average over `coeffs_window` iterations. `timeStart minIter` starts it at
 only from `minIter`. The run stops when, for all the fields, the window is
 complete and |average − current value| < `coeffs_variation`. `endIter` is
 the second limit.
+
+To change the tolerance of a running case, edit `tolerance` in its
+`system/FOs/FOrunTimeControl` and `touch system/controlDict`. The solver
+reads the file again and starts the average from zero, so the run cannot
+stop before one more `coeffs_window`.
 
 ## 6. Turbulence
 
