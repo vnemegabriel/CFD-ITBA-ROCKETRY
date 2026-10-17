@@ -465,13 +465,13 @@ Use one of these two methods:
 ### 9.5 The sweep of record: 3 meshes × 5 Mach numbers × 3 angles of attack
 
 `meshes.txt` holds the three meshes of the study plus `h0` to start them,
-and two sweep files the 66 runs: 5 Mach numbers × α = 0, 8, 16° × 4 meshes,
+and two sweep files the 66 runs: 5 Mach numbers × α = 0, 4, 8° × 4 meshes,
 plus 6 `pimple` start runs. `sweepSupersonic.txt` has M 1.2 and 1.8 (30
 runs) on socket 0, `sweepSubsonic.txt` has M 0.3, 0.6 and 0.8 (36 runs) on
 socket 1, each with 14 processes, one per physical core. Each Mach number and angle is a chain
 h0 → h1 → h2 → h3, each run started from the previous one (`--init`). M 0.3,
 0.6 and 0.8 run `pimple` on all the meshes. M 1.2 and 1.8 start with a
-`pimple` run on `h0` (`m18-a16-h0-pimple`, ...) and run `central` from it
+`pimple` run on `h0` (`m18-a04-h0-pimple`, ...) and run `central` from it
 on, because `central` from the uniform free stream crashes at the base
 (SOLVERS.md §17). The runs are in order of mesh, so all the `h0` results
 come first.
@@ -482,14 +482,16 @@ regions of `meshDict` (`baseWake`, `nearWake`, `midWake`) are cones on the x
 axis, but the wake follows the free stream and moves tan α per metre
 towards +y:
 
-| Region | Radius | Length behind the base | Offset at 8° | Offset at 16° |
+| Region | Radius | Length behind the base | Offset at 4° | Offset at 8° |
 |---|---|---|---|---|
-| `baseWake` | 0.08 m | 0.36 m | 0.05 m | 0.10 m |
-| `nearWake` | 0.14 m | 0.85 m | 0.12 m | 0.24 m |
-| `midWake` | 0.26 m | 2.1 m | 0.30 m | 0.59 m |
+| `baseWake` | 0.08 m | 0.36 m | 0.03 m | 0.05 m |
+| `nearWake` | 0.14 m | 0.85 m | 0.06 m | 0.12 m |
+| `midWake` | 0.26 m | 2.1 m | 0.15 m | 0.30 m |
 
-At 16° the wake leaves the 6.25 mm region less than 0.4 m behind the base.
-Take this into account for the base drag at 16°.
+At 4° the wake stays inside the three regions. At 8° it leaves `midWake`
+about 1.85 m behind the base. The sweep had α = 16° until 2026-10-17; it was
+replaced by 4° because the TeleMega puts α in the coast below 0.2°
+(`flightData/`), and at 16° the wake left the regions 0.4 m behind the base.
 
 To make the same results on another
 computer:

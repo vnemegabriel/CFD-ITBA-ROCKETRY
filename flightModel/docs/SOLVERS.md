@@ -218,7 +218,7 @@ stable from the uniform free stream on `h1` at M 0.3 (§16.6).
 | `coeffs_variation` | `[0.007]` | `[0.007]` | Absolute tolerance of each coefficient: 0.007 is 2 % of `Cd` = 0.35, that of `m08-a00-h0`. A higher `Cd` gets less than 2 %, a lower one more. |
 | `coeffs_window` | `[1000]` | `[1000]` | Window of each coefficient, in iterations. |
 
-The sweep stops on `Cd` alone, also at α = 8 and 16°: check that `Cl` and
+The sweep stops on `Cd` alone, also at α = 4 and 8°: check that `Cl` and
 `CmPitch` are flat in `coefficient.dat` too. A tolerance for `CmPitch` has
 not been chosen: about the nose tip with `lRef` = 0.151 m it is of order
 10 to 100 times `Cl`. You can add `Cl` and `CmPitch` to `coeffs_fields`. The tolerance

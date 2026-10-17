@@ -24,9 +24,9 @@ resolver bien la malla, en orden:
 2. La estela de base, que es una fracción grande del Cd de un cohete.
 3. La fricción de pared, que depende de y+.
 
-El barrido va a α = 0, 8 y 16°, impuesto con el campo de velocidad
+El barrido va a α = 0, 4 y 8°, impuesto con el campo de velocidad
 (`--alpha`): la malla es la misma. Los conos de estela del `meshDict` siguen
-el eje x, y a 16° la estela sale de ellos a menos de 0.4 m de la base.
+el eje x; a 8° la estela sale de `midWake` a unos 1.85 m de la base.
 No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas para todo el barrido:** h1, h2, h3 para la
