@@ -135,7 +135,7 @@
             skinZ0
             {
                 type        patchEdge;
-                axis        x;
+                axis        xyz;
                 patches     $wallPatches;
                 surfaceType plane;
                 planeType   pointAndNormal;

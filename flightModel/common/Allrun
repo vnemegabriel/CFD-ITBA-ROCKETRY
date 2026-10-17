@@ -69,9 +69,11 @@ APP=$(getApplication)
 
 BINDING=none
 SOCKET=$(cat socket 2>/dev/null)
-if [ -z "$SOCKET" ] && [ "$(lscpu -p=SOCKET | grep -v '^#' | sort -u | wc -l)" = 1 ]; then
+if [ -z "$SOCKET" ] && [ "$(lscpu -p=SOCKET | grep -v '^#' | sort -u | wc -l)" = 1 ] &&
+   [ "$NP" -le "$(lscpu -p=CORE | grep -v '^#' | sort -un | wc -l)" ]; then
     SOCKET=0
 fi
+[ "$SOCKET" = none ] && SOCKET=""
 if [ -n "$SOCKET" ] && [ "$NP" -gt 1 ]; then
     CORES=$(lscpu -p=SOCKET,CORE | awk -F, -v s="$SOCKET" '$1 == s {print $2}' | sort -un | wc -l)
     [ "$NP" -le "$CORES" ] || { echo "!! $NP processes do not fit in the $CORES cores of socket $SOCKET"; exit 1; }
@@ -84,8 +86,17 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 START=$(date +%s)
 STARTISO=$(date -Iseconds)
 
+[ "$NP" -gt 1 ] && runApplication decomposePar -force
+
 # ---- measurement: docs/MEASUREMENTS.md section 5 -----------------------------
 ML=""; PERF=""; EPID=""; MPID=""; SNAP=""
+stopMeasure() {
+    [ -n "$MPID" ] && kill -TERM "$MPID" 2> /dev/null && wait "$MPID"
+    [ -n "$EPID" ] && pkill -P "$EPID" sleep; [ -n "$EPID" ] && wait "$EPID"
+    MPID=""; EPID=""
+}
+trap stopMeasure EXIT
+trap 'exit 1' INT TERM
 [ -f machineLog.py ] && ML="python3 -I machineLog.py"
 EVENTS=task-clock,cycles,instructions,stalled-cycles-frontend,cache-misses,cpu-migrations,context-switches
 if perf stat -x, -e cycles -- true > /dev/null 2>&1; then
@@ -105,7 +116,6 @@ fi
 [ "$(cat /sys/firmware/acpi/platform_profile 2>/dev/null || echo performance)" = performance ] ||
     echo "!! platform_profile is not performance: the cost will not compare"
 
-[ "$NP" -gt 1 ] && runApplication decomposePar -force
 SOLVER_START=$(date +%s)
 if [ "$NP" -gt 1 ]; then
     $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runParallel -np "$1" "$2"' sh "$NP" "$APP"
@@ -113,8 +123,7 @@ else
     $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runApplication "$1"' sh "$APP"
 fi
 SOLVER_END=$(date +%s)
-[ -n "$MPID" ] && kill -TERM "$MPID" && wait "$MPID"
-[ -n "$EPID" ] && pkill -P "$EPID" sleep; [ -n "$EPID" ] && wait "$EPID"
+stopMeasure
 [ "$NP" -gt 1 ] && runApplication reconstructPar -latestTime
 END=$(date +%s)
 

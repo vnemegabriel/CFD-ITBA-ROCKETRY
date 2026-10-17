@@ -528,9 +528,10 @@ computer:
    of service) use `sweepSubsonic.nemepad.txt` and
    `sweepSupersonic.nemepad.txt`: the same runs with `--np 8` and no
    `--socket`. Run one file, then the other, never both at once. On `h0`,
-   `m08-a00-h0` takes 2.3 s per step with 8 processes (20 steps, 2026-10-15),
-   against 1.77 s with 14 processes on one socket of newton. The memory is
-   about 3 GB per million cells: `h3` does not fit in the 28 GB of nemepad.
+   `m08-a00-h0` takes ~2.7 s per step with 8 processes (clean intervals of the
+   sweep runs, 2026-10-17), against 1.77 s with 14 processes on one socket of
+   newton: about 1.5 times slower per step. The memory is about 3 GB per
+   million cells: `h3` does not fit in the 28 GB of nemepad.
 
 The flight conditions are those of the coast phase (t > 4 s) of the IREC
 flight in Midland. For each Mach number, `pInf` and `Tinf` are the ISA

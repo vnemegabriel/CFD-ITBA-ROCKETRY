@@ -101,19 +101,27 @@ done
 [ -n "$NP" ] && foamDictionary -entry numberOfSubdomains -set "$NP" system/decomposeParDict > /dev/null
 [ -n "$SOCKET" ] && echo "$SOCKET" > socket
 
-if [ ! "$MESH/meshHash" -nt "$MESH/constant/polyMesh/points" ]; then
-    (cd "$MESH/constant/polyMesh" && cat points faces owner neighbour boundary | sha256sum | cut -c1-16) > "$MESH/meshHash"
+[ -n "$REFINE" ] && ./Allrefine "$REFINE"
+
+meshHash() { (cd "$1" && cat points faces owner neighbour boundary | sha256sum | cut -c1-16); }
+if [ -n "$REFINE" ]; then
+    HASH=$(meshHash constant/polyMesh)
+elif [ "$MESH/meshHash" -nt "$MESH/constant/polyMesh/points" ]; then
+    HASH=$(cat "$MESH/meshHash")
+else
+    HASH=$(meshHash "$MESH/constant/polyMesh")
+    { echo "$HASH" > "$MESH/meshHash.$$" && mv "$MESH/meshHash.$$" "$MESH/meshHash"; } 2> /dev/null || true
 fi
 TH=constant/thermophysicalProperties
 MW=$(foamDictionary -entry mixture/specie/molWeight -value $TH)
 CP=$(foamDictionary -entry mixture/thermodynamics/Cp -value $TH)
 fd() { foamDictionary -entry "$1" -value "$2"; }
 {
-    echo "meshHash    \"$(cat "$MESH/meshHash")\";"
+    echo "meshHash    \"$HASH\";"
     echo "flow"
     echo "{"
     foamDictionary -expand system/flowDerived | sed -n '/^}/,$p' | sed '1d; /^$/d; /^\/\//d; s/^/    /'
-    awk -v mw="$MW" -v cp="$CP" -v r="$(fd rhoInf system/flowDerived)" -v u="$(fd Uinf system/flowDerived)" \
+    LC_ALL=C awk -v mw="$MW" -v cp="$CP" -v r="$(fd rhoInf system/flowDerived)" -v u="$(fd Uinf system/flowDerived)" \
         -v mu="$(fd muInf system/flowDerived)" -v d="$(fd lRef constant/meshInfo)" \
         -v l="$(fd lBody constant/meshInfo)" 'BEGIN{
         R = 8314.46/mw; cv = cp - R
@@ -131,8 +139,6 @@ fd() { foamDictionary -entry "$1" -value "$2"; }
     echo "    initial         \"${INIT:-uniform free stream}\";"
     echo "}"
 } >> run.info
-
-[ -n "$REFINE" ] && ./Allrefine "$REFINE"
 
 echo
 echo "ready: cd $RUN && ./Allrun ${NP:+$NP}"

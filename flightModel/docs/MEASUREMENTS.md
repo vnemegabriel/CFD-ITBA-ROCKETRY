@@ -55,7 +55,7 @@ dict de OpenFOAM, así que se lee con `foamDictionary`.
 | `mesh`, `nCells` | `newCase.sh` | Malla enlazada y número de celdas |
 | `options` | `newCase.sh` | La línea de opciones tal cual |
 | `meshHash`, `flow` | `newCase.sh` | Huella de la malla y definición física del caso (§6) |
-| `host`, `cpu`, `np`, `binding` | `Allrun` | Máquina, procesos MPI y socket fijado. Con un solo socket se fija el 0 aunque no haya `--socket` |
+| `host`, `cpu`, `np`, `binding` | `Allrun` | Máquina, procesos MPI y socket fijado. Con un solo socket se fija el 0 aunque no haya `--socket`, si `np` entra en los núcleos físicos; `none` en el archivo `socket` lo desactiva (para una prueba al lado de otra corrida) |
 | `start`, `end`, `wallSeconds` | `Allrun` | Wall total de decomposePar + solver + reconstructPar |
 | `solverWallSeconds` | `Allrun` | Wall del solver solo |
 | `status` | `Allrun` | `ok` si el log del solver termina en `End`, si no `failed` |
@@ -254,7 +254,7 @@ que hay que medir igual en las dos.
 |---|---|
 | Historia de `Cd`, `Cl`, `CmPitch`, cada 50 pasos | `forceCoeffs1/*/coefficient.dat` |
 | Fuerza de presión y viscosa | `forces1/*/force.dat` |
-| Cp, τw e y+ a lo largo del cuerpo | `samples/*/skinZ0_*.csv` (corte 0.5 mm sobre z = 0: barlovento y sotavento) y `skinY0_*.csv` (sobre y = 0, de costado). Los dos planos pasan entre las aletas |
+| Cp, τw e y+ a lo largo del cuerpo | `samples/*/skinZ0_*.csv` (corte 0.5 mm sobre z = 0, con x, y, z: barlovento y < 0, sotavento y > 0) y `skinY0_*.csv` (sobre y = 0, de costado). Los dos planos pasan entre las aletas |
 | Perfiles de estela | `samples/*/wake05`, `wake1`, `wake2`, `wake5`: líneas en y de −0.6 a 0.6 m sobre z = 0, a 0.5, 1, 2 y 5 diámetros detrás de la base |
 | Eje | `samples/*/axis_*.csv`: de x = −0.5 m a 20 diámetros detrás de la base |
 | Control de corriente libre | `samples/*/freeStream_*.csv`: un punto 1 m delante de la punta |
