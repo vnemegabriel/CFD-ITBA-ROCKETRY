@@ -258,8 +258,8 @@ A sweep file has one case on each line: a case name, then the options of
 `newCase.sh`.
 
 ```
-m18-h1  --mesh h1 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56
-m18-h2  --mesh h2 --solver central --Minf 1.8 --pInf 80127 --Tinf 275.56  --init m18-h1
+m18-h1  --mesh h1 --solver central --Minf 1.8 --pInf 78354 --Tinf 295.82
+m18-h2  --mesh h2 --solver central --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-h1
 ```
 
 - Lines that start with `#`, and empty lines, have no effect.
@@ -536,17 +536,28 @@ computer:
    million cells: `h3` does not fit in the 28 GB of nemepad.
 
 The flight conditions are those of the coast phase (t > 4 s) of the IREC
-flight in Midland. For each Mach number, `pInf` and `Tinf` are the ISA
-values at the altitude where the TeleMega recorded that Mach number. The
-pad is at 896 m MSL. The data is in `fin_flutter/data/midland_telemega_data.csv`.
+flight in Midland, with the atmosphere of that day, not the ISA. The data is
+in `flightData/AconcaguaIREC_TeleMega.csv`, and `flightData/cdFlight.py`
+gets everything from it:
+
+- The pressure at the pad (896 m MSL) is the mean before launch, 90565 Pa.
+- The temperature profile is fitted to the GPS height above the pad against
+  the measured pressure, on the descent: 305.0 K at the pad and 7.2 K/km,
+  about ISA + 20 K.
+- The speed is the axial accelerometer integrated from t = 18 s, where the
+  baro is clean. The Mach number comes from that speed and the fitted
+  temperature; `pInf` and `Tinf` come from the integrated height.
 
 | M | t [s] | Altitude MSL [m] | `pInf` [Pa] | `Tinf` [K] |
 |---|---|---|---|---|
-| 1.8 | 4.0 | 1936 | 80127 | 275.56 |
-| 1.2 | 8.2 | 3913 | 62346 | 262.72 |
-| 0.8 | 13.5 | 5604 | 49800 | 251.72 |
-| 0.6 | 18.3 | 6710 | 42766 | 244.54 |
-| 0.3 | 26.5 | 7901 | 36113 | 236.79 |
+| 1.8 | 4.1 | 2171 | 78354 | 295.82 |
+| 1.2 | 8.5 | 4347 | 60547 | 280.15 |
+| 0.8 | 14.6 | 6289 | 47509 | 266.17 |
+| 0.6 | 19.8 | 7437 | 40911 | 257.90 |
+| 0.3 | 29.0 | 8679 | 34613 | 248.96 |
+
+Until 2026-10-17 they were the ISA values at the altitude of the TeleMega
+(e.g. M 0.8: 49800 Pa, 251.72 K); the runs in `~/runs.sin-medicion` use those.
 
 ## 10. Rules
 
