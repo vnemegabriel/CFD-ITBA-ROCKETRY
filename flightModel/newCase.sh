@@ -66,7 +66,7 @@ else
     ln -s "$MESH/constant/polyMesh" "$RUN/constant/polyMesh"
 fi
 cp "$MESH/meshInfo" "$RUN/constant/meshInfo"
-cp "$ROOT/common/Allrun" "$ROOT/common/Allrefine" "$RUN/"
+cp "$ROOT/common/Allrun" "$ROOT/common/Allrefine" "$ROOT/common/machineLog.py" "$RUN/"
 chmod +x "$RUN"/Allrun "$RUN"/Allrefine
 
 cd "$RUN"
@@ -102,6 +102,43 @@ done
 [ -n "$SOCKET" ] && echo "$SOCKET" > socket
 
 [ -n "$REFINE" ] && ./Allrefine "$REFINE"
+
+meshHash() { (cd "$1" && cat points faces owner neighbour boundary | sha256sum | cut -c1-16); }
+if [ -n "$REFINE" ]; then
+    HASH=$(meshHash constant/polyMesh)
+elif [ "$MESH/meshHash" -nt "$MESH/constant/polyMesh/points" ]; then
+    HASH=$(cat "$MESH/meshHash")
+else
+    HASH=$(meshHash "$MESH/constant/polyMesh")
+    { echo "$HASH" > "$MESH/meshHash.$$" && mv "$MESH/meshHash.$$" "$MESH/meshHash"; } 2> /dev/null || true
+fi
+TH=constant/thermophysicalProperties
+MW=$(foamDictionary -entry mixture/specie/molWeight -value $TH)
+CP=$(foamDictionary -entry mixture/thermodynamics/Cp -value $TH)
+fd() { foamDictionary -entry "$1" -value "$2"; }
+{
+    echo "meshHash    \"$HASH\";"
+    echo "flow"
+    echo "{"
+    foamDictionary -expand system/flowDerived | sed -n '/^}/,$p' | sed '1d; /^$/d; /^\/\//d; s/^/    /'
+    LC_ALL=C awk -v mw="$MW" -v cp="$CP" -v r="$(fd rhoInf system/flowDerived)" -v u="$(fd Uinf system/flowDerived)" \
+        -v mu="$(fd muInf system/flowDerived)" -v d="$(fd lRef constant/meshInfo)" \
+        -v l="$(fd lBody constant/meshInfo)" 'BEGIN{
+        R = 8314.46/mw; cv = cp - R
+        printf "    RgasThermo      %.6g;\n", R
+        printf "    PrEucken        %.4f;\n", cp/(cv*(1.32 + 1.77*R/cv))
+        printf "    RePerMetre      %.6g;\n", r*u/mu
+        printf "    ReD             %.6g;\n", r*u*d/mu
+        printf "    ReL             %.6g;\n", r*u*l/mu }'
+    echo "    thermo          \"$(fd thermoType/type $TH) $(fd thermoType/transport $TH) $(fd thermoType/energy $TH)\";"
+    echo "    sutherland      ($(fd mixture/transport/As $TH) $(fd mixture/transport/Ts $TH));"
+    echo "    Cp              $CP;"
+    echo "    turbulence      $(fd RAS/RASModel constant/turbulenceProperties);"
+    echo "    wallT           $(fd boundaryField/walls/type 0.orig/T);"
+    echo "    wallNut         $(fd boundaryField/walls/type 0.orig/nut);"
+    echo "    initial         \"${INIT:-uniform free stream}\";"
+    echo "}"
+} >> run.info
 
 echo
 echo "ready: cd $RUN && ./Allrun ${NP:+$NP}"

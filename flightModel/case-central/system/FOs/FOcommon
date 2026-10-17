@@ -110,4 +110,67 @@
         }
     }
 
+    // -- Lines to set against another solver (docs/MEASUREMENTS.md section 6):
+    //    the skin cut 0.5 mm off the planes z = 0 and y = 0, between the fins;
+    //    the wake 0.5, 1, 2 and 5 diameters behind the base; the axis; and a
+    //    free-stream point 1 m ahead of the nose.
+    samples
+    {
+        type            sets;
+        libs            (sampling);
+        writeControl    onEnd;
+        setFormat       csv;
+        interpolationScheme cellPoint;
+        fields          (p T U rho Ma k omega nut static(p)_coeff wallShearStress yPlus);
+
+        xW05            #eval{ $lBody + 0.5*$lRef };
+        xW1             #eval{ $lBody + 1.0*$lRef };
+        xW2             #eval{ $lBody + 2.0*$lRef };
+        xW5             #eval{ $lBody + 5.0*$lRef };
+        xEnd            #eval{ $lBody + 20.0*$lRef };
+        _wake           { type uniform; axis y; nPoints 401; }
+
+        sets
+        {
+            skinZ0
+            {
+                type        patchEdge;
+                axis        xyz;
+                patches     $wallPatches;
+                surfaceType plane;
+                planeType   pointAndNormal;
+                pointAndNormalDict { point (0 0 0.0005); normal (0 0 1); }
+                origin      (0 0 0);
+            }
+            skinY0
+            {
+                type        patchEdge;
+                axis        x;
+                patches     $wallPatches;
+                surfaceType plane;
+                planeType   pointAndNormal;
+                pointAndNormalDict { point (0 0.0005 0); normal (0 1 0); }
+                origin      (0 0 0);
+            }
+            wake05 { $_wake; start ($xW05 -0.6 0); end ($xW05 0.6 0); }
+            wake1  { $_wake; start ($xW1  -0.6 0); end ($xW1  0.6 0); }
+            wake2  { $_wake; start ($xW2  -0.6 0); end ($xW2  0.6 0); }
+            wake5  { $_wake; start ($xW5  -0.6 0); end ($xW5  0.6 0); }
+            axis
+            {
+                type        uniform;
+                axis        x;
+                start       (-0.5 0 0.0005);
+                end         ($xEnd 0 0.0005);
+                nPoints     1001;
+            }
+            freeStream
+            {
+                type        cloud;
+                axis        xyz;
+                points      ((-1 0 0.0005));
+            }
+        }
+    }
+
 // ************************************************************************* //

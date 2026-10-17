@@ -57,8 +57,9 @@ flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
 ```
 
 El Python es `mesh/makeRocket.py`, que escribe el STL, `mesh/snapPlane.py`,
-que aplana el corte de la media malla, y `post/firstLayer.py`, que mide la
-primera capa; sólo usan la biblioteca estándar. La
+que aplana el corte de la media malla, `post/firstLayer.py`, que mide la
+primera capa, y `common/machineLog.py`, que registra la máquina durante cada
+corrida (`docs/MEASUREMENTS.md` §5); sólo usan la biblioteca estándar. La
 malla se define en `mesh/system/meshDict` y todo ahí es un **nivel**: un
 entero que parte una celda al medio, local a un patch o a una caja, sin
 acoplarse a nada más.
