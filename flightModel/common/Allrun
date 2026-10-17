@@ -67,7 +67,7 @@ fi
 
 APP=$(getApplication)
 
-BINDING=none
+BINDING=none; MPIOPTS=--oversubscribe
 SOCKET=$(cat socket 2>/dev/null)
 if [ -z "$SOCKET" ] && [ "$(lscpu -p=SOCKET | grep -v '^#' | sort -u | wc -l)" = 1 ] &&
    [ "$NP" -le "$(lscpu -p=CORE | grep -v '^#' | sort -un | wc -l)" ]; then
@@ -80,6 +80,7 @@ if [ -n "$SOCKET" ] && [ "$NP" -gt 1 ]; then
     i=0; : > rankfile
     while [ $i -lt "$NP" ]; do echo "rank $i=localhost slot=$SOCKET:$i" >> rankfile; i=$((i + 1)); done
     OMPI_MCA_rmaps_rank_file_path=$PWD/rankfile; export OMPI_MCA_rmaps_rank_file_path
+    MPIOPTS="--bind-to core"
     BINDING="socket $SOCKET, one process per core"
 fi
 STAMP=$(date +%Y%m%d-%H%M%S)
@@ -118,7 +119,9 @@ fi
 
 SOLVER_START=$(date +%s)
 if [ "$NP" -gt 1 ]; then
-    $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runParallel -np "$1" "$2"' sh "$NP" "$APP"
+    # runParallel always adds --oversubscribe, and Open MPI 5 then ignores the rankfile
+    echo "Running $APP ($NP processes, $BINDING) on $PWD"
+    $PERF /usr/bin/time -v -o log.time mpirun $MPIOPTS -n "$NP" "$APP" -parallel < /dev/null > "log.$APP" 2>&1
 else
     $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runApplication "$1"' sh "$APP"
 fi

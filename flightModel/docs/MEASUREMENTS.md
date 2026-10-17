@@ -85,9 +85,13 @@ m06-h1  --np 8 --socket 1 --mesh h1 ...
 
 `newCase.sh` escribe `S` en el archivo `socket` del caso. `Allrun` arma un
 `rankfile` con el proceso `i` en el núcleo físico `i` de ese socket, y se lo
-pasa a Open MPI por `OMPI_MCA_rmaps_rank_file_path`, porque `runParallel` no
-acepta opciones de `mpirun`. Se detiene si `np` supera los núcleos del
-socket.
+pasa a Open MPI por `OMPI_MCA_rmaps_rank_file_path`. Llama a `mpirun`
+directamente, con `--bind-to core`, y no a `runParallel`: `runParallel`
+siempre agrega `--oversubscribe`, y con eso Open MPI 5 ignora el `rankfile` y
+deja cada proceso suelto en todos los CPUs (nemepad, 2026-10-17). Se detiene
+si `np` supera los núcleos del socket. Para comprobar el binding:
+`taskset -cp <pid>` de cada proceso tiene que dar los dos hilos de un solo
+núcleo.
 
 Cada corrida queda con su memoria, su L3 y un núcleo físico por proceso, sin
 hyperthreads ni migraciones. La frecuencia del turbo sí sigue dependiendo de
