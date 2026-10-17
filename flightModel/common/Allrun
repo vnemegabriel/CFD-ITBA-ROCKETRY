@@ -59,7 +59,7 @@ if [ -f initFrom ]; then
     } > system/changeDictionaryDict.init
     runApplication -overwrite mapFields "$SRC" -consistent -sourceTime latestTime
     runApplication -overwrite changeDictionary -dict system/changeDictionaryDict.init -time 0
-    if grep -q "FOAM FATAL" log.mapFields log.changeDictionary; then
+    if ! tail -n 3 log.mapFields | grep -q "^End" || ! tail -n 3 log.changeDictionary | grep -q "^End"; then
         echo "!! starting from $SRC failed: see log.mapFields, log.changeDictionary"; exit 1
     fi
     echo "initial field: $SRC, time $TSRC"
@@ -68,8 +68,11 @@ fi
 APP=$(getApplication)
 
 BINDING=none
-if [ -f socket ] && [ "$NP" -gt 1 ]; then
-    SOCKET=$(cat socket)
+SOCKET=$(cat socket 2>/dev/null)
+if [ -z "$SOCKET" ] && [ "$(lscpu -p=SOCKET | grep -v '^#' | sort -u | wc -l)" = 1 ]; then
+    SOCKET=0
+fi
+if [ -n "$SOCKET" ] && [ "$NP" -gt 1 ]; then
     CORES=$(lscpu -p=SOCKET,CORE | awk -F, -v s="$SOCKET" '$1 == s {print $2}' | sort -un | wc -l)
     [ "$NP" -le "$CORES" ] || { echo "!! $NP processes do not fit in the $CORES cores of socket $SOCKET"; exit 1; }
     i=0; : > rankfile
@@ -81,13 +84,38 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 START=$(date +%s)
 STARTISO=$(date -Iseconds)
 
-if [ "$NP" -gt 1 ]; then
-    runApplication decomposePar -force
-    /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runParallel -np "$1" "$2"' sh "$NP" "$APP"
-    runApplication reconstructPar -latestTime
+# ---- measurement: docs/MEASUREMENTS.md section 5 -----------------------------
+ML=""; PERF=""; EPID=""; MPID=""; SNAP=""
+[ -f machineLog.py ] && ML="python3 -I machineLog.py"
+EVENTS=task-clock,cycles,instructions,stalled-cycles-frontend,cache-misses,cpu-migrations,context-switches
+if perf stat -x, -e cycles -- true > /dev/null 2>&1; then
+    PERF="perf stat -x, -I 30000 -o log.perf -e $EVENTS --"
 else
-    /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runApplication "$1"' sh "$APP"
+    echo "!! perf cannot count cycles: set kernel.perf_event_paranoid <= 1"
 fi
+if perf stat -a -x, -e power/energy-pkg/ -- true > /dev/null 2>&1; then
+    perf stat -a -x, -I 30000 -o log.energy -e power/energy-pkg/ -- sleep 31536000 &
+    EPID=$!
+fi
+if [ -n "$ML" ]; then
+    SNAP=$($ML snapshot | sed 's/^/    /')
+    $ML sample log.machine 30 &
+    MPID=$!
+fi
+[ "$(cat /sys/firmware/acpi/platform_profile 2>/dev/null || echo performance)" = performance ] ||
+    echo "!! platform_profile is not performance: the cost will not compare"
+
+[ "$NP" -gt 1 ] && runApplication decomposePar -force
+SOLVER_START=$(date +%s)
+if [ "$NP" -gt 1 ]; then
+    $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runParallel -np "$1" "$2"' sh "$NP" "$APP"
+else
+    $PERF /usr/bin/time -v -o log.time sh -c '. "$WM_PROJECT_DIR/bin/tools/RunFunctions"; runApplication "$1"' sh "$APP"
+fi
+SOLVER_END=$(date +%s)
+[ -n "$MPID" ] && kill -TERM "$MPID" && wait "$MPID"
+[ -n "$EPID" ] && pkill -P "$EPID" sleep; [ -n "$EPID" ] && wait "$EPID"
+[ "$NP" -gt 1 ] && runApplication reconstructPar -latestTime
 END=$(date +%s)
 
 # ---- record ------------------------------------------------------------------
@@ -101,6 +129,10 @@ RSS=$(awk -F': ' '/Maximum resident/{print $2}' log.time)
 CD=$(tail -n 1 postProcessing/forceCoeffs1/*/coefficient.dat 2>/dev/null | tail -n 1 | awk '{print $2}')
 WALL=$((END - START))
 COST=$(awk -v w=$WALL -v n=$NP -v c=$NCELLS -v s=$STEPS 'BEGIN{print (s > 0) ? w*n*1e6/(c*s) : 0}')
+MEASURED=""
+[ -n "$ML" ] && MEASURED=$($ML summary log.machine log.perf log.energy | sed 's/^/    /')
+CYCLES=$(echo "$MEASURED" | awk '$1 == "cycles" {sub(";", "", $2); print $2}')
+CPCS=$(awk -v y="${CYCLES:-0}" -v c=$NCELLS -v s=$STEPS 'BEGIN{print (y > 0 && s > 0) ? y/(c*s) : 0}')
 
 cat >> run.info <<EOF
 
@@ -114,11 +146,21 @@ run_$STAMP
     end         "$(date -Iseconds)";
     status      $STATUS;
     wallSeconds $WALL;
+    solverWallSeconds $((SOLVER_END - SOLVER_START));
     steps       $STEPS;
     simTime     (${T0:-0} ${T1:-0});
     maxRSSkB    ${RSS:-0};
     coreUsPerCellStep $COST;
+    cyclesPerCellStep $CPCS;
     Cd          ${CD:-0};
+    machine
+    {
+$SNAP
+    }
+    measured
+    {
+$MEASURED
+    }
 }
 EOF
 
@@ -126,7 +168,8 @@ if [ "$NP" -gt 1 ] && grep -q '^End' log.reconstructPar 2>/dev/null; then
     rm -rf processor*
 fi
 mv log.time "log.time.$STAMP"
-for f in log.decomposePar "log.$APP" log.reconstructPar; do
+[ -f log.machine ] && mv log.machine "log.machine.$STAMP"
+for f in log.decomposePar "log.$APP" log.reconstructPar log.perf log.energy; do
     [ -f "$f" ] && xz -T0 --suffix=".$STAMP.xz" "$f"
 done
 
