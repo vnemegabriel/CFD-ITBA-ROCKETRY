@@ -53,14 +53,14 @@ m08-a16-h2         --np 8 --mesh h2 --solver pimple  --alpha 16 --Minf 0.8 --pIn
 m06-a16-h2         --np 8 --mesh h2 --solver pimple  --alpha 16 --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a16-h1
 m03-a16-h2         --np 8 --mesh h2 --solver pimple  --alpha 16 --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a16-h1
 
-m08-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a00-h2
-m06-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a00-h2
-m03-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a00-h2
+#m08-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a00-h2
+#m06-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a00-h2
+#m03-a00-h3         --np 8 --mesh h3 --solver pimple  --alpha 0  --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a00-h2
 
-m08-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a08-h2
-m06-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a08-h2
-m03-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a08-h2
+#m08-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a08-h2
+#m06-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a08-h2
+#m03-a08-h3         --np 8 --mesh h3 --solver pimple  --alpha 8  --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a08-h2
 
-m08-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a16-h2
-m06-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a16-h2
-m03-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a16-h2
+#m08-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.8 --pInf 49800 --Tinf 251.72  --init m08-a16-h2
+#m06-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.6 --pInf 42766 --Tinf 244.54  --init m06-a16-h2
+#m03-a16-h3         --np 8 --mesh h3 --solver pimple  --alpha 16 --Minf 0.3 --pInf 36113 --Tinf 236.79  --init m03-a16-h2
