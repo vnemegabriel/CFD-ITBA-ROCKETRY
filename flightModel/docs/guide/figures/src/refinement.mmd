@@ -1,0 +1,25 @@
+%% fontSize: 22
+flowchart LR
+  subgraph dom["Domain"]
+    subgraph far["farWake"]
+      subgraph wk["wake"]
+        subgraph nf["nearField · upstream → downstream"]
+          direction LR
+          subgraph tip["noseTip"]
+            ap["noseApex"]
+          end
+          body["wall bands"]
+          subgraph fin["fins"]
+            fe["edges, roots"]
+          end
+          sh["shoulder,<br/>baseEdge"]
+          subgraph mw["midWake"]
+            subgraph nw["nearWake"]
+              bw["baseWake"]
+            end
+          end
+          ap ~~~ body ~~~ fe ~~~ sh ~~~ bw
+        end
+      end
+    end
+  end

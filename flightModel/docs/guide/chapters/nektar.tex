@@ -22,13 +22,13 @@ Item & Where it is & Note \\
 Item & Where it is & Note \\
 \midrule
 \endhead
-Mesh & \ent{meshHash} in \file{run.info}; \file{<mesh-dir>/meshHash} & sha256 (16 characters) of \file{points}, \file{faces}, \file{owner}, \file{neighbour}, \file{boundary}. With \ent{--refine}, the hash of the refined mesh. The Nektar++ mesh comes from the same \file{polyMesh}. \\
+Mesh & \ent{meshHash} in \file{run.info}; \file{<mesh-dir>/meshHash} & Hash of \file{points}, \file{faces}, \file{owner}, \file{neighbour}, \file{boundary}. With \ent{--refine}, the hash of the refined mesh. The Nektar++ mesh comes from the same \file{polyMesh}. \\
 Half mesh & \file{meshInfo}: \ent{sector half} & Symmetry plane $z = 0$. \ent{Aref} is half the frontal area. \\
 Free stream & block \ent{flow} in \file{run.info} & \ent{Minf}, \ent{alpha}, \ent{pInf}, \ent{Tinf}, \ent{Uinf}, \ent{rhoInf}, \ent{muInf}, the components of $\mathbf{U}$. \\
 Reynolds number & \ent{RePerMetre}, \ent{ReD}, \ent{ReL} & From \ent{rhoInf}, \ent{Uinf} and \ent{muInf}, on the diameter and on the body length. \\
-Gas & \ent{Rgas}, \ent{gammaGas}, \ent{Cp}, \ent{RgasThermo} & $R$ is 287.05 in \file{flowDerived} and 287.10 in the thermophysical model (\cref{sec:thermo}). \\
+Gas & \ent{Rgas}, \ent{gammaGas}, \ent{Cp}, \ent{RgasThermo} & \ent{Rgas} of \file{flowDerived} and \ent{RgasThermo} from \ent{molWeight}: use the one of the thermophysical model (\cref{sec:thermo}). \\
 Viscosity & \ent{sutherland (As Ts)} & $\mu = A_s\sqrt{T}/(1 + T_s/T)$. \\
-Conductivity & \ent{PrEucken} & $Pr = 0.690$ from the Eucken correction, not 0.72. Nektar++ must use this value. \\
+Conductivity & \ent{PrEucken} & $Pr$ from the Eucken correction, not the usual 0.72 (\cref{sec:thermo}). Nektar++ must use this value. \\
 Turbulence & \ent{turbulence}, \ent{Prt}, \ent{Ti}, \ent{nuRatio}, \ent{kInlet}, \ent{omegaInlet} & $k$--$\omega$ SST with \ent{nutUSpaldingWallFunction}. \\
 Wall & \ent{wallT}, \ent{wallNut} & Adiabatic (\val{zeroGradient} on $T$), no slip. \\
 Initial field & \ent{initial} & \val{uniform free stream}, or the run that was mapped. \\
@@ -42,7 +42,7 @@ References & \file{FOcommon} & \ent{CofR (0 0 0)} (nose tip); drag and lift in w
 \toprule
 Quantity & OpenFOAM file \\
 \midrule
-History of $C_D$, $C_L$, $C_m$ & \file{forceCoeffs1/*/coefficient.dat}, every 50 steps \\
+History of $C_D$, $C_L$, $C_m$ & \file{forceCoeffs1/*/coefficient.dat}, \\
 Pressure and viscous force & \file{forces1/*/force.dat} \\
 $C_p$, $\tau_w$, \yplus{} along the body & \file{samples/*/skinZ0_*.csv}, \file{skinY0_*.csv} \\
 Wake profiles & \file{samples/*/wake05}, \file{wake1}, \file{wake2}, \file{wake5} \\

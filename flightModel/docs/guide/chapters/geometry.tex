@@ -1,9 +1,9 @@
 \chapter{Geometry}\label{ch:geometry}
 
-\section{Requirements}\label{sec:geometry-requirements}
+\section{Requirements of the surface}\label{sec:geometry-requirements}
 
-\begin{longtable}{@{}P{0.16\linewidth} P{0.36\linewidth} P{0.40\linewidth}@{}}
-\caption{Requirements for the STL file.}\label{tab:stl-req}\\
+\begin{longtable}{@{}P{0.16\linewidth} P{0.34\linewidth} P{0.42\linewidth}@{}}
+\caption{Requirements of the STL file.}\label{tab:stl-req}\\
 \toprule
 Item & Requirement & Reason \\
 \midrule
@@ -12,125 +12,72 @@ Item & Requirement & Reason \\
 Item & Requirement & Reason \\
 \midrule
 \endhead
-Format & ASCII STL & A binary STL has no solid names. All the rocket then becomes one patch. \\
-Solid names & \val{nosecone}, \val{body}, \val{boattail}, \val{fins} & \file{Allmesh} changes the first three to \val{cone}, \val{walls}, \val{tail}. The dictionaries and the cases use these four names. \\
-Units & Metres & \file{meshDict} and \file{meshInfo} use metres. \\
-Position & Nose tip at the origin, axis along $+x$ & The refinement regions, the fin region in \file{meshInfo} and the moment reference \ent{CofR (0 0 0)} use this position. \\
-Edge files & \file{<name>_finEdges.obj} and \file{<name>_finRoots.obj} next to the STL & \file{Allmesh} copies them for \ent{edgeMeshRefinement} (\cref{sec:edge-refinement}). \\
+Format & ASCII STL & Only ASCII STL keeps the solid names, which become the patches. \\
+Solid names & \val{nosecone}, \val{body}, \val{boattail}, \val{fins} & The dictionaries, the boundary conditions and the force integration use the patch names. \file{Allmesh} renames the first three to \val{cone}, \val{walls}, \val{tail}. \\
+Units, position & Metres; nose tip at the origin; axis along $+x$ & The refinement regions and the moment reference are written in this frame. \\
+Edge files & \file{<name>_finEdges.obj}, \file{<name>_finRoots.obj} & Lines for the edge refinement of the fins (\cref{sec:object-refinements}). \\
+Topology & Closed shells, normals out & \cmd{cartesianMesh} classifies inside and outside from the surface. \\
 \bottomrule
 \end{longtable}
 
-\subsection{Solid names that are not in the list}
-
-\file{Allmesh} does not stop if a solid has a different name. The patch keeps the
-name of the solid. \Cref{tab:bad-names} gives the effects.
-
-\begin{longtable}{@{}P{0.32\linewidth} P{0.62\linewidth}@{}}
-\caption{Effects of a solid name that is not in the list.}\label{tab:bad-names}\\
-\toprule
-Step & Effect \\
-\midrule
-\endfirsthead
-\toprule
-Step & Effect \\
-\midrule
-\endhead
-\cmd{cartesianMesh}, \ent{localRefinement} & An entry without a patch gives only a warning. The patch gets no surface refinement. The cell size near the wall is then that of the volume region (\unit{50}{mm} in \ent{nearField}), not \unit{6.25}{mm}. \\
-\cmd{cartesianMesh}, \ent{boundaryLayers} & The patch gets only the global layers (\cref{sec:layers}). \\
-Case, \file{0.orig/} & The boundary conditions use the names \val{cone}, \val{walls}, \val{tail}, \val{fins}. A patch with a different name has no boundary condition, and the solver stops. \\
-Case, \ent{forceCoeffs} & \ent{wallPatches} in \file{meshInfo} does not contain the patch. Its force is not in the coefficients. \\
-\bottomrule
-\end{longtable}
-
-Before you make a mesh from a new STL file, examine the solid names:
-
+A solid with another name does not stop \file{Allmesh}, but the patch then gets no
+refinement, no boundary condition and no force integration. Examine the names of a new
+file:
 \begin{shell}
 grep -E '^ *solid ' mesh/stl/<file>.stl
 \end{shell}
 
-\section{makeRocket.py}\label{sec:makerocket}
+\section{Design rules of the surface}\label{sec:surface-rules}
 
-\file{mesh/makeRocket.py} writes the geometry from its dimensions. It writes three
-files: the STL file, \file{<name>_finEdges.obj} (the leading and trailing edges of
-the fins) and \file{<name>_finRoots.obj} (the root of each fin). \cmd{python3
-mesh/makeRocket.py -h} gives the options. A file with one \texttt{name value} on each
-line can give the dimensions (\ent{--dims}).
+\file{mesh/makeRocket.py} applies these rules. Each one prevents a known failure of
+the layer extrusion (\cref{sec:layers}).
 
-To write the geometry of the full mesh (fins at $0^\circ$):
-
-\begin{shell}
-python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117.stl
-\end{shell}
-
-To write the geometry of the half mesh (fins at $45^\circ$, the default of
-\file{Allmesh}):
-
-\begin{shell}
-python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117_roll45.stl --finRoll 45
-\end{shell}
-
-\ent{--finRoll 45} turns the fins to $45^\circ$, $135^\circ$, $225^\circ$ and
-$315^\circ$. The plane $z = 0$ then passes between two fins. The STL file is always
-the whole rocket: the half mesh is cut from the full mesh (\cref{sec:half-mesh}).
-
-\begin{table}[htbp]
-\centering
-\caption{Parts of the Aconcagua geometry.}\label{tab:parts}
-\begin{tabularx}{\linewidth}{@{}l L l@{}}
+\begin{longtable}{@{}P{0.30\linewidth} P{0.62\linewidth}@{}}
+\caption{Design rules of the surface.}\label{tab:surface-rules}\\
 \toprule
-Part & Shape & Solid name \\
-\midrule
-Nose & Von Kármán, \unit{0.8}{m} long & \val{nosecone} \\
-Body & Cylinder, $d = \unit{0.151}{m}$ & \val{body} \\
-Fins & 4 fins, biconvex section of constant thickness \unit{11.7}{mm}, edges rounded with \unit{1}{mm}, a fillet of \unit{3}{mm} all round the root & \val{fins} \\
-Boattail & Cone to $d = \unit{0.110}{m}$, and the base. Shoulder and base edge rounded with \unit{3}{mm} & \val{boattail} \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\subsection{Properties of the surface}
-
-The script writes a file only if the surface is closed and all the normals point
-out. The properties in \cref{tab:surface-props} come from measurements with
-\cmd{cartesianMesh}. Do not change them.
-
-\begin{longtable}{@{}P{0.40\linewidth} P{0.54\linewidth}@{}}
-\caption{Properties of the surface and the measurements that set them.}\label{tab:surface-props}\\
-\toprule
-Property & Reason, measured with the same \file{meshDict} \\
+Rule & Principle \\
 \midrule
 \endfirsthead
 \toprule
-Property & Reason \\
+Rule & Principle \\
 \midrule
 \endhead
-Nose and body + fins + boattail are two closed shells that touch on coplanar caps. The rings of the two shells are turned by half a facet. & With a sharp shoulder, one continuous hull gave 12 to 87 negative cell volumes at the shoulder. With the shoulder rounded (\ent{--shoulderRadius}, \unit{3}{mm}) the continuous hull gave 0 on $h1$. The boattail must be in the body shell, because the root fillet of the trailing edge runs \unit{3}{mm} onto the cone. \\
-Body and fins are one shell: the fin root is cut into the cylinder. & With the fins as separate shells sunk into the body, the fin-body junction was not an edge of the surface. The layers of the two surfaces met at one node in the corner. \\
-The leading edge, the trailing edge and the tip of the fins have a radius (\ent{--finEdgeRadius}, \unit{1}{mm}). & With sharp edges, the layers of the two fin faces met at the edge: maximum skewness 25 to 33, non-orthogonality up to $176^\circ$. With the radius: skewness 3.7, non-orthogonality $77^\circ$ to $82^\circ$. \\
-A fillet of \unit{3}{mm} all round each fin root (\ent{--finRootRadius}). & Without it, the fin face and the body met at about $90^\circ$, and the fin layers and the body layers closed to one node along the root. With it, on $h1$: non-orthogonality $81.9^\circ \to 67.7^\circ$, skewness $3.58 \to 1.89$, smallest cell $2.6 \to 6.9 \times 10^{-13}$\,m\textsuperscript{3}. \\
-The base edge is rounded with \unit{3}{mm} (\ent{--baseEdgeRadius}). & \\
-The root trailing edge is on the shoulder (\ent{--finFromBase} = \ent{--tailLength}). & \\
-44 facets around the axis (\ent{--nTheta}). & With 96 facets the continuous hull had more negative volumes. \\
+Round all external edges of the fins (leading edge, trailing edge, tip) and the base edge. & At a sharp edge the layers extruded from the two adjacent faces meet and tangle. A radius larger than the layer stack lets the layers turn around the edge. \\
+A fillet at each fin root. & At a concave corner of approximately $90^\circ$, the layers of the fin and of the body converge to one node. The fillet replaces the corner with a curve that the two layer stacks can follow. \\
+Fins and body in one shell; the fin root cut into the body. & With separate shells the junction is not an edge of the surface, and the layers of the two shells meet at one node. \\
+Nose and body as two closed shells on coplanar caps; the shoulder rounded. & A sharp shoulder in one continuous hull gives negative cell volumes. The rounded shoulder lets the boattail stay in the body shell, which the fillet of the trailing edge needs. \\
+Facets around the axis: as few as give a smooth surface. & More facets give more small faces where the shells meet, and more bad cells. \\
 \bottomrule
 \end{longtable}
 
-The edge radius is in the section parallel to the axis. Normal to the swept leading
-edge ($57^\circ$), it is approximately \unit{0.5}{mm}. The section is the convex hull
-of the biconvex arcs and a circle of the radius at each edge. The profile is thus a
-little thicker in approximately the first \unit{80}{mm} of the chord.
+The radius of an edge is set in the section parallel to the axis. Normal to a swept
+edge it is smaller by the cosine of the sweep angle.
+
+\section{Write the geometry}\label{sec:makerocket}
+
+\begin{shell}
+python3 mesh/makeRocket.py mesh/stl/<name>.stl [--finRoll <deg>] [--dims <file>] [options]
+\end{shell}
+
+The script writes the STL file and its two edge files. It writes them only if the
+surface is closed and all normals point out. \cmd{python3 mesh/makeRocket.py -h} gives
+the dimensions and their defaults; \ent{--dims} reads them from a file with one
+\texttt{name value} on each line.
+
+For a half mesh, turn the fins so that the plane $z = 0$ is a plane of symmetry of the
+fins (\ent{--finRoll}). The STL file always describes the whole rocket, because the
+half mesh is cut from the full mesh (\cref{sec:half-mesh}).
 
 \section{Use a new geometry}
 
 \begin{steps}
-\item Write the STL file with \file{makeRocket.py} (\cref{sec:makerocket}), or put
-  it in \file{mesh/stl/} with its two edge files.
-\item Make sure that the STL file agrees with \cref{tab:stl-req}.
-\item Change the six distances of \cmd{surfaceGenerateBoundingBox} in
-  \file{Allmesh} (\cref{sec:domain}).
-\item Write \ent{lBody} and \ent{rBody} of the new rocket in \file{mesh/meshInfo}.
-  The refinement regions scale with them (\cref{sec:object-refinements}).
-\item Change the other entries of \file{mesh/meshInfo} (\cref{sec:meshinfo}).
-\item Make the mesh: \cmd{mesh/Allmesh <mesh-dir> mesh/stl/<file>.stl}.
-\item Remove the old meshes. \file{runMesh.sh} does not compare the geometry
-  (\cref{sec:run-mesh}).
+\item Write the STL file and its edge files with \file{makeRocket.py}, or put them in
+  \file{mesh/stl/}.
+\item Examine the file against \cref{tab:stl-req,tab:surface-rules}.
+\item Write the reference values and the fin data of the new rocket in
+  \file{mesh/meshInfo} (\cref{sec:meshinfo}). The refinement regions scale with
+  \ent{lBody} and \ent{rBody}.
+\item Examine the domain limits in \file{Allmesh} against \cref{sec:domain}.
+\item Make a new mesh. Remove the meshes of the old geometry: \file{runMesh.sh} does
+  not compare the geometry.
 \end{steps}

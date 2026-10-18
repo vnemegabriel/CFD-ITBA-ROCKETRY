@@ -1,16 +1,8 @@
 \chapter{Validation}\label{ch:validation}
 
-This chapter gives the procedures that compare the results with references. Each
-reference has its formula and its constants, so that you can calculate it by hand.
-Do the procedures in this sequence:
-
-\begin{steps}
-\item The checks of \cref{sec:run-checks}, on each run.
-\item Subsonic flow (\cref{sec:barrowman}). There are analytical references.
-\item Transonic and supersonic flow (\cref{sec:supersonic-validation}).
-\item The flight (\cref{ch:flight}).
-\item Mesh convergence (\cref{sec:gci}), before you publish a value.
-\end{steps}
+Do the procedures in this sequence: the checks on each run, the subsonic references,
+the transonic and supersonic references, the flight, and the mesh convergence before you
+publish a value.
 
 \section{Checks on each run}\label{sec:run-checks}
 
@@ -24,157 +16,86 @@ Check & Correct result & Cause if not correct \\
 Check & Correct result & Cause if not correct \\
 \midrule
 \endhead
-$C_L$, \val{CmPitch} at $\alpha = 0$ & $\approx 0$ & The mesh is not symmetric, or the run did not converge. \\
-\val{CmRoll} at $\alpha = 0$ & $\approx 0$ & The fin meshes are not equal. \\
-\yplus{} on each wall patch & Near \cref{tab:yplus-estimate}, and the same on all meshes of a study & The first cell changed (\cref{sec:layers}). \\
-Minimum and maximum of $T$ & Possible: at most near the stagnation temperature, not near 0 & The start transient is not resolved. \\
-Iterations & More than \ent{minIter}, and the stop criterion met & The run stopped before the flow was steady. \\
-$C_N$ from $\alpha = 2^\circ$ to $8^\circ$ & Linear in $\alpha$ ($C_{N\alpha} \approx \unit{18}{/rad}$ on $h0$) & The run did not converge, or \yplus{} on the fins is out of range. \\
-Machine record & \ent{suspendedSeconds} 0, \ent{profiles} \val{performance} & The cost of the run is not usable (\cref{sec:measurement}). \\
+$C_L$, $C_m$ at $\alpha = 0$; $C_l$ (roll) & $\approx 0$ & The mesh is not symmetric, or the run did not converge. \\
+\yplus{} on each wall patch & Near the estimate of \cref{sec:layers}, and equal on the meshes of a study & The first cell changed. \\
+Minimum and maximum of $T$ & Physical: at most near the stagnation temperature & The start transient is not resolved. \\
+Iterations & More than \ent{minIter}, and the criterion met & The run stopped before it was steady. \\
+$C_N(\alpha)$ & Linear at small $\alpha$ & The run did not converge, or the fins are not resolved. \\
+Machine record & No suspension; one CPU profile & The cost is not usable (\cref{sec:measurement}). \\
 \bottomrule
 \end{longtable}
 
 \section{Subsonic flow: Barrowman}\label{sec:barrowman}
 
-The references are the equations of \citet{barrowman1967,barrowman1966}, which
-OpenRocket uses. \citet[ch.~2]{fleeman2012} gives equivalent equations for the fins
-and the fin-body interference. The coefficients refer to the body cross-section
-$A = \pi d^2/4$ and are for each radian.
+The slender-body equations of \citet{barrowman1967,barrowman1966}, which OpenRocket
+uses, give the normal force and the centre of pressure of each component, referred to
+the body cross-section and for each radian. \citet[ch.~2]{fleeman2012} gives equivalent
+equations for the fins and the fin-body interference.
 
-\subsection{Geometry data}
-
-\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\begin{tabularx}{\linewidth}{@{}l L@{}}
 \toprule
-Symbol & Value & Source \\
+Component & $C_{N\alpha}$ \\
 \midrule
-$d$ & \unit{0.151}{m} & \ent{lRef} \\
-$L$ & \unit{2.955}{m} & \ent{lBody} \\
-$r$ & \unit{0.0755}{m} & \ent{rBody} \\
-$s$, exposed semi-span & $0.2355 - 0.0755 = \unit{0.160}{m}$ & $\texttt{finTipR} - \texttt{rBody}$ \\
-$c_r$, $c_t$, $l_m$ & -- & Measure on the fin drawing or in \file{makeRocket.py} \\
-$(d_\text{base}/d)^2$ & 0.53 & $d_\text{base} = \unit{0.110}{m}$ \\
-\bottomrule
-\end{tabularx}
-
-\begin{note}
-$\texttt{finX1} - \texttt{finX0} = \unit{0.401}{m}$ is the $x$ extent of the fin, not
-the root chord.
-\end{note}
-
-\subsection{Normal force and centre of pressure}
-
-\begin{tabularx}{\linewidth}{@{}l l L@{}}
-\toprule
-Component & $C_{N\alpha}$ [1/rad] & $x_\text{cp}$ from the nose tip \\
-\midrule
-Nose & 2.0 for all noses of revolution & $0.466\,L_\text{nose}$ for an ogive \\
-Cylinder & $\approx 0$ (slender-body theory) & -- \\
-Boattail & $2[(d_\text{base}/d)^2 - 1] = -0.94$ & From the drawing \\
-Fins, $N = 4$ & Equation below & From the drawing \\
-\bottomrule
-\end{tabularx}
-\[
-  C_{N,\text{fins}} = K_{fb}\,\frac{4N(s/d)^2}{1 + \sqrt{1 + \left(\dfrac{2 l_m}{c_r + c_t}\right)^2}},
-  \qquad K_{fb} = 1 + \frac{r}{s + r}.
-\]
-
-\subsection{Procedure}
-
-\begin{steps}
-\item Run an angle-of-attack sweep from $0^\circ$ to $6^\circ$.
-\item Calculate the slope of $C_N$ against $\alpha$ in radians. Use the force normal
-  to the body axis, not $C_L$: $C_L$ is normal to the free stream,
-  $C_N = C_L\cos\alpha + C_D\sin\alpha$.
-\item Compare the slope with the sum of the components.
-\item For the breakdown, add one \ent{forceCoeffs} function object for each patch and
-  compare each term with its reference.
-\end{steps}
-
-\subsection{Drag at zero angle of attack}
-
-Compare the components of the drag, not only the total.
-
-\begin{tabularx}{\linewidth}{@{}P{0.22\linewidth} L@{}}
-\toprule
-Term & Reference \\
-\midrule
-Skin friction & $C_f\,S_\text{wet}/A_\text{ref}$, with $C_f = 0.0576\,Re_L^{-0.2}$ (turbulent flat plate, \citealp[ch.~21]{schlichting1979}) \\
-Body form factor & $1 + 1/(2\,L/d)$, with $L/d = 19.57$ \\
-Fin form factor & $1 + 2\,t/c$ \\
-Base drag & \citet[ch.~3]{hoerner1965}, with $(d_\text{base}/d)^2$ \\
+Nose & 2, for any nose of revolution \\
+Cylinder & $\approx 0$ \\
+Boattail & $2\left[(d_\text{base}/d)^2 - 1\right]$ \\
+Fins, $N$ fins & $K_{fb}\,\dfrac{4N(s/d)^2}{1 + \sqrt{1 + \left(\dfrac{2 l_m}{c_r + c_t}\right)^2}}$, \quad $K_{fb} = 1 + \dfrac{r}{s + r}$ \\
 \bottomrule
 \end{tabularx}
 
 \medskip
-$Re_L$ for each case is in \file{run.info} (\ent{ReL}). The $C_f$ correlation is for
-incompressible flow. \file{forces1} gives the pressure and the viscous parts in
-different columns: compare the viscous part with the skin friction term.
+$s$ is the exposed semi-span, $c_r$ and $c_t$ the root and tip chords, $l_m$ the length
+of the mid-chord line, $r$ the body radius.
+
+\begin{steps}
+\item Run an angle-of-attack sweep at small angles.
+\item Calculate the slope of $C_N = C_L\cos\alpha + C_D\sin\alpha$ against $\alpha$ in
+  radians. $C_L$ is normal to the free stream, $C_N$ to the body axis.
+\item Compare the slope with the sum of the components. For the breakdown, add one
+  \ent{forceCoeffs} function object for each patch.
+\end{steps}
+
+\paragraph{Drag at zero angle.} Compare the components, not only the total. The
+viscous part of \file{force.dat} against the skin friction $C_f S_\text{wet}/A_\text{ref}$
+with $C_f = 0.0576\,Re_L^{-1/5}$ \citep[ch.~21]{schlichting1979} and the form factors
+$1 + 1/(2L/d)$ (body) and $1 + 2t/c$ (fins); the base drag against
+\citet[ch.~3]{hoerner1965}. $Re_L$ of each case is in \file{run.info}.
 
 \section{Transonic and supersonic flow}\label{sec:supersonic-validation}
 
-No analytical reference applies to the full rocket. Use these methods, from the
-smallest to the largest work.
-
 \begin{enumerate}
-\item \textbf{Tutorial of the template.} Run
-  \file{$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35} and compare it
-  with its published data. This validates the solver and the flux scheme, and
-  separates a configuration error from a mesh error.
+\item \textbf{Tutorial of the template.} Run the \cmd{rhoCentralFoam} tutorial
+  \file{biconic25-55Run35} and compare it with its published data. This separates a
+  configuration error from a mesh error.
 \item \textbf{Oblique shock on a wedge.} The $\theta$--$\beta$--$M$ relation is exact
   \citep[ch.~4]{anderson2003}:
   \[
     \tan\theta = 2\cot\beta\,\frac{M^2\sin^2\beta - 1}{M^2(\gamma + \cos 2\beta) + 2}.
   \]
-  The tutorial \file{rhoCentralFoam/wedge15Ma5} is this case. Compare the shock angle
-  and the pressure ratio.
-\item \textbf{Flight.} \Cref{ch:flight}. The flight $C_D$ rises from 0.31 at $M = 0.9$
-  to approximately 0.70 at $M = 1.03$, and decreases to 0.39 at $M = 1.8$. The CFD
-  must show this rise. If it does not, the mesh is too coarse where the shock occurs.
-\item \textbf{OpenRocket.} Semi-empirical. It finds an error of a factor of 2. It does
-  not support a difference of 5\,\%, and it does not show the transonic peak of the
-  flight.
+  The tutorial \file{wedge15Ma5} is this case.
+\item \textbf{Flight.} \Cref{ch:flight}. The CFD must show the transonic drag rise
+  of the flight. If it does not, the mesh is too coarse where the shocks occur.
+\item \textbf{OpenRocket.} Semi-empirical: it finds gross errors, not small ones.
 \end{enumerate}
 
 \section{Mesh convergence}\label{sec:gci}
 
-\subsection{Procedure}
-
-\begin{steps}
-\item Make three meshes with only \ent{maxCellSize} changed (\cref{sec:mesh-convergence-setup}).
-\item Run the same flight condition on the three meshes.
-\item Measure \yplus{} on each mesh. It must stay in the same range.
-\item Calculate the representative cell size $h = N^{-1/3}$ of each mesh, and the
-  ratio of each pair, $r = h_\text{coarse}/h_\text{fine}$.
-\item Calculate the observed order $p$, the extrapolated value and the grid
-  convergence index with the method of \citet{celik2008}.
-\end{steps}
-
-\subsection{Equations}
-
-With $f_1$, $f_2$, $f_3$ the results on the fine, the medium and the coarse mesh, and
-a constant ratio $r$:
+With $f_1$, $f_2$, $f_3$ the results on the fine, medium and coarse meshes, the
+representative cell size $h = N^{-1/3}$ and the ratio $r = h_\text{coarse}/h_\text{fine}$,
+the method of \citet{celik2008} gives the observed order $p$, the extrapolated value and
+the grid convergence index:
 \[
-  p = \frac{\ln\left[(f_3 - f_2)/(f_2 - f_1)\right]}{\ln r}, \qquad
-  f_\text{ext} = f_1 + \frac{f_1 - f_2}{r^p - 1}, \qquad
+  p = \frac{\ln\left[(f_3 - f_2)/(f_2 - f_1)\right]}{\ln r},\qquad
+  f_\text{ext} = f_1 + \frac{f_1 - f_2}{r^p - 1},\qquad
   \text{GCI}_{12} = 1.25\,\frac{|(f_1 - f_2)/f_1|}{r^p - 1}.
 \]
-The ratios of the sweep meshes are not equal (1.25 and 1.33,
-\cref{sec:mesh-convergence-setup}). Use the iterative form of \citet{celik2008} for
-unequal ratios. If $(f_3 - f_2)/(f_2 - f_1)$ is negative, the convergence is
-oscillatory and the equations do not apply \citep{roache1994}.
+With unequal ratios, use the iterative form of \citet{celik2008}. If
+$(f_3 - f_2)/(f_2 - f_1) < 0$, the convergence is oscillatory and the equations do not
+apply \citep{roache1994}.
 
 \section{Record}
 
-For each run that you publish, keep these files with the results:
-
-\begin{tabularx}{\linewidth}{@{}P{0.40\linewidth} L@{}}
-\toprule
-File & Function \\
-\midrule
-\file{<mesh-dir>/system/meshDict}, \file{meshInfo}, \file{log.checkMesh} & Make the mesh again; its record and quality. \\
-The STL file, or its commit & Geometry. \\
-\file{<run-dir>/run.info} & Case, commit, mesh fingerprint, flight condition, computer and cost. \\
-\file{<run-dir>/system/flowConditions}, \file{config.json} & Flight condition, ramp and stop criterion. \\
-\file{postProcessing/} & Coefficients, \yplus, samples. \\
-\bottomrule
-\end{tabularx}
+For each published value keep: \file{meshDict}, \file{meshInfo} and
+\file{log.checkMesh} of the mesh; the STL file or its commit; \file{run.info},
+\file{flowConditions} and \file{config.json} of the run; and \file{postProcessing/}.
+With these files another person can make the result again.

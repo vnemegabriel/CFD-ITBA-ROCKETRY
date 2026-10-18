@@ -36,7 +36,7 @@ Option & Function \\
 \end{longtable}
 
 The flow options change entries in \file{system/flowConditions}. The options that you
-do not give keep the values of the template (\cref{tab:flowconditions}).
+do not give keep the values of the template (\cref{sec:flow-conditions}).
 
 \begin{note}
 For \file{newCase.sh}, \ent{--mesh} and \ent{--init} are paths. Only
@@ -212,11 +212,9 @@ The free-stream entries of the patches (\ent{freestreamValue}, \ent{inletValue},
 have a time directory with the solution.
 
 \begin{caution}
-\cmd{mapFields} stops with a segmentation fault when it maps onto the same mesh
-($h0 \to h0$), at the field \ent{Ma} (2026-10-17). The supersonic chain does this
-mapping (pimple $\to$ central on $h0$). \file{Allrun} now stops the run. Before this
-check, the run continued from the uniform free stream and \file{Allrun} reported the
-mapping as correct. See \cref{sec:ts-mapfields}.
+\cmd{mapFields} can stop with a segmentation fault when the source and the target
+are the same mesh, which is the case of the supersonic start. \file{Allrun} then
+stops the run (\cref{sec:ts-mapfields}).
 \end{caution}
 
 \section{Refine the mesh near the fins (optional)}\label{sec:refine}

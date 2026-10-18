@@ -1,0 +1,12 @@
+flowchart TB
+  M{"Free-stream Mach number"}
+  M -- "M < 1" --> S1["rhoPimpleFoam<br/>pressure-based, transonic"]
+  M -- "M > 1" --> P1["rhoPimpleFoam start run<br/>on the coarsest mesh"]
+  P1 --> C1["rhoCentralFoam<br/>density-based, central-upwind"]
+  S1 --> BS["p: freestreamPressure on inlet, outlet, box<br/>one acoustic wave enters"]
+  C1 --> BC["p: fixedValue inlet · zeroGradient outlet<br/>waveTransmissive box"]
+  BS --> I1["Start: uniform free stream,<br/>then the coarser mesh"]
+  BC --> I2["Start: pimple run on the same mesh,<br/>then the coarser central run"]
+  I2 --> T{"T0 changes cp?"}
+  T -- "no" --> H1["hConst"]
+  T -- "yes" --> H2["janaf"]

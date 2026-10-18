@@ -1,7 +1,5 @@
 \chapter{Troubleshooting}\label{ch:troubleshooting}
 
-\section{Symptoms and remedies}
-
 \begin{longtable}{@{}P{0.30\linewidth} P{0.30\linewidth} P{0.32\linewidth}@{}}
 \caption{Symptoms, causes and remedies.}\label{tab:troubleshooting}\\
 \toprule
@@ -12,102 +10,52 @@ Symptom & Cause & Remedy \\
 Symptom & Cause & Remedy \\
 \midrule
 \endhead
-A script stops with \val{source the OpenFOAM bashrc first}. & The OpenFOAM environment is not loaded. & \Cref{ch:setup}. \\
-\file{Allmesh} shows negative cell volumes. & The geometry or \file{meshDict} does not agree with \cref{tab:surface-props}. & Do not use the mesh. Change the geometry or the levels and make a new mesh. \\
-\file{newCase.sh} stops with \val{needs jinja2}. & \cmd{jinja2-cli} is not installed. & \cmd{pipx install jinja2-cli}. \\
-The domain of a new mesh is incorrect, or a number has a comma. & A script calculates with \cmd{awk} in a locale with a decimal comma. & \Cref{sec:ts-locale}. \\
-\cmd{rhoCentralFoam} stops with a floating point exception in the first 300 iterations. & Start from the uniform free stream: the base empties. & Start from a pimple run (\cref{sec:supersonic-start}). \\
-The Courant number in the log is of the order of $10^7$. & Normal with \ent{localEuler}. & \Cref{sec:ts-courant}. \\
-A run started with \ent{--init} has the $C_D$ of a start from rest. & \cmd{mapFields} failed. & \Cref{sec:ts-mapfields}. \\
-$C_D$ of the central template increases without limit. & Open defect. & \Cref{sec:ts-central-divergence}. \\
-\ent{cpuMigrations} is large, or \cmd{taskset} shows all CPUs for a process. & The binding does not work. & \Cref{sec:binding}. Use the current \file{Allrun}. \\
-\ent{suspendedSeconds} is not 0, or the wall time is much larger than the CPU time. & The computer suspended, for example when the lid closed. & \Cref{sec:prepare-computer}, step 3. The coefficients are correct; the cost is not. \\
-\ent{GHzEffective} is near 2 on \texttt{nemepad}, or \ent{profiles} is not \val{performance}. & The CPU profile changed. & \Cref{sec:prepare-computer}, step 1. \\
-No \ent{cycles} in \file{run.info}; \file{Allrun} shows \val{perf cannot count cycles}. & \ent{perf_event_paranoid} is 2 or more, for example after a restart. & \Cref{sec:prepare-computer}, step 2. \\
-The computer stops under load. & A defective memory module (\texttt{newton}, DIMM\_A1). & Do not use the computer until the module is replaced. \\
-The run stops with no memory, or the computer swaps. & The mesh is too large for the memory (approximately \unit{3}{GB} for each million cells). & Use another computer for $h3$. \\
-\cmd{pkill -f} stops your own shell. & The command line of the shell contains the pattern. & Stop the process by its number with \cmd{kill}. \\
-A sweep reads incorrect lines after an edit of its file. & The sweep file was edited while \file{runCase.sh} ran. & Stop \file{runCase.sh}, edit, start it again. \\
-A shell script does unexpected things after an edit. & \cmd{sh} reads a script while it runs it. & Do not edit a script that runs. \\
-An OpenFOAM dictionary gives a parse error near its banner. & The banner comment contains \texttt{*/}, which ends the comment early. & Remove \texttt{*/} from the comment. \\
-A script continues after an application failed. & \cmd{runApplication} returns 0 also when the application stops with \val{FOAM FATAL ERROR}. & Read the log of each application, as \file{Allmesh} and \file{Allrun} do. \\
-OpenFOAM is very slow on WSL. & The case is in \file{/mnt/c}. & Move the mesh and run directories to the Linux file system. \\
+\val{source the OpenFOAM bashrc first} & No OpenFOAM environment. & \Cref{ch:setup}. \\
+Negative cell volumes. & The surface breaks a rule of \cref{tab:surface-rules}, or a level is too coarse for a curvature. & Do not use the mesh. Correct the surface or the levels. \\
+A wall patch without layers. & No entry in \ent{patchBoundaryLayers}. & \Cref{sec:layers}. \\
+Incorrect domain, or a number with a decimal comma. & \cmd{awk} in a locale with a decimal comma. & \Cref{sec:ts-locale}. \\
+\cmd{rhoCentralFoam} fails in the first iterations. & Start from a uniform free stream. & \Cref{sec:supersonic-start}. \\
+Courant number of order $10^7$ in the log. & Normal with \ent{localEuler}. & \Cref{sec:ts-courant}. \\
+A run with \ent{--init} behaves as a start from rest. & \cmd{mapFields} failed. & \Cref{sec:ts-mapfields}. \\
+\cmd{taskset} shows all CPUs for a process; many migrations. & The binding does not work. & \Cref{sec:binding}. \\
+Wall time much larger than CPU time; \ent{suspendedSeconds} $> 0$. & The computer suspended. & \Cref{sec:prepare-computer}. The coefficients are correct; the cost is not. \\
+\ent{profiles} has more than one value; low \ent{GHzEffective}. & The CPU profile changed during the run. & \Cref{sec:prepare-computer}. \\
+No \ent{cycles} in \file{run.info}. & \ent{perf_event_paranoid} too high. & \Cref{sec:prepare-computer}. \\
+The computer swaps or the run stops for memory. & The mesh is too large for the memory. & Scale the memory from a coarser mesh (\cref{tab:requirements}). \\
+\cmd{pkill -f} stops your own shell. & The command line contains the pattern. & Stop the process by its number. \\
+A sweep reads wrong lines. & The sweep file was edited while it ran. & Stop, edit, start again. \\
+A script does unexpected things after an edit. & \cmd{sh} reads a script while it runs it. & Do not edit a script that runs. \\
+A dictionary does not parse near its banner. & \texttt{*/} in the banner comment closes the comment. & Remove \texttt{*/}. \\
+A script continues after a failed application. & \cmd{runApplication} returns 0 on \val{FOAM FATAL ERROR}. & Read each log, as \file{Allmesh} and \file{Allrun} do. \\
 \bottomrule
 \end{longtable}
 
-\section{Central template: drag increases without limit}\label{sec:ts-central-divergence}
-
-\textbf{Status:} open (2026-10-18). Do not run the supersonic sweep.
-
-Run \texttt{m18-a00-h0}: \cmd{rhoCentralFoam} on $h0$ at $M = 1.8$, started from the
-pimple run at the same condition (ISA conditions of the first sweep).
-
-\begin{table}[htbp]
-\centering
-\caption{Pimple start against the central run, $h0$, $M = 1.8$.}\label{tab:central-divergence}
-\begin{tabular}{@{}lcc@{}}
-\toprule
- & Pimple at the end & Central, iteration 550 \\
-\midrule
-$C_D$ & 0.437 & 0.894, still increasing \\
-Viscous force, $x$ & \unit{266}{N} & \unit{828}{N} \\
-Pressure force, $x$ & \unit{445}{N} & \unit{604}{N} \\
-Mean \yplus{} on \val{walls} & 16.6 & 33.7 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The run stopped at iteration 584 because the computer stopped, not the solver. The
-wall shear stress increases by a factor of 3. The flight gives $C_D = 0.39$ at this
-Mach number. Items to examine:
-\begin{itemize}
-\item The wall conditions and the wall functions of the two templates (\ent{nut},
-  \ent{k}, \ent{omega}, \ent{T}, \ent{alphat}).
-\item The transfer of the fields with \cmd{mapFields} and \cmd{changeDictionary},
-  including the turbulence fields.
-\item The flux scheme and the limiter at the wall.
-\item The difference between the start transient and the steady state.
-\end{itemize}
-
 \section{mapFields on the same mesh}\label{sec:ts-mapfields}
 
-\textbf{Symptom.} \cmd{mapFields} stops with a segmentation fault at the field
-\ent{Ma}, when the source and the target are the same mesh ($h0 \to h0$, 2026-10-17).
-Between different meshes ($h0 \to h1$) it works.
+\cmd{mapFields} can stop with a segmentation fault when the source and the target are
+the same mesh. Between different meshes it works. \file{Allrun} stops the run if the
+log of \cmd{mapFields} or \cmd{changeDictionary} does not end with \val{End}; a check
+for \val{FOAM FATAL} only does not detect a segmentation fault. On the same mesh, a copy
+of the fields of the source run is an alternative that does not interpolate.
 
-\textbf{Effect before the correction.} \file{Allrun} looked only for \val{FOAM FATAL}.
-The run started from the uniform free stream, and the log said that the mapping was
-correct.
+\section{The Courant number with a local time step}\label{sec:ts-courant}
 
-\textbf{Current behaviour.} \file{Allrun} stops if the log of \cmd{mapFields} or
-\cmd{changeDictionary} does not end with \val{End}.
+With \ent{localEuler}, \cmd{rhoCentralFoam} calculates the Courant number with the
+global \ent{deltaT}, so the value in the log is meaningless. Read
+\val{Flow time scale min/max} (\cref{sec:lts}).
 
-\textbf{Open item.} The cause of the fault is not known. The supersonic chain needs
-this mapping (pimple $\to$ central on $h0$). On the same mesh, a copy of the fields
-of the source run is an alternative that does not interpolate.
+\section{Decimal comma}\label{sec:ts-locale}
 
-\section{The Courant number in the log}\label{sec:ts-courant}
-
-With \ent{localEuler}, \cmd{rhoCentralFoam} calculates the Courant number with
-\ent{deltaT 1} of \file{controlDict}, so it writes values of approximately $10^7$.
-\cmd{rhoPimpleFoam} does not write it. Read \val{Flow time scale min/max}. This
-incorrect reading kept the central template on a global \ent{Euler} step until
-2026-10-12.
-
-\section{Decimal comma in scripts}\label{sec:ts-locale}
-
-With the locale \texttt{es\_ES} (\texttt{newton}), \cmd{awk} reads and writes numbers
-with a decimal comma. \file{Allmesh} once gave \val{11,775} to
-\cmd{surfaceGenerateBoundingBox} and made an incorrect domain. Each script that
-calculates with \cmd{awk} sets \cmd{LC_ALL=C}: \file{Allmesh}, \file{Allrun} and the
-calculation of the block \ent{flow} in \file{newCase.sh}. Do the same in a new script.
+In a locale with a decimal comma, \cmd{awk} reads and writes numbers with a comma, and
+OpenFOAM reads them incorrectly. Each script that calculates with \cmd{awk} sets
+\cmd{LC_ALL=C}. Do the same in a new script.
 
 \section{Rules for a change to the scripts}
 
 \begin{itemize}
-\item Measure before you propose a change. A change without a number is not complete.
+\item Measure before you propose a change; a change without a number is not complete.
 \item Do not put a Python script in a bash here-document: a \texttt{\textbackslash n}
   in an f-string becomes a real new line and breaks the file.
-\item After a change to a script, run one short case and examine \file{run.info}.
+\item After a change, run one short case and examine \file{run.info}.
 \item Change this guide in the same commit.
 \end{itemize}

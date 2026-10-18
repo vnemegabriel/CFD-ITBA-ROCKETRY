@@ -31,7 +31,9 @@ const names = process.argv.length > 2
 
 for (const name of names) {
   const text = readFileSync(join(src, `${name}.mmd`), 'utf8');
-  const { svg, width, height } = render(text, { fontFamily: font, fontSize: 14, padding: 8 });
+  // A first line "%% fontSize: <px>" sets the font of a wide figure.
+  const fontSize = Number((text.match(/^%%\s*fontSize:\s*(\d+)/m) || [])[1] || 14);
+  const { svg, width, height } = render(text, { fontFamily: font, fontSize, padding: 8 });
   const w = Math.ceil(width), h = Math.ceil(height);
   const html = `<!doctype html><meta charset="utf-8"><style>
     @page { size: ${w}px ${h}px; margin: 0 }

@@ -9,7 +9,8 @@ queda en inglés (mesh, solver, y+, wall function, skewness). La documentación
 es la guía en LaTeX de `flightModel/docs/guide/`, en inglés técnico
 simplificado (ASD-STE100) con estructura ISO/IEC/IEEE 26514; los scripts,
 en inglés. Un cambio de procedimiento cambia la guía en el mismo commit;
-compilala con `make` ahí (lualatex) y commiteá también el PDF.
+compilala con `make` ahí (lualatex) y commiteá también el PDF. Los resultados
+medidos van al informe de `flightModel/docs/report/`, no a la guía.
 
 **Pocos comentarios en el código.** Para explicar están los docs. Un comentario
 se justifica sólo cuando el código no lo puede decir — por ejemplo que los seis
@@ -58,7 +59,8 @@ flightModel/runCase.sh    un sweep*.txt en serie, sobre mallas ya hechas: sweepS
 flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
                           firstLayer.py (t1 e y de la primera celda)
 flightModel/flightData/   telemetría de la TeleMega, cdFlight.py (Cd del vuelo)
-flightModel/docs/guide/   la guía de usuario: LaTeX, diagramas Mermaid con Pele
+flightModel/docs/guide/   la guía de usuario (sólo método): LaTeX, diagramas Mermaid con Pele
+flightModel/docs/report/  el informe técnico (resultados), en inglés, para la tesis
 ```
 
 El Python es `mesh/makeRocket.py`, que escribe el STL, `mesh/snapPlane.py`,

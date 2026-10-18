@@ -16,11 +16,11 @@ File & Contents \\
 File & Contents \\
 \midrule
 \endhead
-\file{postProcessing/forceCoeffs1/<t0>/coefficient.dat} & $C_D$, $C_L$, \val{CmPitch}, \val{CmRoll}, \val{CmYaw}, $C_s$, each also split into front \val{(f)} and rear \val{(r)}. Every 50 steps. \\
-\file{postProcessing/forces1/<t0>/force.dat}, \file{moment.dat} & Force in N and moment in N\,m: total, pressure and viscous. Every 50 steps. \\
-\file{postProcessing/residuals/<t0>/solverInfo.dat} & Initial residuals. Every 50 steps. \\
+\file{postProcessing/forceCoeffs1/<t0>/coefficient.dat} & $C_D$, $C_L$, \val{CmPitch}, \val{CmRoll}, \val{CmYaw}, $C_s$, each also split into front \val{(f)} and rear \val{(r)}. \\
+\file{postProcessing/forces1/<t0>/force.dat}, \file{moment.dat} & Force and moment: total, pressure and viscous parts. \\
+\file{postProcessing/residuals/<t0>/solverInfo.dat} & Initial residuals. \\
 \file{postProcessing/yPlus/<t0>/yPlus.dat} & \yplus{} minimum, maximum and mean for each wall patch, at each write time. \\
-\file{postProcessing/timeInfo/<t0>/timeInfo.dat} & CPU and wall time, total and for the last 50 steps. \\
+\file{postProcessing/timeInfo/<t0>/timeInfo.dat} & CPU and wall time, total and for each interval. \\
 \file{postProcessing/surfaces/<t>/} & VTK of the skin and the symmetry plane, at the end. \\
 \file{postProcessing/samples/<t>/*.csv} & Lines and points for the comparison with another solver, at the end (\cref{tab:samples}). \\
 Last time directory & \ent{p}, \ent{T}, \ent{U}, \ent{rho}, \ent{k}, \ent{omega}, \ent{nut}, \ent{alphat}, \ent{Ma}, \ent{static(p)_coeff} ($C_p$), \ent{yPlus}, \ent{wallShearStress}. \\
@@ -49,11 +49,11 @@ Total pressure and temperature & function object \ent{pressure} with \ent{mode t
 \toprule
 Set & Contents \\
 \midrule
-\val{skinZ0} & The wall cut \unit{0.5}{mm} off the plane $z = 0$. Columns $x$, $y$, $z$: windward is $y < 0$, leeward is $y > 0$. \\
-\val{skinY0} & The wall cut \unit{0.5}{mm} off the plane $y = 0$ (the side). The two planes pass between the fins. \\
-\val{wake05}, \val{wake1}, \val{wake2}, \val{wake5} & Lines in $y$ from $-0.6$ to \unit{0.6}{m} on $z = 0$, at 0.5, 1, 2 and 5 diameters behind the base. \\
-\val{axis} & From $x = \unit{-0.5}{m}$ to 20 diameters behind the base. \\
-\val{freeStream} & One point \unit{1}{m} in front of the nose tip. \\
+\val{skinZ0} & The wall cut by a plane slightly off $z = 0$. Columns $x$, $y$, $z$: windward is $y < 0$, leeward is $y > 0$. \\
+\val{skinY0} & The wall cut by a plane slightly off $y = 0$ (the side). The two planes pass between the fins. \\
+\val{wake05}, \val{wake1}, \val{wake2}, \val{wake5} & Lines across the wake on $z = 0$, at increasing distances behind the base, in body diameters. \\
+\val{axis} & Along the body axis, from upstream of the nose to far into the wake. \\
+\val{freeStream} & One point upstream of the nose tip. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -109,9 +109,9 @@ the solver, without a change to the solver (\cref{fig:measurement}).
 \toprule
 File & Tool & Contents \\
 \midrule
-\file{log.perf} & \cmd{perf stat -I 30000} on the solver & Every \unit{30}{s}: task clock, cycles, instructions, front-end stalls, cache misses, migrations, context switches. \\
-\file{log.machine} & \file{machineLog.py sample} & Every \unit{30}{s}: wall, monotonic and boot clocks, CPU frequency, load, temperatures of CPU, memory and NVMe, fans, CPU profile. \\
-\file{log.energy} & \cmd{perf stat -a -e power/energy-pkg/} & Energy of the CPU package every \unit{30}{s}. Only if \cmd{perf} can count on the whole system. \\
+\file{log.perf} & \cmd{perf stat -I} on the solver & At a fixed interval: task clock, cycles, instructions, front-end stalls, cache misses, migrations, context switches. \\
+\file{log.machine} & \file{machineLog.py sample} & At a fixed interval: wall, monotonic and boot clocks, CPU frequency, load, temperatures of CPU, memory and NVMe, fans, CPU profile. \\
+\file{log.energy} & \cmd{perf stat -a -e power/energy-pkg/} & Energy of the CPU package at a fixed interval. Only if \cmd{perf} can count on the whole system. \\
 \bottomrule
 \end{tabularx}
 
@@ -126,8 +126,8 @@ Entry & Meaning \\
 \midrule
 \endhead
 \ent{suspendedSeconds} & Change of the boot clock minus change of the monotonic clock: the time that the computer was suspended. If it is not 0, the wall time is not a cost. \\
-\ent{mhzMean}, \ent{mhzMinOfMean} & Mean clock of all logical CPUs, and the lowest mean of \unit{30}{s}. \\
-\ent{tCpuMax}, \ent{tDimm<i>Max}, \ent{tNvmeMax} & Highest temperatures. DDR5 memory doubles its refresh above \unit{85}{\textdegree C}. \\
+\ent{mhzMean}, \ent{mhzMinOfMean} & Mean clock of all logical CPUs, and the lowest mean of one interval. \\
+\ent{tCpuMax}, \ent{tDimm<i>Max}, \ent{tNvmeMax} & Highest temperatures. Memory above its rated temperature refreshes more often and loses bandwidth. \\
 \ent{profiles} & The CPU profiles during the run. If it is not only \val{performance}, the run does not compare. \\
 \ent{cpuSeconds} & CPU time of all solver processes. \\
 \ent{cycles}, \ent{instructions} & Totals of all processes. \\
@@ -180,15 +180,15 @@ This procedure is not automated.
 
 \subsection{Runs without this measurement}
 
-The runs before 2026-10-17 have only \file{timeInfo.dat}. An interval with wall time
-much larger than CPU time is a suspension. An interval with CPU time much above the
-median is a low clock or a load beside the run. Without those intervals, the $h0$ runs
-on \texttt{nemepad} cost 20 to 22 core-\textmu s for each cell and step.
+A run that has only \file{timeInfo.dat} gives CPU and wall time of one process at
+each interval. An interval with wall time much larger than CPU time is a suspension.
+An interval with CPU time much above the median is a low clock or a load beside the
+run. Leave out these intervals before you use the cost.
 
 \section{Monitor a run}\label{sec:monitor}
 
 \begin{shell}
-./post/monitor.sh <run-dir> [seconds]     # default 30 s
+./post/monitor.sh <run-dir> [seconds]
 \end{shell}
 
 The script plots $C_D$ and $C_L$ against the iteration and the initial residuals on a
@@ -228,7 +228,7 @@ directory only.
 \begin{itemize}
 \item The solver log is compressed with \cmd{xz} at the end. While the solver runs,
   the log grows by 1 to \unit{2}{kB} for each step.
-\item \ent{residuals} and the coefficients write one line every 50 steps.
+\item The residuals and the coefficients write one line at each output interval.
 \item \file{constant/polyMesh} is a link to the mesh, except with \ent{--refine}.
 \item \ent{purgeWrite 1} keeps only the last time. \file{processor*} is removed when
   \cmd{reconstructPar} ends correctly.

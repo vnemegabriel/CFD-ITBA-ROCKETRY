@@ -4,7 +4,7 @@
   {\color{brand}\rule{\linewidth}{1.5pt}}\\[8mm]
   {\Huge\bfseries\color{brand} Aconcagua CFD}\\[4mm]
   {\LARGE User Guide}\\[6mm]
-  {\large Drag of the Aconcagua rocket with OpenFOAM v2412:\\
+  {\large Workflow to calculate the drag of a finned rocket with OpenFOAM:\\
    geometry, mesh, cases, sweeps, measurement and validation}\\[8mm]
   {\color{brand}\rule{\linewidth}{1.5pt}}
   \vfill
@@ -12,8 +12,7 @@
     Document & ACG-CFD-UG-001 \\
     Revision & \docrev \\
     Date & \docdate \\
-    Repository & \texttt{github.com/vnemegabriel/CFD-ITBA-ROCKETRY} \\
-    Applies to & branch \texttt{sweep/nemepad}, \texttt{flightModel/} \\
+    Repository & \texttt{github.com/vnemegabriel/CFD-ITBA-ROCKETRY}, directory \texttt{flightModel/} \\
     Organization & ITBA Rocketry \\
   \end{tabular}
   \vspace*{10mm}
@@ -30,31 +29,23 @@
 \toprule
 Rev. & Date & Change \\
 \midrule
-A & \docdate & First issue. Replaces the Markdown files \file{WORKFLOW.md}, \file{MESH.md},
-\file{SOLVERS.md}, \file{VALIDATION.md} and \file{MEASUREMENTS.md} of \file{flightModel/docs/}.
-Adds the chapters on the comparison with Nektar++, the flight data and troubleshooting. \\
+A & 2026-10-18 & First issue. Replaced the Markdown files of \file{flightModel/docs/}. \\
+B & \docdate & The guide gives only the method. Measured results moved to the
+technical report ACG-CFD-TR-001. Parameter values are not copied: each parameter
+has its function, the principle that sets it, and its file. Content specific to one
+computer removed. Diagrams with fixed geometric meaning. \\
 \bottomrule
 \end{tabularx}
-
-\section*{Status of the template}
-
-\begin{caution}
-The case templates are not validated. Do not publish a result before you do the
-procedures in \cref{ch:validation}. The supersonic template has an open defect
-(\cref{sec:ts-central-divergence}).
-\end{caution}
 
 \section*{Maintenance of this document}
 
 \begin{itemize}
-\item This guide is the only user documentation of \file{flightModel/}. Do not
-  write the same information in another file.
-\item Change the source in \file{flightModel/docs/guide/} and compile it with
-  \cmd{make} (\cref{sec:build-guide}). Commit the source and the PDF together.
-\item When a change to a script changes a procedure, change the procedure in this
-  guide in the same commit.
-\item Increase the revision letter and add a line to the revision history for each
-  issue.
+\item This guide is the only user documentation of \file{flightModel/}. The
+  dictionaries and scripts are the only source of the parameter values: this guide
+  tells where each value is, and why, but does not copy it.
+\item When a change to a script changes a procedure, change the guide in the same
+  commit. Compile it with \cmd{make} (\cref{sec:build-guide}) and commit the PDF.
+\item Results go to the technical report, not to this guide.
 \end{itemize}
 
 \tableofcontents
@@ -67,41 +58,39 @@ procedures in \cref{ch:validation}. The supersonic template has an open defect
 
 \section*{Purpose}
 
-This guide tells you how to calculate the drag coefficient of the Aconcagua rocket
-as a function of the Mach number with OpenFOAM. It gives the procedures, the
-reference data of each dictionary, the models, the measurements that each run
-records, and the procedures that validate the results.
+This guide tells you how to calculate the drag coefficient of a finned rocket as a
+function of the Mach number and the angle of attack with OpenFOAM, how to estimate the
+discretization error, and how to compare the result with flight data and with another
+solver. For each step it gives the procedure and the principle that justifies it.
 
 \section*{Audience}
 
-The guide is for members of ITBA Rocketry who run or change the CFD cases. You must
-know how to use a Linux shell. You must know the basic concepts of compressible
-flow, RANS turbulence models and the finite-volume method. You do not have to know
-the OpenFOAM source code.
+People who replicate or extend the workflow. You must know how to use a Linux shell,
+the basics of compressible flow and of RANS turbulence models, and the
+finite-volume method.
 
 \section*{Scope}
 
-The guide covers the directory \file{flightModel/} of the repository: the geometry
-script, the mesh scripts, the two case templates, the sweep scripts, the
-post-processing scripts and the flight data. It does not cover the directory
-\file{fin_flutter/}.
+The directory \file{flightModel/}: geometry, mesh, case templates, sweeps,
+post-processing, measurement of the computer and flight data. The guide applies to
+any Linux computer with the software of \cref{tab:requirements}.
 
 \section*{How to use this guide}
 
-\begin{tabularx}{\linewidth}{@{}P{0.38\linewidth} L@{}}
+\begin{tabularx}{\linewidth}{@{}P{0.40\linewidth} L@{}}
 \toprule
 If you want to & Read \\
 \midrule
-Make the first run & \cref{ch:overview,ch:setup}, then \cref{sec:make-case,sec:run-case} \\
-Run the sweep of record & \cref{ch:sweeps} \\
+Understand the workflow & \cref{ch:overview} \\
+Make the first run & \cref{ch:setup}, then \cref{sec:make-case,sec:run-case} \\
+Run a study & \cref{ch:sweeps} \\
 Change the geometry or the mesh & \cref{ch:geometry,ch:mesh} \\
 Know why the solver is set up as it is & \cref{ch:solvers} \\
-Find a result or a measurement & \cref{ch:results} \\
-Compare a run with Nektar++ & \cref{ch:nektar} \\
-Compare a run with the flight & \cref{ch:flight} \\
+Measure the cost of a run & \cref{ch:results} \\
+Compare with another solver & \cref{ch:nektar} \\
+Compare with the flight & \cref{ch:flight} \\
 Validate a result & \cref{ch:validation} \\
 Correct a problem & \cref{ch:troubleshooting} \\
-Find a command quickly & \cref{app:quickref} \\
 \bottomrule
 \end{tabularx}
 
@@ -112,24 +101,38 @@ Find a command quickly & \cref{app:quickref} \\
 Convention & Meaning \\
 \midrule
 \file{mesh/Allmesh} & A file, a directory, a command, a dictionary entry or a value. \\
-\file{<mesh-dir>} & A value that you must supply. \\
-\file{[stl-file]} & An optional argument. \\
-\file{~/meshes}, \file{~/runs} & The default directories of the meshes and of the runs. \\
-Paths without a leading \file{/} & Relative to \file{flightModel/}, except where the text says otherwise. \\
-$h0$, $h1$, $h2$, $h3$ & The four meshes of the sweep (\cref{tab:meshes}). \\
-\texttt{m08-a04-h1} & A run: Mach 0.8, angle of attack $4^\circ$, mesh $h1$. \\
+\file{<mesh-dir>}, \file{[stl-file]} & A value that you must supply; an optional argument. \\
+Paths without a leading \file{/} & Relative to \file{flightModel/}. \\
+$h_0, h_1, \ldots$ & The meshes of a study, from coarse to fine. $h_0$ only starts the runs. \\
 \bottomrule
 \end{tabularx}
 
 \medskip
-Procedures are numbered steps. Each step gives one action. A result that you must
-see after a step follows the step.
+Procedures are numbered steps, one action in each step. \Cref{tab:diagrams} gives the
+meaning of the geometry of the diagrams.
+
+\begin{table}[htbp]
+\centering
+\caption{Geometric conventions of the diagrams.}\label{tab:diagrams}
+\begin{tabularx}{\linewidth}{@{}P{0.34\linewidth} L@{}}
+\toprule
+Geometry & Meaning \\
+\midrule
+Left to right & The workflow, or the time, or the refinement from coarse to fine. \\
+Top to bottom & From the input to the result, inside one stage. \\
+A box inside a box & A region of a finer mesh level inside a coarser one. \\
+A diamond & A decision. \\
+A cylinder & Data on disk. \\
+A frame with a title & One stage or one script. \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section*{Notices}
 
 \begin{caution}
-A CAUTION tells you about a condition that can damage data, give an incorrect
-result without a message, or waste days of computer time.
+A CAUTION tells you about a condition that can damage data, give an incorrect result
+without a message, or waste computer time.
 \end{caution}
 
 \begin{note}
@@ -138,22 +141,20 @@ A NOTE gives information that helps you to do a step or to understand a result.
 
 \section*{Writing standard}
 
-The structure of this guide follows ISO/IEC/IEEE 26514 \citep{iso26514}: concepts,
-procedures and reference information are in different sections. The text follows
-the writing rules of ASD-STE100 Simplified Technical English \citep{asdste100}:
-short sentences, one instruction in each sentence, the active voice and one meaning
-for each word. Technical names (\emph{mesh}, \emph{solver}, \yplus,
-\emph{wall function}) stay as the OpenFOAM documentation writes them.
+The structure follows ISO/IEC/IEEE 26514 \citep{iso26514}: concepts, procedures and
+reference information are separate. The text follows the rules of ASD-STE100
+Simplified Technical English \citep{asdste100}. Technical names stay as the OpenFOAM
+documentation writes them.
 
 \section*{Related documents}
 
-\begin{tabularx}{\linewidth}{@{}P{0.38\linewidth} L@{}}
+\begin{tabularx}{\linewidth}{@{}P{0.40\linewidth} L@{}}
 \toprule
 Document & Contents \\
 \midrule
+ACG-CFD-TR-001, \file{docs/report/} & Technical report: the results of the workflow. \\
 \file{CLAUDE.md} & Rules for the people and the agents who change the repository. \\
-\file{flightModel/case-central/README.md}, \file{case-pimple/README.md} & Short description of each template, with references to this guide. \\
-\file{flightModel/flightData/cdFlight.py} & Source of the flight analysis of \cref{ch:flight}. \\
+\file{case-central/README.md}, \file{case-pimple/README.md} & Short description of each template. \\
 OpenFOAM v2412 user guide & \url{https://www.openfoam.com/documentation/user-guide} \\
 \bottomrule
 \end{tabularx}

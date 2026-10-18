@@ -17,7 +17,8 @@ flightModel/runMesh.sh    the meshes of meshes.txt
 flightModel/runCase.sh    one sweep file in series, on meshes that exist
 flightModel/post/         monitor.sh, sweepTable.sh, firstLayer.py
 flightModel/flightData/   TeleMega data and cdFlight.py (flight Cd)
-flightModel/docs/guide/   the user guide (LaTeX)
+flightModel/docs/guide/   the user guide: the method (LaTeX)
+flightModel/docs/report/  the technical report: the results (LaTeX)
 ```
 
 ## First run

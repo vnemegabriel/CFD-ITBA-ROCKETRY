@@ -2,8 +2,8 @@
 
 \section{Requirements}
 
-\begin{longtable}{@{}P{0.26\linewidth} P{0.68\linewidth}@{}}
-\caption{Software and hardware requirements.}\label{tab:requirements}\\
+\begin{longtable}{@{}P{0.24\linewidth} P{0.70\linewidth}@{}}
+\caption{Requirements.}\label{tab:requirements}\\
 \toprule
 Item & Requirement \\
 \midrule
@@ -12,97 +12,57 @@ Item & Requirement \\
 Item & Requirement \\
 \midrule
 \endhead
-OpenFOAM & ESI v2412, with cfMesh (\cmd{cartesianMesh}). \\
-Open MPI & The version of the OpenFOAM installation. 4.1 and 5.0 are tested. \\
-\cmd{jinja2} & \cmd{jinja2-cli}. Install it with \cmd{pipx install jinja2-cli}. \\
-Shell tools & \cmd{bash}, \cmd{rsync}, \cmd{awk}, GNU \cmd{sed}, \cmd{xz}, \cmd{/usr/bin/time}. \\
-Python 3 & Standard library only. \file{cdFlight.py} also needs \cmd{matplotlib}. \\
-\cmd{perf} & Optional. Counts the CPU cycles of each run (\cref{sec:measurement}). \\
-\cmd{gnuplot} & Optional. For \file{post/monitor.sh}. \\
-Memory & About \unit{3}{GB} for each million cells. $h3$ (10.0 M cells) needs about \unit{30}{GB}. \\
-Disk & About \unit{1}{GB} for each mesh of 2 M cells, and \unit{0.4}{GB} for each run on it. \\
+OpenFOAM & ESI v2412 with cfMesh (\cmd{cartesianMesh}), and its Open MPI. \\
+Tools & \cmd{bash}, \cmd{rsync}, \cmd{awk}, GNU \cmd{sed}, \cmd{xz}, \cmd{/usr/bin/time}, \cmd{jinja2-cli}. \\
+Python 3 & Standard library; \cmd{matplotlib} for \file{cdFlight.py}. \\
+\cmd{perf} & Optional: counts the CPU cycles and the energy of each run. \\
+Memory & Proportional to the number of cells. Measure \ent{maxRSSkB} of a run on the coarsest mesh (\cref{sec:runinfo}) and scale it with the number of cells before you run a finer mesh. \cmd{cartesianMesh} needs the memory of the full rocket also for a half mesh. \\
 \bottomrule
 \end{longtable}
 
 \section{Prepare the shell}
 
-Do this step in each new shell, before you use a script:
-
+Do this step in each new shell:
 \begin{shell}
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 \end{shell}
 
-If you do not do this step, all scripts stop with the message
-\val{source the OpenFOAM bashrc first}.
-
 \begin{caution}
-Put the mesh directories and the run directories outside \file{/mnt/c}. On WSL,
-that file system makes the input and output of OpenFOAM several times slower.
+On WSL, put the mesh and run directories on the Linux file system, not in
+\file{/mnt/c}: the input and output of OpenFOAM become several times slower.
 \end{caution}
 
-\section{Prepare the computer for a sweep}\label{sec:prepare-computer}
+\section{Prepare the computer for a study}\label{sec:prepare-computer}
 
-A sweep runs for days. The cost of each run is a measurement
-(\cref{sec:measurement}). Do these steps before you start a sweep. Steps 1 to 4
-need \cmd{sudo}.
+The cost of a run is a measurement only if the computer runs at a known, constant
+state (\cref{sec:measurement}). Before a study:
 
 \begin{steps}
-\item Set the CPU profile to \val{performance}. Other profiles decrease the clock
-  frequency, and the cost of the run does not compare with other runs.
-\begin{shell}
-echo performance | sudo tee /sys/firmware/acpi/platform_profile
-\end{shell}
-  The setting is lost when the computer starts again.
-\item Let \cmd{perf} count the cycles and the energy, permanently:
-\begin{shell}
-echo kernel.perf_event_paranoid=0 | sudo tee /etc/sysctl.d/90-perf.conf
-sudo sysctl --system
-\end{shell}
-  With \val{1}, \cmd{perf} counts the cycles but not the energy. With \val{2} or
-  more, it counts neither.
-\item On a laptop, make sure that the computer does not suspend when you close the
-  lid. Set \ent{HandleLidSwitch=ignore} in \file{/etc/systemd/logind.conf}, or keep
-  this command open in a terminal for the duration of the sweep:
-\begin{shell}
-systemd-inhibit --what=handle-lid-switch:sleep --why="CFD sweep" sleep infinity
-\end{shell}
-\item Make sure that the memory has sufficient cooling. Keep the air inlets open
-  and lift the rear of a laptop. On \texttt{nemepad} a memory module reached
-  \unit{83}{\textdegree C} (limit \unit{85}{\textdegree C}) with the fans in automatic mode.
-\item Stop other heavy programs. Two runs on one socket share the memory
-  bandwidth.
+\item Fix the CPU frequency policy: the \val{performance} governor or platform
+  profile. A power-saving policy lowers the clock and changes the cost.
+\item Let \cmd{perf} count events: \ent{kernel.perf_event_paranoid} $\leq 1$ for the
+  cycles, $\leq 0$ also for the energy. Make the setting permanent in
+  \file{/etc/sysctl.d/}.
+\item Prevent suspension during the study (power settings, or \cmd{systemd-inhibit}).
+\item Give the memory and the CPU sufficient cooling. Above its temperature limit,
+  memory refreshes more often and loses bandwidth; a CPU lowers its clock.
+\item Run one case on each CPU socket, with nothing heavy beside it. Runs on one
+  socket share the memory bandwidth.
 \end{steps}
-
-\begin{caution}
-On a ThinkPad, a reload of the module \cmd{thinkpad_acpi} (for example to control
-the fans) can set the CPU profile to \val{custom}, at about \unit{2}{GHz}. Do step 1
-again after a reload.
-\end{caution}
 
 \section{Build this guide}\label{sec:build-guide}
 
-The guide needs LuaLaTeX, BibTeX, the TeX Gyre fonts and the packages of TeX Live
-\texttt{latex-extra}. The diagrams need Node.js 20 or later, the npm package
-\texttt{pele} and Google Chrome.
+The guide needs LuaLaTeX, BibTeX and the TeX Gyre fonts. The diagrams need Node.js,
+the npm package \texttt{pele} and Google Chrome.
 
 \begin{steps}
-\item Go to the directory of the guide:
-\begin{shell}
-cd flightModel/docs/guide
-\end{shell}
-\item If you changed a diagram, install Pele once and render the diagrams:
+\item Go to \file{docs/guide/}.
+\item If you changed a diagram in \file{figures/src/*.mmd}, render the diagrams:
 \begin{shell}
 npm install
 make figures
 \end{shell}
-  \file{figures/render.mjs} renders each \file{figures/src/*.mmd} (Mermaid) to SVG
-  with Pele, and prints it to \file{figures/pdf/*.pdf} with headless Chrome. Set
-  \cmd{CHROME} to use another Chrome executable.
-\item Compile the guide:
-\begin{shell}
-make
-\end{shell}
-  Result: \file{aconcagua-user-guide.pdf}. \cmd{make} runs \cmd{lualatex},
-  \cmd{bibtex} and \cmd{lualatex} two more times.
-\item Commit the source, \file{figures/pdf/} and the PDF together.
+  Pele renders the Mermaid source to SVG; headless Chrome prints it to a vector PDF,
+  because Pele sets the colours with CSS variables.
+\item Compile with \cmd{make}. Commit the source, \file{figures/pdf/} and the PDF.
 \end{steps}
