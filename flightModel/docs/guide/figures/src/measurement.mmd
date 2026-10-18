@@ -1,0 +1,14 @@
+flowchart LR
+  subgraph side["Beside the solver"]
+    P["perf stat -I 30000<br/>solver and MPI processes"]
+    E["perf stat -a<br/>power/energy-pkg"]
+    S["machineLog.py sample<br/>every 30 s"]
+  end
+  P --> LP[("log.perf.&lt;date&gt;.xz")]
+  E --> LE[("log.energy.&lt;date&gt;.xz")]
+  S --> LM[("log.machine.&lt;date&gt;")]
+  SN["machineLog.py snapshot"] --> RI
+  LP --> SU["machineLog.py summary"]
+  LE --> SU
+  LM --> SU
+  SU --> RI[("run.info:<br/>machine, measured,<br/>cyclesPerCellStep")]

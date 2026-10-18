@@ -1,0 +1,52 @@
+\chapter{Quick reference}\label{app:quickref}
+
+\section{Commands}
+
+\begin{shell}
+source /usr/lib/openfoam/openfoam2412/etc/bashrc
+
+# geometry and one mesh
+python3 mesh/makeRocket.py mesh/stl/Aconcagua_biconvex117_roll45.stl --finRoll 45
+mesh/Allmesh ~/meshes/h1 --maxCellSize 1.6 --nLayers 10 --thicknessRatio 1.2
+./post/firstLayer.py ~/meshes/h1
+
+# one case
+./newCase.sh ~/runs/test --mesh ~/meshes/h1 --solver pimple --Minf 0.8 --np 8
+cd ~/runs/test && ./Allrun 8
+
+# sweep
+./runMesh.sh meshes.txt ~/meshes
+nohup ./runCase.sh sweepSubsonic.nemepad.txt > ~/log.sweepSubsonic.nemepad 2>&1 &
+
+# results
+./post/monitor.sh ~/runs/test
+./post/sweepTable.sh ~/runs > sweep.csv
+python3 flightData/cdFlight.py
+
+# check the binding and the measurement of a running case
+for p in $(pgrep -x rhoPimpleFoam); do taskset -cp $p; done
+tail -3 ~/runs/<case>/log.machine
+\end{shell}
+
+\section{Run names}
+
+\texttt{m<M>-a<alpha>-h<n>[-pimple]}: \texttt{m08} is $M = 0.8$, \texttt{a04} is
+$\alpha = 4^\circ$, \texttt{h1} is the mesh. The suffix \texttt{-pimple} marks the
+\cmd{rhoPimpleFoam} start run of a supersonic chain.
+
+\section{Key values}
+
+\begin{tabularx}{\linewidth}{@{}P{0.42\linewidth} L@{}}
+\toprule
+Item & Value \\
+\midrule
+Reference area, full rocket & $A_\text{ref} = \pi\,(0.0755)^2 = \unit{0.0179081}{m\textsuperscript{2}}$ \\
+Reference length & $l_\text{ref} = d = \unit{0.151}{m}$ \\
+Moment reference & Nose tip, $(0, 0, 0)$ \\
+Rocket length & \unit{2.955}{m} \\
+First cell on the body & $t_1 \approx \unit{0.10}{mm}$, $y \approx \unit{0.05}{mm}$ \\
+Stop criterion & $|\overline{C_D} - C_D| < 0.007$ over 1000 iterations \\
+Memory & approximately \unit{3}{GB} for each million cells \\
+Midland atmosphere & $p_0 = \unit{90\,565}{Pa}$ at \unit{896}{m} MSL, $T_0 = \unit{305.0}{K}$, \unit{7.2}{K/km} \\
+\bottomrule
+\end{tabularx}

@@ -5,7 +5,7 @@
 # Half meshes, the Allmesh default (symmetry plane z = 0, fins rolled 45 deg).
 # Only maxCellSize changes, by sqrt(2): every level in meshDict is relative to
 # it, so every region scales by the same ratio.  nLayers/thicknessRatio keep
-# the first body cell the same on all of them (docs/MESH.md section 4.4);
+# the first body cell the same on all of them (docs/guide, Mesh > boundaryLayers);
 # measure it on each new mesh with post/firstLayer.py.
 # h0 is coarser, only to start the h1 runs (newCase.sh --init); h1-h3 are the
 # mesh convergence study.

@@ -17,7 +17,7 @@ FoamFile
 //  Derived from system/flowConditions -- nothing to edit here.
 //
 //  Every formula below is written out so the case is checkable by hand.
-//  References are in docs/SOLVERS.md; the short version:
+//  References are in docs/guide; the short version:
 //
 //    a     = sqrt(gamma R T)            speed of sound, calorically perfect gas
 //    rho   = p / (R T)                  ideal gas law

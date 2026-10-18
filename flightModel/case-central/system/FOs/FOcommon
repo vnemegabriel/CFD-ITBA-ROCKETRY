@@ -110,7 +110,7 @@
         }
     }
 
-    // -- Lines to set against another solver (docs/MEASUREMENTS.md section 6):
+    // -- Lines to set against another solver (docs/guide, Comparison with Nektar++):
     //    the skin cut 0.5 mm off the planes z = 0 and y = 0, between the fins;
     //    the wake 0.5, 1, 2 and 5 diameters behind the base; the axis; and a
     //    free-stream point 1 m ahead of the nose.

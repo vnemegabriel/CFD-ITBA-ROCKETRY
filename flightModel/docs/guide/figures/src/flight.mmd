@@ -1,0 +1,14 @@
+flowchart TB
+  CSV[("TeleMega CSV")] --> PAD["Pad pressure p0:<br/>mean before launch"]
+  CSV --> GPS["GPS height above the pad<br/>√(pad_range² − pad_dist²), descent"]
+  PAD --> FIT["Fit T0 and lapse rate L:<br/>p = p0 (1 − L h/T0)^(g/RL)"]
+  GPS --> FIT
+  CSV --> ANC["Anchor at t = 18 s:<br/>dh/dt from the baro"]
+  FIT --> ANC
+  ANC --> V["Integrate dV/dt = a_x − g cos(tilt)<br/>forward and backward"]
+  CSV --> V
+  V --> H["Integrate the height"]
+  H --> ATM["Ambient p and T from the height"]
+  V --> CD["Cd = −m a_x / (½ ρ V² Aref)"]
+  ATM --> CD
+  CD --> CHK["Check: apogee against the GPS"]

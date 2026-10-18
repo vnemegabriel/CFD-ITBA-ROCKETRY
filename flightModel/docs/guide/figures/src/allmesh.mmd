@@ -1,0 +1,23 @@
+flowchart LR
+  subgraph surf["Surface"]
+    direction TB
+    A["1 · Copy mesh/system/,<br/>meshInfo, edge files"] --> B["2 · Write lBody, rBody and<br/>the options into meshDict"]
+    B --> C["3 · Rename the solids:<br/>cone, walls, tail"]
+    C --> D["4 · surfaceGenerateBoundingBox:<br/>add the domain faces"]
+    D --> E["5 · surfaceFeatureEdges<br/>-angle 60 → geometry.fms"]
+  end
+  subgraph vol["Volume"]
+    direction TB
+    F["6 · cartesianMesh"] --> G["7 · createPatch:<br/>inlet, outlet, box"]
+    G --> H{"Half mesh?"}
+    H -- "yes" --> I["7a · topoSet + subsetMesh:<br/>keep z ≥ 0"]
+    I --> J["7b · snapPlane.py:<br/>z = 0 on the cut"]
+    J --> K["7c · createPatch: symm;<br/>Aref/2 in meshInfo"]
+    H -- "no (--full)" --> L
+    K --> L["8 · checkMesh"]
+    L --> M["9 · Record in meshInfo"]
+    M --> N{"Negative<br/>volumes?"}
+    N -- "yes" --> X["Stop: do not<br/>use the mesh"]
+    N -- "no" --> Y["Show the summary"]
+  end
+  surf --> vol

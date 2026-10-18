@@ -1,0 +1,68 @@
+% Layout, colours, admonitions and inline markup of the guide.
+
+\definecolor{brand}{HTML}{1F3A5F}
+\definecolor{cautionfill}{HTML}{FFF4E0}
+\definecolor{cautionframe}{HTML}{C77700}
+\definecolor{notefill}{HTML}{EAF2FB}
+\definecolor{noteframe}{HTML}{2F6DB5}
+\definecolor{codefill}{HTML}{F5F6F8}
+\definecolor{rowgray}{HTML}{F2F3F5}
+
+\titleformat{\chapter}[display]
+  {\sffamily\bfseries\color{brand}}{\Large\chaptertitlename\ \thechapter}{6pt}{\huge}
+\titleformat*{\section}{\sffamily\bfseries\Large\color{brand}}
+\titleformat*{\subsection}{\sffamily\bfseries\large\color{brand}}
+\titleformat*{\subsubsection}{\sffamily\bfseries\color{brand}}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\sffamily\small\thepage}
+\fancyhead[RE]{\sffamily\small Aconcagua CFD -- User Guide}
+\fancyhead[LO]{\sffamily\small\nouppercase{\leftmark}}
+\fancyfoot[C]{\sffamily\scriptsize ACG-CFD-UG-001 \quad Rev.\ \docrev}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\sffamily\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+\setlist{itemsep=2pt,topsep=4pt}
+\setlist[enumerate,1]{label=\arabic*.,leftmargin=*}
+\newlist{steps}{enumerate}{2}
+\setlist[steps,1]{label=\textbf{\arabic*.},leftmargin=*,itemsep=4pt}
+\setlist[steps,2]{label=\alph*),leftmargin=*}
+
+\renewcommand{\arraystretch}{1.2}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\LTpre}{6pt}
+\setlength{\LTpost}{6pt}
+
+\newcommand{\docrev}{A}
+\newcommand{\docdate}{2026-10-18}
+
+% Inline markup.  \file: a path; \cmd: a command or application;
+% \ent: a dictionary entry or option; \val: a literal value.
+\newcommand{\file}{\nolinkurl}
+\newcommand{\cmd}{\nolinkurl}
+\newcommand{\ent}{\nolinkurl}
+\newcommand{\val}{\nolinkurl}
+\newcommand{\unit}[2]{#1\,#2}
+\newcommand{\yplus}{$y^+$}
+
+% Safety and information notices (ANSI Z535.6 / ISO/IEC/IEEE 26514 levels).
+% This guide has no hazard to persons, so there is no WARNING level.
+\newtcolorbox{caution}{enhanced,breakable,colback=cautionfill,colframe=cautionframe,
+  boxrule=0.8pt,left=6pt,right=6pt,top=4pt,bottom=4pt,arc=1pt,
+  title={\sffamily\bfseries CAUTION},coltitle=white,fonttitle=\small}
+\newtcolorbox{note}{enhanced,breakable,colback=notefill,colframe=noteframe,
+  boxrule=0.8pt,left=6pt,right=6pt,top=4pt,bottom=4pt,arc=1pt,
+  title={\sffamily\bfseries NOTE},coltitle=white,fonttitle=\small}
+
+\lstdefinestyle{shell}{
+  basicstyle=\ttfamily\small,backgroundcolor=\color{codefill},frame=single,
+  rulecolor=\color{black!20},framesep=4pt,xleftmargin=4.4pt,xrightmargin=4.4pt,
+  breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,
+  upquote=true,aboveskip=6pt,belowskip=6pt,
+  literate={-}{-}1 {~}{{\raisebox{0.5ex}{\texttildelow}}}1}
+\lstset{style=shell}
+\lstnewenvironment{shell}{\lstset{style=shell}}{}

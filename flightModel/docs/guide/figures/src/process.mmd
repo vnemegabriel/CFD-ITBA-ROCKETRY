@@ -1,0 +1,19 @@
+flowchart LR
+  subgraph geo["1 · Geometry"]
+    direction TB
+    G["mesh/makeRocket.py"] --> STL[("stl/*.stl<br/>*_finEdges.obj<br/>*_finRoots.obj")]
+  end
+  subgraph msh["2 · Mesh"]
+    direction TB
+    L1["meshes.txt"] --> RM["runMesh.sh"] --> AM["mesh/Allmesh"] --> MD[("~/meshes/h0 … h3")]
+  end
+  subgraph run["3 · Cases"]
+    direction TB
+    SW["sweep*.txt"] --> RC["runCase.sh"] --> NC["newCase.sh"] --> AR["Allrun"]
+  end
+  subgraph post["4 · Results"]
+    direction TB
+    OUT[("run.info, coefficients,<br/>samples, surfaces")] --> ST["sweepTable.sh"]
+    OUT --> CF["cdFlight.py"]
+  end
+  geo --> msh --> run --> post

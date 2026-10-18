@@ -1,55 +1,37 @@
 # CFD-ITBA-ROCKETRY
 
-Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, `rhoPimpleFoam`
-para M < 1 y `rhoCentralFoam` para M > 1, barrido de Mach en serie.
+Aerodynamics of the Aconcagua rocket with OpenFOAM v2412: cfMesh meshes,
+`rhoPimpleFoam` for M < 1 and `rhoCentralFoam` for M > 1, Mach sweeps in
+series, and a comparison with the flight data of the IREC flight in Midland.
+
+**User guide:** [`flightModel/docs/guide/aconcagua-user-guide.pdf`](flightModel/docs/guide/aconcagua-user-guide.pdf)
+(source in `flightModel/docs/guide/`). It is the only user documentation.
 
 ```
-flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshDict — la malla
-flightModel/common/       Allrun, Allrefine — los scripts que va a usar cada corrida
-flightModel/case-central/ plantilla rhoCentralFoam, M > 1
-flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 (sólo lo que difiere)
-flightModel/newCase.sh    arma una corrida: plantilla + malla + condiciones de vuelo
-flightModel/runMesh.sh    construye las mallas de meshes.txt
-flightModel/runCase.sh    corre un archivo de sweep en serie, sobre mallas ya hechas
-flightModel/meshes.txt    una malla por línea
-flightModel/sweep*.txt    una corrida por línea: M > 1 en el socket 0, M < 1 en el 1
-flightModel/docs/         cómo se usa y por qué
+flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/   the mesh
+flightModel/common/       Allrun, Allrefine, machineLog.py                  copied into each run
+flightModel/case-central/ rhoCentralFoam template, M > 1
+flightModel/case-pimple/  rhoPimpleFoam template, M < 1 (only what differs)
+flightModel/newCase.sh    one run: template + mesh + flight condition
+flightModel/runMesh.sh    the meshes of meshes.txt
+flightModel/runCase.sh    one sweep file in series, on meshes that exist
+flightModel/post/         monitor.sh, sweepTable.sh, firstLayer.py
+flightModel/flightData/   TeleMega data and cdFlight.py (flight Cd)
+flightModel/docs/guide/   the user guide (LaTeX)
 ```
 
-## Arranque
+## First run
 
 ```bash
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
+cd flightModel
 
-flightModel/mesh/Allmesh ~/meshes/base                    # ~2 min, 2.1 M celdas
-flightModel/newCase.sh ~/runs/prueba --mesh ~/meshes/base --Minf 0.8 --np 8
-cd ~/runs/prueba && ./Allrun 8
+mesh/Allmesh ~/meshes/h1
+./newCase.sh ~/runs/test --mesh ~/meshes/h1 --solver pimple --Minf 0.8 --np 8
+cd ~/runs/test && ./Allrun 8
 ```
 
-El barrido entero:
+Put the mesh and run directories outside `/mnt/c`. The user guide gives the
+requirements, the preparation of the computer for a sweep, and the procedures.
 
-```bash
-flightModel/runMesh.sh
-flightModel/runCase.sh
-```
-
-Los directorios de corrida van **fuera de `/mnt/c`**: hace la E/S de OpenFOAM
-varias veces más lenta.
-
-## Qué leer
-
-| | |
-|---|---|
-| [WORKFLOW.md](flightModel/docs/WORKFLOW.md) | el flujo completo, de la geometría al Cd |
-| [SOLVERS.md](flightModel/docs/SOLVERS.md) | el solver, los modelos y por qué |
-| [VALIDATION.md](flightModel/docs/VALIDATION.md) | contra qué comparar los resultados |
-| [TROUBLESHOOTING.md](flightModel/docs/TROUBLESHOOTING.md) | lo que ya falló y cómo se arregló |
-
-## Requisitos
-
-OpenFOAM v2412 de ESI, que ya trae cfMesh (`cartesianMesh`). Bajo Windows,
-en WSL. La plantilla necesita `jinja2-cli`
-(`pip install jinja2-cli`) para renderizar sus `*.j2`; ver
-[SOLVERS.md §2.3](flightModel/docs/SOLVERS.md).
-
-
+`fin_flutter/` is a separate project.

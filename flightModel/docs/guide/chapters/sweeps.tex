@@ -1,0 +1,278 @@
+\chapter{Sweeps}\label{ch:sweeps}
+
+A sweep is two steps. \file{runMesh.sh} makes the meshes. \file{runCase.sh} makes
+and runs the cases on meshes that exist.
+
+\section{Make the meshes}\label{sec:run-mesh}
+
+\file{meshes.txt} has one mesh on each line: a name, then the options of
+\file{Allmesh}. Lines that start with \texttt{\#}, and empty lines, have no effect.
+
+\begin{shell}
+h0  --maxCellSize 2.2627 --nLayers 12 --thicknessRatio 1.1878
+h1  --maxCellSize 1.6    --nLayers 10 --thicknessRatio 1.2
+h2  --maxCellSize 1.1314 --nLayers 8  --thicknessRatio 1.229
+h3  --maxCellSize 0.8    --nLayers 7  --thicknessRatio 1.2
+\end{shell}
+
+\begin{shell}
+./runMesh.sh [meshes-file] [meshes-dir]      # default: meshes.txt, ~/meshes
+\end{shell}
+
+For each line, \file{runMesh.sh} does these steps:
+
+\begin{steps}
+\item If the mesh exists, it compares \ent{maxCellSize}, the level of \val{fins},
+  \ent{nLayers} and \ent{thicknessRatio} with the line. It keeps the mesh if they are
+  equal, and stops if they are different. It does not compare the geometry: after a
+  change of the STL file, remove the old meshes.
+\item If the mesh directory exists but has no mesh, it stops.
+\item If not, it runs \file{Allmesh} with the options of the line. It stops if
+  \file{Allmesh} stops with an error.
+\end{steps}
+
+To make only one mesh of the file, give a file with that line only.
+
+\section{Run the cases}\label{sec:run-sweep}
+
+A sweep file has one case on each line: a case name, then the options of
+\file{newCase.sh} (\cref{tab:newcase}).
+
+\begin{shell}
+m08-a00-h0  --np 8 --mesh h0 --solver pimple --alpha 0 --Minf 0.8 --pInf 47509 --Tinf 266.17
+m08-a00-h1  --np 8 --mesh h1 --solver pimple --alpha 0 --Minf 0.8 --pInf 47509 --Tinf 266.17 --init m08-a00-h0
+\end{shell}
+
+\begin{itemize}
+\item Lines that start with \texttt{\#}, and empty lines, have no effect.
+\item \ent{--mesh} is mandatory. A name without \texttt{/} is a directory in
+  \file{<meshes-dir>}.
+\item \ent{--init} is optional. A name without \texttt{/} is a directory in
+  \file{<runs-dir>}. That run must come earlier in the file, because the cases run in
+  sequence.
+\end{itemize}
+
+\begin{shell}
+./runCase.sh <sweep-file> [runs-dir] [meshes-dir]   # default: ~/runs, ~/meshes
+\end{shell}
+
+For each line, \file{runCase.sh} does these steps:
+
+\begin{steps}
+\item If \file{<runs-dir>/<name>} exists, it goes to the next line. If you run
+  \file{runCase.sh} again after a stop, it thus continues from the first case that does
+  not exist.
+\item If the mesh does not exist, it stops.
+\item It runs \file{newCase.sh}. It stops if \file{newCase.sh} stops with an error.
+\item It runs \file{./Allrun}. If \file{Allrun} stops with an error, it shows a
+  message and goes to the next line.
+\end{steps}
+
+\subsection{Start a sweep}
+
+A sweep runs for days. Start it so that it continues when the terminal closes:
+
+\begin{steps}
+\item Do the steps of \cref{sec:prepare-computer}.
+\item Start the sweep:
+\begin{shell}
+nohup ./runCase.sh sweepSubsonic.nemepad.txt > ~/log.sweepSubsonic.nemepad 2>&1 &
+\end{shell}
+\item Monitor it:
+\begin{shell}
+tail -f ~/log.sweepSubsonic.nemepad
+\end{shell}
+\item On the first case, examine the binding (\cref{sec:binding}) and the measurement
+  files (\cref{sec:measurement}).
+\end{steps}
+
+\cmd{nohup} keeps \file{runCase.sh} alive when the terminal closes or the ssh session
+stops. \cmd{tmux} or \cmd{screen} do the same.
+
+\subsection{Stop a sweep}
+
+\begin{steps}
+\item Stop \file{runCase.sh}. No new case starts. The solver of the current case
+  continues until it ends.
+\begin{shell}
+pkill -f 'runCase.sh sweepSubsonic'
+\end{shell}
+\item To stop the solver also, stop its \cmd{prterun} (Open MPI 5) or \cmd{mpirun}
+  (Open MPI 4) by its process number. \file{Allrun} then reconstructs the last time,
+  writes the record and stops the measurement.
+\end{steps}
+
+\begin{caution}
+\cmd{pkill -f <pattern>} also stops the shell that runs the command if its command
+line contains the pattern, for example in a script. Find the process number with
+\cmd{ps} and stop it with \cmd{kill <pid>}.
+\end{caution}
+
+\begin{caution}
+\file{runCase.sh} reads the sweep file line by line while it runs. Do not edit the
+file in place until the sweep ends: the next line is read from the old position in
+the new contents. Stop \file{runCase.sh}, edit the file, and start it again. It skips
+the cases that exist.
+\end{caution}
+
+\section{The sweep of record}
+
+\Cref{tab:sweep-record} gives the sweep of record.
+
+\begin{table}[htbp]
+\centering
+\caption{The sweep of record.}\label{tab:sweep-record}
+\begin{tabularx}{\linewidth}{@{}P{0.26\linewidth} L@{}}
+\toprule
+Item & Value \\
+\midrule
+Mach numbers & 0.3, 0.6, 0.8 (\cmd{rhoPimpleFoam}); 1.2, 1.8 (\cmd{rhoCentralFoam}) \\
+Angles of attack & $0^\circ$, $4^\circ$, $8^\circ$ \\
+Meshes & $h0$ (start only), $h1$, $h2$, $h3$ (\cref{tab:meshes}) \\
+Runs & 66: $5 \times 3 \times 4$, plus 6 \cmd{rhoPimpleFoam} start runs for $M > 1$ \\
+Files & \file{sweepSubsonic.txt} (36 runs), \file{sweepSupersonic.txt} (30 runs); \file{*.nemepad.txt} for \texttt{nemepad} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Each Mach number and angle is a chain of runs. Each run starts from the run on the
+coarser mesh (\cref{fig:chains}). The runs are in the sequence of the meshes, so all
+the $h0$ results come first. $h0$ is not part of the mesh study.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/pdf/chains.pdf}
+  \caption{Chains of runs. Each arrow is an \texttt{--init}.}
+  \label{fig:chains}
+\end{figure}
+
+The supersonic chains start with \cmd{rhoPimpleFoam} on $h0$. \cmd{rhoCentralFoam}
+from the uniform free stream stops at the base (\cref{sec:supersonic-start}).
+
+\ent{--alpha} turns the free stream in the $x$--$y$ plane, which is the plane of the
+half mesh. The mesh is the same for all angles. The angle $16^\circ$ was in the sweep
+until 2026-10-17. It was replaced by $4^\circ$, because the flight had
+$\alpha < 0.2^\circ$ in the coast (\cref{sec:flight-alpha}), and at $16^\circ$ the wake
+left the refinement regions \unit{0.4}{m} behind the base.
+
+\subsection{Computers}
+
+On \texttt{newton}, run the two files at the same time, one on each socket
+(\ent{--socket 0} and \ent{--socket 1}, 14 processes each). Each chain of
+\ent{--init} must stay in one file.
+
+On \texttt{nemepad} (one socket, 8 cores), use \file{sweepSubsonic.nemepad.txt} and
+\file{sweepSupersonic.nemepad.txt}: the same runs with \ent{--np 8} and no
+\ent{--socket}. Run one file, then the other. Never run the two at the same time.
+On $h0$, \texttt{m08-a00-h0} takes approximately \unit{2.7}{s} for each step on
+\texttt{nemepad}, against \unit{1.77}{s} on one socket of \texttt{newton}.
+
+\begin{caution}
+$h3$ does not fit in the memory of \texttt{nemepad}. The $h3$ lines of the
+\texttt{nemepad} files are comments until \texttt{newton} is back in service. Make
+only the meshes that you need: \file{runCase.sh} stops at the first case whose mesh
+does not exist.
+\end{caution}
+
+\section{Flight conditions}\label{sec:flight-conditions}
+
+The flight conditions are those of the coast phase ($t > \unit{4}{s}$) of the IREC
+flight in Midland, with the atmosphere of that day. \file{flightData/cdFlight.py}
+calculates them from the TeleMega data (\cref{ch:flight}):
+
+\begin{itemize}
+\item The pressure at the pad (\unit{896}{m} MSL) is the mean before launch,
+  \unit{90\,565}{Pa}.
+\item The temperature is \unit{305.0}{K} at the pad, with a lapse rate of
+  \unit{7.2}{K/km}: approximately ISA + \unit{20}{K}.
+\item The Mach number comes from the integrated speed and that temperature. $p_\infty$
+  and $T_\infty$ come from the integrated height.
+\end{itemize}
+
+\begin{table}[htbp]
+\centering
+\caption{Flight conditions of the sweep.}\label{tab:conditions}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+$M$ & $t$ [s] & Altitude MSL [m] & \ent{pInf} [Pa] & \ent{Tinf} [K] \\
+\midrule
+1.8 & 4.1  & 2171 & 78\,354 & 295.82 \\
+1.2 & 8.5  & 4347 & 60\,547 & 280.15 \\
+0.8 & 14.6 & 6289 & 47\,509 & 266.17 \\
+0.6 & 19.8 & 7437 & 40\,911 & 257.90 \\
+0.3 & 29.0 & 8679 & 34\,613 & 248.96 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{note}
+Until 2026-10-17 the sweep used the ISA values at the altitude of the TeleMega (for
+example $M = 0.8$: \unit{49\,800}{Pa}, \unit{251.72}{K}). The runs in
+\file{~/runs.sin-medicion} use those values.
+\end{note}
+
+\section{Do the sweep again on another computer}
+
+\begin{steps}
+\item Do the steps of \cref{ch:setup}.
+\item Optional: write the geometry again and compare it with the file in the
+  repository. The two files must be equal.
+\begin{shell}
+python3 mesh/makeRocket.py /tmp/check.stl && cmp /tmp/check.stl mesh/stl/Aconcagua_biconvex117.stl
+\end{shell}
+\item Make the meshes with \cmd{./runMesh.sh}. They must agree with
+  \cref{tab:mesh-quality}.
+\item Start the sweep files for the computer (\cref{sec:run-sweep}).
+\end{steps}
+
+\section{Typical studies}
+
+\subsection{Mach sweep}
+
+\begin{steps}
+\item Write one line for each Mach number in a sweep file.
+\item Run \cmd{./runCase.sh <sweep-file>}.
+\item Measure \yplus{} on each case. The mesh does not set \yplus, and the speed
+  changes by a factor of 6 from $M = 0.3$ to $M = 1.8$.
+\end{steps}
+
+\subsection{Mesh convergence}\label{sec:mesh-convergence-setup}
+
+\begin{steps}
+\item Change only \ent{maxCellSize}, with a constant ratio. Do not change the levels.
+  All cell sizes then change by the same ratio.
+\item Use the ratio $\sqrt{2}$. The method of \citet{celik2008} needs a ratio larger
+  than 1.3. The mesh does not refine uniformly: the number of cells $N$ grows
+  $\times 1.95$ from $h1$ to $h2$ and $\times 2.34$ from $h2$ to $h3$. The effective
+  ratio $r = (N_\text{fine}/N_\text{coarse})^{1/3}$ is thus 1.25 and 1.33. Use these
+  values, not $\sqrt{2}$, in \cref{sec:gci}.
+\item Keep the first cell equal on all meshes (\cref{tab:meshes}). If $t_1$ changes,
+  \yplus{} changes, and the study mixes the wall treatment with the discretization
+  error.
+\item Use the same flight condition on all meshes.
+\end{steps}
+
+\subsection{Angle-of-attack sweep}
+
+\begin{shell}
+for a in 0 2 4 6 8; do
+    ./newCase.sh ~/runs/a$a --mesh ~/meshes/h1 --solver pimple --Minf 0.8 --alpha $a --np 8
+    ( cd ~/runs/a$a && ./Allrun 8 )
+done
+\end{shell}
+
+\subsection{Finer fins}
+
+Raise the levels of \val{fins}, \val{finEdges} and \val{finRoots} in
+\file{meshDict} and make a new mesh, or run \cmd{./Allrefine tip} in the case before
+\cmd{./Allrun}.
+
+\section{Rules}
+
+\begin{itemize}
+\item Do not put meshes in the repository. \file{Allmesh} makes them again. Put the
+  STL file and \file{meshDict} in the repository.
+\item When a change to \file{meshDict} changes the mesh, commit it with the number of
+  cells and the \cmd{checkMesh} output of the new mesh.
+\item Put the run directories outside the repository and outside \file{/mnt/c}.
+\end{itemize}

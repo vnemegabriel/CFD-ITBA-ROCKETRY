@@ -23,7 +23,7 @@ FoamFile
 //
 //  Never run foamDictionary -set on a file containing #eval.
 //  The mesh is built for ONE speed: read Uinf off the ./Allrun banner and
-//  check y+ (docs/SOLVERS.md).
+//  check y+ (docs/guide).
 // ============================================================================
 
 Minf            1.80;       // -     free-stream Mach number

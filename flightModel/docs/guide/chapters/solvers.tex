@@ -1,0 +1,681 @@
+\chapter{Solvers and models}\label{ch:solvers}
+
+This chapter gives the dictionaries of the two templates, the models that they
+select and the references. Use it to calculate the values of a case by hand and to
+compare them with the case.
+
+\section{Summary}
+
+\begin{longtable}{@{}P{0.26\linewidth} P{0.68\linewidth}@{}}
+\caption{Summary of the templates.}\label{tab:solver-summary}\\
+\toprule
+Item & Value \\
+\midrule
+\endfirsthead
+\toprule
+Item & Value \\
+\midrule
+\endhead
+Templates & \file{case-central/} ($M > 1$, started from pimple, \cref{sec:supersonic-start}); \file{case-pimple/} ($M < 1$, \cref{sec:pimple}) \\
+Solvers & \cmd{rhoCentralFoam}; \cmd{rhoPimpleFoam} \\
+Formulation & Compressible. Central: density-based, explicit. Pimple: pressure-based, \ent{transonic} \\
+Time & \ent{localEuler} in both; time counts iterations (\cref{sec:lts}). Central: Courant ramp \\
+Fields in \file{0.orig/} & \ent{U}, \ent{p}, \ent{T}, \ent{k}, \ent{omega}, \ent{nut}, \ent{alphat} \\
+Turbulence & $k$--$\omega$ SST with wall functions \\
+Gas & Air, perfect gas, constant $c_p$, Sutherland viscosity \\
+Input & \ent{Minf}, \ent{pInf}, \ent{Tinf}, \ent{alpha}, \ent{beta}, \ent{Ti}, \ent{nuRatio} \\
+Initial condition & Uniform free stream, or another run (\cref{sec:init}) \\
+\bottomrule
+\end{longtable}
+
+\subsection{Why two solvers}
+
+The central-upwind flux of \cmd{rhoCentralFoam} scales its numerical dissipation with
+the speed of sound, not with the flow speed. It is thus too dissipative at low Mach
+numbers. The OpenFOAM ToolChain report \citep[§6]{toolchain2026} measured an error of
+approximately 100\,\% in $C_A$ against wind-tunnel data with \cmd{rhoCentralFoam} at
+low Mach numbers, and better results with \cmd{rhoPimpleFoam} for $M < 0.8$. Above
+$M = 1.5$, \cmd{rhoPimpleFoam} gave nonphysical results at the nose tip.
+
+The cost is a change of discretization at $M = 1$. A step in the curve $C_D(M)$ there
+is not separable from the physics. To measure the step, run one Mach number with the
+two solvers on the same mesh (\cref{sec:two-solvers}).
+
+The models, the gas, the boundary conditions, the function objects and the flight
+condition are the same files in the two templates.
+
+\section{Files of the template}
+
+This section lists \file{case-central/}. \file{case-pimple/} holds only the files that
+differ (\cref{sec:pimple}).
+
+\begin{longtable}{@{}P{0.40\linewidth} P{0.14\linewidth} P{0.38\linewidth}@{}}
+\caption{Files of \texttt{case-central/}.}\label{tab:template-files}\\
+\toprule
+File & Edit & Function \\
+\midrule
+\endfirsthead
+\toprule
+File & Edit & Function \\
+\midrule
+\endhead
+\file{system/flowConditions} & yes & Flight condition (\cref{sec:flow-conditions}). \\
+\file{config.json} & yes & Courant ramp and stop criterion (\cref{sec:config-json}). \\
+\file{system/flowDerived} & no & Values calculated from \file{flowConditions}. \\
+\file{0.orig/*} & no & Initial and boundary conditions (\cref{sec:bc}). \\
+\file{constant/thermophysicalProperties} & no & Gas model (\cref{sec:thermo}). \\
+\file{constant/turbulenceProperties} & no & Turbulence model (\cref{sec:turbulence}). \\
+\file{constant/meshInfo} & no & \file{newCase.sh} replaces it (\cref{sec:meshinfo}). \\
+\file{system/controlDictBase.j2} & with care & Time control and function objects. \\
+\file{system/FOs/FOcommon} & with care & Function objects of the two templates, except \ent{residuals} (\cref{sec:function-objects}). \\
+\file{system/controlDict} & no & Includes \file{controlDictBase} and adds \ent{maxCo 0.01}. \\
+\file{system/fileUpdaterControlDict/}, \file{system/fileUpdater.j2} & no & Steps and schedule of the Courant ramp. \\
+\file{system/FOs/FOrunTimeControl.j2} & no & Stop criterion. \\
+\file{system/fvSchemes}, \file{fvSchemesUpwind} & no & First-order schemes for the start. \\
+\file{system/fvSchemesVanLeer} & with care & Second-order schemes (\cref{sec:schemes}). \\
+\file{system/fvSolution} & no & Linear solvers (\cref{sec:linear-solvers}). \\
+\file{system/decomposeParDict} & with \ent{--np} & Parallel decomposition: \ent{method scotch}. \\
+\file{system/topoSetDict}, \file{refineMeshDict} & \ent{margin}, \ent{wake}, \ent{tipBand} & Regions of \file{Allrefine}. \\
+\file{Allclean} & no & Removes the mesh, the fields and the logs. \\
+\bottomrule
+\end{longtable}
+
+\begin{caution}
+Use \cmd{foamDictionary -set} only on \file{system/flowConditions}. On a file with
+\texttt{\#include} or \texttt{\#eval}, \cmd{foamDictionary -set} writes the expanded
+values. The file then does not follow \file{flowConditions}.
+\end{caution}
+
+\section{Flight condition}\label{sec:flow-conditions}
+
+\subsection{flowConditions}
+
+\begin{table}[htbp]
+\centering
+\caption{Entries of \texttt{flowConditions} and the values of the template.}\label{tab:flowconditions}
+\begin{tabularx}{\linewidth}{@{}l l l L@{}}
+\toprule
+Entry & Default & Unit & Function \\
+\midrule
+\ent{Minf} & 1.80 & -- & Free-stream Mach number. \\
+\ent{alpha} & 0 & deg & Angle of attack. The velocity turns from $+x$ to $+y$. \\
+\ent{beta} & 0 & deg & Angle of sideslip. The velocity turns to $+z$. \\
+\ent{pInf} & 101\,325 & Pa & Static pressure (ISA sea level). \\
+\ent{Tinf} & 288.15 & K & Static temperature (ISA sea level). \\
+\ent{Ti} & 0.005 & -- & Turbulence intensity. \\
+\ent{nuRatio} & 5 & -- & Ratio $\nu_t/\nu$ in the free stream. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The sweep gives \ent{Minf}, \ent{pInf}, \ent{Tinf} and \ent{alpha} for each case
+(\cref{tab:conditions}). To change a value, use \file{newCase.sh}, or:
+
+\begin{shell}
+foamDictionary system/flowConditions -entry Minf -set 1.5
+\end{shell}
+
+\subsection{flowDerived}
+
+\file{flowDerived} includes \file{flowConditions} and calculates the values below with
+\texttt{\#eval}. The fields in \file{0.orig/} and \file{controlDictBase} include
+\file{flowDerived}. A change to \file{flowConditions} thus changes all the conditions.
+
+\begin{longtable}{@{}l P{0.30\linewidth} r r@{}}
+\caption{Values of \texttt{flowDerived} at two sweep conditions ($\texttt{Ti} = 0.005$, $\texttt{nuRatio} = 5$).}\label{tab:flowderived}\\
+\toprule
+Value & Formula & $M = 0.8$ & $M = 1.8$ \\
+\midrule
+\endfirsthead
+\toprule
+Value & Formula & $M = 0.8$ & $M = 1.8$ \\
+\midrule
+\endhead
+\ent{aInf} [m/s] & $\sqrt{\gamma R T}$ & 327.06 & 344.79 \\
+\ent{Uinf} [m/s] & $M a$ & 261.64 & 620.62 \\
+\ent{rhoInf} [kg/m\textsuperscript{3}] & $p/(R T)$ & 0.6218 & 0.9227 \\
+\ent{muInf} [Pa\,s] & $A_s\sqrt{T}/(1 + T_s/T)$ & $1.681\times10^{-5}$ & $1.828\times10^{-5}$ \\
+\ent{kInlet} [m\textsuperscript{2}/s\textsuperscript{2}] & $1.5\,(U\,\texttt{Ti})^2$ & 2.567 & 14.44 \\
+\ent{nutInlet} [m\textsuperscript{2}/s] & $\texttt{nuRatio}\;\nu$ & $1.352\times10^{-4}$ & $9.903\times10^{-5}$ \\
+\ent{omegaInlet} [1/s] & $k/\nu_t$ & $1.900\times10^{4}$ & $1.459\times10^{5}$ \\
+\bottomrule
+\end{longtable}
+
+\begin{tabularx}{\linewidth}{@{}l L@{}}
+\toprule
+Value & Formula \\
+\midrule
+\ent{Ux}, \ent{Uy}, \ent{Uz} & $U\,(\cos\alpha\cos\beta,\ \sin\alpha\cos\beta,\ \sin\beta)$ \\
+Drag direction \ent{dx}, \ent{dy}, \ent{dz} & $(\cos\alpha\cos\beta,\ \sin\alpha\cos\beta,\ \sin\beta)$ \\
+Lift direction \ent{lx}, \ent{ly}, \ent{lz} & $(-\sin\alpha,\ \cos\alpha,\ 0)$ \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Constants in \file{flowDerived}: \ent{Rgas 287.05}, \ent{gammaGas 1.4}, \ent{Prt 0.85}.
+They must agree with \file{thermophysicalProperties} (\cref{sec:thermo}). The
+Sutherland constants are in the formula of \ent{muInf}.
+
+\section{Equations and numerical method of rhoCentralFoam}
+
+\cmd{rhoCentralFoam} does not solve a pressure equation. It advances the conserved
+variables $\rho$, $\rho\mathbf{U}$ and $\rho E$ with a central-upwind flux, then it
+applies the diffusive terms implicitly. \file{fvSolution} thus has no \ent{SIMPLE} or
+\ent{PIMPLE} dictionary and no relaxation factors.
+
+\paragraph{Flux.} \ent{fluxScheme Kurganov}. The scheme divides the face flux with the
+local wave speeds $a^+$ and $a^-$. It captures shocks without a Riemann solver and
+without artificial viscosity \citep{kurganov2000,kurganov2001}.
+\citet{greenshields2010} give the implementation and validation in OpenFOAM.
+
+\paragraph{Reconstruction.} The primitive variables go to the faces with the van Leer
+limiter: \ent{reconstruct(rho) vanLeer}, \ent{reconstruct(U) vanLeerV},
+\ent{reconstruct(T) vanLeer}. At a discontinuity the limiter decreases the scheme to
+first order. In smooth regions the scheme stays second order \citep{vanleer1979}.
+\ent{vanLeerV} limits in the direction of the largest gradient.
+
+\section{Local time step, Courant ramp and stop criterion}
+
+\subsection{Local time step}\label{sec:lts}
+
+The two templates use \ent{ddt localEuler}, as the OpenFOAM ToolChain does
+\citep[§5.3]{toolchain2026}. Each cell advances with its own time step, the step that
+gives \ent{maxCo} in that cell. The run is a pseudo-transient march to the steady
+state: the intermediate states are not physical, the converged state is.
+
+\ent{deltaT 1} in \file{controlDict}, so the time counts iterations: \ent{endTime},
+\ent{writeInterval}, the ramp and the stop criterion are all in iterations.
+
+On $h1$ at $M = 1.8$ the local step goes from $1.5\times10^{-10}$\,s in the smallest
+cells to $1.6\times10^{-5}$\,s in the far field. With a global \ent{Euler} step, all
+the domain advanced at $1.5\times10^{-10}$\,s: approximately $6.8\times10^{5}$ steps
+for each flow-through time.
+
+\begin{tabularx}{\linewidth}{@{}l P{0.25\linewidth} P{0.25\linewidth} L@{}}
+\toprule
+Entry & Central: read from & Pimple: read from & Value \\
+\midrule
+\ent{maxCo} & \file{controlDict} (the ramp changes it) & \file{fvSolution} \ent{PIMPLE} & ramp to \ent{final_Co}; pimple from \file{config.json} \\
+\ent{maxDeltaT} & \file{controlDict} & \file{fvSolution} \ent{PIMPLE} & \unit{1}{s}: no limit \\
+\ent{rDeltaTSmoothingCoeff} & \file{controlDict} & \file{fvSolution} \ent{PIMPLE} & 0.1 \\
+\ent{rDeltaTDampingCoeff} & not read & \file{fvSolution} \ent{PIMPLE} & pimple 0.9 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Source: \file{setRDeltaT.H} of \cmd{rhoCentralFoam} and of \cmd{rhoPimpleFoam} in v2412.
+
+\begin{caution}
+With \ent{localEuler}, the line \val{Mean and max Courant Numbers} of
+\cmd{rhoCentralFoam} uses \ent{deltaT} of \file{controlDict} (1), not the local step.
+Values of the order of $10^7$ are normal. \cmd{rhoPimpleFoam} does not write the
+Courant number. Look at \val{Flow time scale min/max}: the minimum is the step of the
+most restrictive cell. A sudden decrease shows a cell that diverges.
+\end{caution}
+
+\subsection{Courant ramp (central only)}\label{sec:ramp}
+
+A uniform free stream on a no-slip wall causes a large transient. The ramp of the
+ToolChain \citep[§5.4.1]{toolchain2026} starts with \ent{maxCo 0.01} and first-order
+reconstruction, and doubles \ent{maxCo} step by step. The function objects
+\ent{timeActivatedFileUpdate} in \file{system/fileUpdater} copy a file onto
+\file{system/controlDict} or \file{system/fvSchemes} at each switch iteration.
+\ent{runTimeModifiable yes} makes the solver read the new file.
+
+\begin{table}[htbp]
+\centering
+\caption{Courant ramp of \texttt{case-central/}.}\label{tab:ramp}
+\begin{tabularx}{\linewidth}{@{}l L L@{}}
+\toprule
+Phase & Iterations & \ent{maxCo} \\
+\midrule
+Upwind & 0, 20, 35, 50, 65, 80, 100 & 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 \\
+van Leer & \ent{vanLeer} + 0, 20, 35, 150, 300, 800, 2000 & 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5 \\
+Final & \ent{minIter}, or the end of the ramp + 1 if later & \ent{final_Co}, with the stop criterion \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Each \ent{maxCo} is limited to \ent{final_Co}. The final step never comes before the
+end of the ramp. \cmd{rhoCentralFoam} has no damping of the local step, and a jump of
+\ent{maxCo} from 0.04 to 0.5 gave a floating point exception six iterations later
+($h1$, $M = 1.8$). With the default values the ramp ends at iteration 4000.
+
+\cmd{rhoPimpleFoam} has no ramp. It was stable from the uniform free stream on $h1$ at
+$M = 0.3$.
+
+\subsection{config.json}\label{sec:config-json}
+
+\file{newCase.sh} renders all \file{*.j2} files with these values.
+
+\begin{longtable}{@{}l l l P{0.42\linewidth}@{}}
+\caption{Keys of \texttt{config.json}.}\label{tab:config}\\
+\toprule
+Key & Central & Pimple & Function \\
+\midrule
+\endfirsthead
+\toprule
+Key & Central & Pimple & Function \\
+\midrule
+\endhead
+\ent{maxCo} & -- & 0.5 & Courant number of each cell. \\
+\ent{vanLeer} & 2000 & -- & Iteration of the change from upwind to van Leer. \val{-1} keeps upwind. \\
+\ent{minIter} & 3000 & 1000 & First iteration of the stop criterion. \\
+\ent{final_Co} & 0.5 & -- & Largest \ent{maxCo} of the ramp. \\
+\ent{endIter} & 20000 & 20000 & Last iteration if the criterion does not stop the run. \\
+\ent{coeffs_fields} & \val{["Cd"]} & \val{["Cd"]} & Coefficients in the stop criterion. \\
+\ent{coeffs_variation} & \val{[0.007]} & \val{[0.007]} & Absolute tolerance: 0.007 is 2\,\% of $C_D = 0.35$. \\
+\ent{coeffs_window} & \val{[1000]} & \val{[1000]} & Window of each coefficient, in iterations. \\
+\bottomrule
+\end{longtable}
+
+The values come from the ToolChain, which used another rocket and other meshes.
+Adjust them from the first runs on $h1$.
+
+\subsection{Stop criterion}\label{sec:stop-criterion}
+
+File: \file{system/FOs/FOrunTimeControl.j2}, the same for the two templates. For each
+field in \ent{coeffs_fields}, the condition \ent{average} calculates a moving mean over
+\ent{coeffs_window} iterations, from \ent{minIter}. The run stops when, for all the
+fields, the window is complete and
+\[
+  |\overline{C} - C| < \texttt{coeffs\_variation}.
+\]
+\ent{endIter} is the second limit.
+
+The sweep stops on $C_D$ only, also at $\alpha = 4^\circ$ and $8^\circ$. Examine that
+$C_L$ and $C_{m}$ are also flat in \file{coefficient.dat}. You can add \val{Cl} and
+\val{CmPitch} to \ent{coeffs_fields}. No tolerance for \val{CmPitch} is chosen: about
+the nose tip with $l_\text{ref} = \unit{0.151}{m}$ it is 10 to 100 times $C_L$.
+
+To change the tolerance of a running case, edit \ent{tolerance} in its
+\file{system/FOs/FOrunTimeControl} and run \cmd{touch system/controlDict}. The solver
+reads the file again and starts the mean from zero. The run thus cannot stop before
+one more window.
+
+\section{Turbulence}\label{sec:turbulence}
+
+File: \file{constant/turbulenceProperties}: \ent{simulationType RAS},
+\ent{RASModel kOmegaSST}.
+
+\paragraph{Closure.} The Boussinesq hypothesis gives the Reynolds stress from an eddy
+viscosity and the strain rate:
+\[
+  -\overline{u_i'u_j'} = \nu_t\left(\frac{\partial U_i}{\partial x_j} + \frac{\partial U_j}{\partial x_i}\right) - \frac{2}{3}k\,\delta_{ij},
+  \qquad
+  \nu_t = \frac{a_1 k}{\max(a_1\omega,\ S F_2)}.
+\]
+The denominator is the shear-stress limiter. It limits the production of $\nu_t$ in
+adverse pressure gradients, which occur on the boattail and at the fin-body junction.
+
+\paragraph{References.} \citet{menter1994}; \citet{menter2003}, the version that
+OpenFOAM uses. When you compare with the literature, find which version the source
+uses. Default constants (\file{src/TurbulenceModels/.../kOmegaSST/}): $\alpha_{k1}=0.85$,
+$\alpha_{k2}=1.0$, $\alpha_{\omega1}=0.5$, $\alpha_{\omega2}=0.856$, $\beta_1=0.075$,
+$\beta_2=0.0828$, $\beta^*=0.09$, $\gamma_1=5/9$, $\gamma_2=0.44$, $a_1=0.31$, $b_1=1.0$,
+$c_1=10$, $F_3$ off.
+
+\subsection{Wall treatment}\label{sec:wall-treatment}
+
+On \val{cone}, \val{walls}, \val{tail} and \val{fins}:
+
+\begin{tabularx}{\linewidth}{@{}l P{0.36\linewidth} L@{}}
+\toprule
+Field & Condition & Reason \\
+\midrule
+\ent{nut} & \ent{nutUSpaldingWallFunction} & Spalding's law is continuous in \yplus{} \citep{spalding1961}. The first cell can be in the viscous sublayer, the buffer layer or the log layer. \\
+\ent{k} & \ent{kLowReWallFunction} & Also continuous in \yplus. \\
+\ent{omega} & \ent{omegaWallFunction} & Blends the sublayer and log-layer values of $\omega$. \\
+\ent{alphat} & \ent{compressible::alphatWallFunction}, \ent{Prt 0.85} & Turbulent thermal diffusivity from $\nu_t$. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+These conditions need wall patches of type \val{wall}. The mesh does not set \yplus.
+Measure \yplus{} on each case.
+
+\section{Thermophysical properties}\label{sec:thermo}
+
+File: \file{constant/thermophysicalProperties}.
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Entry & Value & Function \\
+\midrule
+\ent{type} & \val{hePsiThermo} & Energy-based, $\psi = 1/(RT)$. \cmd{rhoCentralFoam} accepts only \ent{psiThermo}. \\
+\ent{mixture} & \val{pureMixture} & One species. \\
+\ent{transport} & \val{sutherland} & $\mu(T) = A_s\sqrt{T}/(1 + T_s/T)$. \\
+\ent{thermo} & \val{hConst} & Constant $c_p$. \\
+\ent{equationOfState} & \val{perfectGas} & $p = \rho R T$. \\
+\ent{energy} & \val{sensibleInternalEnergy} & The solver solves $e$. \cmd{rhoCentralFoam} needs it. \\
+\bottomrule
+\end{tabularx}
+
+\begin{table}[htbp]
+\centering
+\caption{Constants of the gas.}\label{tab:gas}
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Constant & Value & Calculation \\
+\midrule
+\ent{molWeight} & \unit{28.96}{kg/kmol} & $R = 8314.46/28.96 = \unit{287.10}{J/(kg\,K)}$ \\
+\ent{Cp} & \unit{1005}{J/(kg\,K)} & $\gamma = c_p/(c_p - R) = 1.400$ \\
+\ent{As} & $1.4792\times10^{-6}$ & At \unit{288.15}{K}: $\mu = \unit{1.790\times10^{-5}}{Pa\,s}$ \\
+\ent{Ts} & \unit{116}{K} & \\
+$Pr$ & 0.690 & From the Eucken correction (below), not an input \\
+\ent{Prt} & 0.85 & Turbulent Prandtl number for air \citep{kays1994} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\citet[eq.~1-36]{white2006} gives Sutherland's law as
+$\mu = \mu_\text{ref}(T/T_\text{ref})^{1.5}(T_\text{ref}+S)/(T+S)$. The OpenFOAM form
+$A_s\sqrt{T}/(1+T_s/T) = A_s T^{1.5}/(T+T_s)$ is the same equation.
+
+\paragraph{Conductivity and Prandtl number.} With \val{sutherland}, OpenFOAM calculates
+the conductivity with the modified Eucken correction,
+$\kappa = \mu\,c_v\,(1.32 + 1.77\,R/c_v)$. The laminar Prandtl number is thus
+\[
+  Pr = \frac{c_p}{c_v\,(1.32 + 1.77\,R/c_v)} = 0.690,
+\]
+not 0.72. Another solver must use the same value (\cref{ch:nektar}).
+
+\paragraph{Gas constant.} \file{flowDerived} uses $R = 287.05$ and the
+thermophysical model $8314.46/28.96 = 287.10$. The difference in \ent{rhoInf} is
+0.02\,\%.
+
+\paragraph{Limit of hConst.} The stagnation temperature is
+$T_0 = T\,(1 + \tfrac{\gamma-1}{2}M^2)$. At the flight conditions
+(\cref{tab:conditions}), $T_0$ is \unit{300}{K} at $M = 0.8$ and \unit{487}{K} at
+$M = 1.8$. The error of a constant $c_p$ is less than 0.5\,\% below $M = 0.8$,
+approximately 2\,\% at $M = 1.8$ and 4\,\% at $M = 2.5$. Above $M = 2.5$, replace
+\val{hConst} with \val{janaf}. The coefficients for air are in
+\file{$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35}.
+
+\section{Temperature limits}
+
+\file{case-central/} has none. \cmd{rhoCentralFoam} in v2412 does not read
+\file{fvOptions}, so a \ent{limitTemperature} entry has no effect. \file{case-pimple/}
+has one (\cref{sec:pimple}). With \val{perfectGas}, a negative $T$ gives an imaginary
+speed of sound, and the solver stops with a floating point exception. The Courant ramp
+is the only protection of the central template.
+
+\section{Boundary conditions}\label{sec:bc}
+
+The number of characteristics that go in and go out on each boundary sets the
+conditions. \ent{U} and \ent{T} use the same condition at all Mach numbers. \ent{p}
+does not: \file{0.orig/p} selects the branch with \texttt{\#if \$\{\{ \$Minf > 1 \}\}}.
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Field & \val{inlet}, \val{outlet}, \val{box} & Function \\
+\midrule
+\ent{U} & \val{freestreamVelocity} & Fixed where the flow goes in, extrapolated where it goes out. \\
+\ent{T}, \ent{k}, \ent{omega} & \val{inletOutlet} & The same. \\
+\ent{nut}, \ent{alphat} & \val{calculated} & From the turbulence model. \\
+\bottomrule
+\end{tabularx}
+
+\paragraph{p, $M \leq 1$.} \val{freestreamPressure} on \val{inlet}, \val{outlet} and
+\val{box}. It extrapolates where the flow goes in and is fixed where the flow goes
+out. In subsonic flow, one acoustic wave goes in through the outlet.
+
+\paragraph{p, $M > 1$.} Each boundary has its own condition:\par
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Boundary & Condition & Reason \\
+\midrule
+\val{inlet} & \val{fixedValue} & All characteristics go in. \\
+\val{outlet} & \val{zeroGradient} & All characteristics go out. \\
+\val{box} & \val{waveTransmissive} & The normal velocity is approximately 0. Waves cross the boundary in the two directions. The condition moves $p$ out at $u+c$ and relaxes it to \ent{fieldInf} over \ent{lInf} = \unit{10}{m}. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+In v2412, \val{freestreamPressure} has no supersonic mode: on a supersonic outlet it
+fixes $p$. This is the reason for the branch. \val{waveTransmissive} is the
+non-reflecting condition of \citet{poinsot1992}. At $M = 1.8$ the Mach cone crosses
+\val{box} (\cref{sec:domain}). A \val{fixedValue} there reflects the wave into the
+domain.
+
+\paragraph{Walls.} \ent{U}: \val{noSlip}. \ent{p}: \val{zeroGradient}. \ent{T}:
+\val{zeroGradient} (adiabatic). At $M = 1.8$ the recovery temperature is approximately
+\unit{470}{K}. In a motor burn of \unit{4}{s}, the airframe does not get to this value.
+Zero heat flux is thus the correct limit.
+
+The \val{symm} entries in \file{0.orig/} apply only to \val{half} and \val{quarter}
+meshes.
+
+\section{Function objects}\label{sec:function-objects}
+
+File: \file{system/FOs/FOcommon}, included by the two templates. \ent{residuals} is in
+\file{controlDictBase.j2} and in \file{case-pimple/system/controlDict.j2}, because the
+solved fields differ.
+
+\begin{longtable}{@{}P{0.25\linewidth} P{0.16\linewidth} P{0.34\linewidth} P{0.13\linewidth}@{}}
+\caption{Function objects.}\label{tab:fo}\\
+\toprule
+Name & Type & Output & Interval \\
+\midrule
+\endfirsthead
+\toprule
+Name & Type & Output & Interval \\
+\midrule
+\endhead
+\ent{forceCoeffs1} & \ent{forceCoeffs} & $C_D$, $C_L$, $C_m$ and others & 50 steps \\
+\ent{forces1} & \ent{forces} & Forces and moments, pressure and viscous parts & 50 steps \\
+\ent{residuals} & \ent{solverInfo} & Residuals (and \ent{p} in pimple) & 50 steps \\
+\ent{timeInfo} & \ent{timeInfo} & CPU and wall time & 50 steps \\
+\ent{MachNo}, \ent{yPlus}, \ent{wallShearStress}, \ent{Cp} & & Fields & write time \\
+\ent{surfaces} & \ent{surfaces}, VTK & $p$, $U$, $T$, $\rho$, $M$, $C_p$, $\tau_w$, \yplus{} on \val{symm} and on the walls & end of the run \\
+\ent{samples} & \ent{sets}, CSV & Lines on the skin, in the wake, on the axis, and a free-stream point (\cref{tab:samples}) & end of the run \\
+\bottomrule
+\end{longtable}
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Reference & Value & Source \\
+\midrule
+\ent{patches} & \ent{$wallPatches} & \file{constant/meshInfo} \\
+\ent{rho} & \val{rho} & The density field: $p$ is in Pa. \\
+\ent{rhoInf}, \ent{magUInf} & \ent{$rhoInf}, \ent{$Uinf} & \file{flowDerived}. For the dynamic pressure. \\
+\ent{Aref}, \ent{lRef} & \ent{$Aref}, \ent{$lRef} & \file{constant/meshInfo} \\
+\ent{CofR} & \val{(0 0 0)} & The nose tip. \\
+\ent{pitchAxis} & \val{(0 0 1)} & $z$ axis \\
+\ent{dragDir}, \ent{liftDir} & from $\alpha$ and $\beta$ & Wind axes (\file{flowDerived}). \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Time control: \ent{startFrom latestTime}, \ent{endTime} = \ent{endIter},
+\ent{deltaT 1}, \ent{writeInterval} 500 steps, \ent{purgeWrite 1} (only the last time
+directory stays), \ent{writeFormat binary}.
+
+\section{Discretization schemes}\label{sec:schemes}
+
+\file{system/fvSchemesVanLeer} contains the full set. \file{system/fvSchemes} and
+\file{system/fvSchemesUpwind} include it and set the three \ent{reconstruct} entries to
+\val{upwind}. The ramp copies \file{fvSchemesUpwind} at the start and
+\file{fvSchemesVanLeer} at iteration \ent{vanLeer}. Do not edit
+\file{system/fvSchemes}.
+
+\begin{tabularx}{\linewidth}{@{}P{0.36\linewidth} P{0.30\linewidth} L@{}}
+\toprule
+Term & Scheme & Reason \\
+\midrule
+\ent{fluxScheme} & \val{Kurganov} & Central-upwind flux. \\
+\ent{reconstruct(rho)}, \ent{reconstruct(T)} & \val{vanLeer} & TVD. \\
+\ent{reconstruct(U)} & \val{vanLeerV} & TVD, vector. \\
+\ent{ddt} & \val{localEuler} & Local time step. \\
+\ent{grad} & \val{Gauss linear} & \\
+\ent{div(tauMC)} & \val{Gauss linear} & Deviatoric viscous stress. \\
+\ent{div(phi,k)}, \ent{div(phi,omega)} & \val{Gauss upwind} & $k$ and $\omega$ must stay positive. \\
+\ent{laplacian}, \ent{snGrad} & \val{limited corrected 0.33} & Non-orthogonal correction, limited. \\
+\ent{wallDist} & \val{meshWave} & Wall distance for the SST model. \\
+\bottomrule
+\end{tabularx}
+
+\section{Linear solvers}\label{sec:linear-solvers}
+
+\begin{tabularx}{\linewidth}{@{}P{0.24\linewidth} L l l@{}}
+\toprule
+Fields & Solver & Tolerance & \ent{relTol} \\
+\midrule
+\ent{rho}, \ent{rhoU}, \ent{rhoE} & \val{diagonal} & -- & -- \\
+\ent{U}, \ent{e} & \val{smoothSolver}, \val{symGaussSeidel}, 2 sweeps & $10^{-9}$ & 0.01 \\
+\ent{k}, \ent{omega} & \val{smoothSolver}, \val{symGaussSeidel}, 1 sweep & $10^{-9}$ & 0.1 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+The conserved variables are explicit. Only the implicit diffusive corrections and the
+turbulence equations use a real linear solver.
+
+\section{Origin of the configuration}
+
+The central template follows
+\file{$FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35} and the Courant
+ramp of the ToolChain. Differences from the tutorial:
+
+\begin{tabularx}{\linewidth}{@{}l P{0.22\linewidth} P{0.20\linewidth} L@{}}
+\toprule
+Item & Tutorial & Template & Reason \\
+\midrule
+Turbulence & laminar & \val{kOmegaSST} & The rocket flow is turbulent. \\
+Walls & \val{maxwellSlipU}, \val{smoluchowskiJumpT} & \val{noSlip}, adiabatic & The tutorial is a low-density flow. \\
+\ent{laplacian}, \ent{snGrad} & not limited & \val{limited corrected 0.33} & Non-orthogonal cells. \\
+\ent{ddt} & \val{localEuler} & \val{localEuler} & The template used \val{Euler} until 2026-10-12, after a misreading of the Courant number (\cref{sec:ts-courant}). \\
+\bottomrule
+\end{tabularx}
+
+\section{rhoPimpleFoam template}\label{sec:pimple}
+
+\file{case-pimple/} holds only the files that differ from \file{case-central/}. The
+other files (\file{0.orig/}, \file{constant/}, \file{flowConditions},
+\file{flowDerived}, \file{decomposeParDict}, \file{FOs/FOcommon},
+\file{FOs/FOrunTimeControl.j2}) are those of \file{case-central/}: change them there.
+
+\begin{tabularx}{\linewidth}{@{}P{0.30\linewidth} L@{}}
+\toprule
+File & Function \\
+\midrule
+\file{config.json} & \ent{maxCo}, \ent{minIter}, \ent{endIter}, stop criterion. \\
+\file{system/controlDict.j2} & Time in iterations, function objects, \ent{residuals} with \ent{p}. \\
+\file{system/fvSchemes} & Schemes (below). \\
+\file{system/fvSolution.j2} & \ent{PIMPLE} and the local-time-step controls. \\
+\file{system/fvOptions} & \ent{limitTemperature} from 100 to \unit{1000}{K}. \\
+\file{central.exclude} & Files of \file{case-central/} that this template replaces or does not use. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Schemes}
+
+From \file{templates/rhoPimpleFoamTransonic} of the ToolChain, with the
+\ent{laplacian} and \ent{snGrad} of the central template.
+
+\begin{tabularx}{\linewidth}{@{}P{0.28\linewidth} P{0.32\linewidth} L@{}}
+\toprule
+Term & Scheme & Reason \\
+\midrule
+\ent{ddt} & \val{localEuler} & \Cref{sec:lts}. \\
+\ent{grad} & \val{cellLimited Gauss linear 1}; 0.333 for \ent{p} and \ent{e} & Bounded gradients. \\
+\ent{div(phi,U)} & \val{Gauss vanLeerV} & TVD, second order away from shocks. \\
+\ent{div(phi,e)}, \ent{div(phid,p)} & \val{Gauss limitedLinear 1} & Bounded. \ent{phid} is the convective flux of $p$ in the \ent{transonic} formulation. \\
+\ent{div(phi,K)} & \val{Gauss linear} & Kinetic energy. \\
+\ent{div(phiv,p)} & \val{Gauss upwind} & Pressure work in the $e$ equation. \\
+\ent{div(phi,k)}, \ent{div(phi,omega)} & \val{Gauss upwind} & As central. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{PIMPLE}
+
+\begin{tabularx}{\linewidth}{@{}P{0.40\linewidth} l L@{}}
+\toprule
+Entry & Value & Reason \\
+\midrule
+\ent{transonic} & yes & Density-weighted pressure equation for $M = 0.6$ to $0.8$. Valid at $M = 0.3$. \\
+\ent{nOuterCorrectors}, \ent{nCorrectors} & 1, 2 & Pseudo-steady march: one PISO pass for each iteration. \\
+\ent{nNonOrthogonalCorrectors} & 1 & Maximum non-orthogonality $66^\circ$. \\
+\ent{pMinFactor}, \ent{pMaxFactor} & 0.05, 6 & Limits of $p$ relative to the boundary values. 6 covers the stagnation pressure behind a normal shock at $M = 1.8$. \\
+\ent{maxCo}, \ent{rDeltaTSmoothingCoeff}, \ent{rDeltaTDampingCoeff}, \ent{maxDeltaT} & 0.5, 0.1, 0.9, 1 & \Cref{sec:lts}. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Linear solvers: \ent{p} with \val{GAMG}, tolerance $10^{-8}$, \ent{relTol 0.01};
+\ent{rho}, \ent{U}, \ent{e}, \ent{k}, \ent{omega} with \val{smoothSolver}
+\val{symGaussSeidel}, \ent{relTol 0.1}.
+
+\paragraph{Temperature limit.} \ent{limitTemperature} between 100 and \unit{1000}{K}.
+The free stream of the sweep is at 249 to \unit{296}{K}, and the stagnation
+temperature at $M = 1.8$ is \unit{487}{K}. The limit only protects the start. Count
+the cells that it limits in the log (\val{LimitedCells}).
+
+\subsection{Tests on h1 (2026-10-12)}
+
+$h1$, half mesh, 8 processes on \texttt{nemepad}, ISA conditions.
+
+\begin{longtable}{@{}P{0.40\linewidth} P{0.54\linewidth}@{}}
+\toprule
+Case & Result \\
+\midrule
+\endhead
+Pimple, $M = 0.3$, 150 iterations from the uniform free stream & Stable. \unit{4.6}{s} for each iteration. \yplus{} mean (max): \val{cone} 6.6 (8.8), \val{walls} 3.1 (7.8), \val{tail} 2.1 (6.1), \val{fins} 11.1 (30.1). \\
+Pimple, $M = 0.3$, from the case above with \ent{--init} & \cmd{mapFields} and the run work. \cmd{mapFields} warns about the tet decomposition on approximately 100 layer faces. \\
+Pimple, $M = 0.3$, three sets of schemes & The same within 1\,\%. The schemes do not change the cold cell (below). \\
+Pimple, $M = 1.8$, 800 iterations & $C_D$ 0.69 (50), 0.54 (300), 0.47 (500 to 800). \\
+Central, $M = 1.8$, from the uniform free stream, three variants & Floating point exception at iteration 74 to 256 (\cref{sec:supersonic-start}). \\
+Central, $M = 1.8$, \ent{--init} from the pimple run, 400 iterations & Stable. $T$ from 136 to \unit{481}{K}. $C_D$ 0.51 to 0.53 in van Leer, not converged. \\
+\bottomrule
+\end{longtable}
+
+At $M = 0.3$, at iteration 1, \ent{limitTemperature} limits 160 cells, then 0 to 2.
+The lowest $T$ is in a layer cell near $x = \unit{2.925}{m}$, $r = \unit{0.06}{m}$,
+between the fin trailing edge and the boattail, almost at rest. It is the start
+transient in a region with almost no flow.
+
+\subsection{Two solvers at the same Mach number}\label{sec:two-solvers}
+
+The sweep runs $M = 1.2$ and $1.8$ on $h0$ with the two solvers, so it gives the
+difference between the solvers at those Mach numbers, on the coarse mesh. To measure
+the step on a mesh of the study, add a pimple case on $h1$ started from the $h0$ pimple
+run, or a central case at $M = 0.8$.
+
+\section{Start of the supersonic cases}\label{sec:supersonic-start}
+
+From the uniform free stream, the flow behind the base starts at $U_\infty$: the base
+acts as a piston and empties the region behind it. The cells there are thin layer
+cells with a small local time step, and they fill slowly. On $h1$ at $M = 1.8$ with the
+pimple template ($p_\infty = \unit{80\,127}{Pa}$, ISA at that time):
+
+\begin{table}[htbp]
+\centering
+\caption{Base pressure and temperature during the pimple start, $h1$, $M = 1.8$.}\label{tab:base-start}
+\begin{tabular}{@{}ccc@{}}
+\toprule
+Iteration & $p$ at the base [Pa] & $T$ at the base [K] \\
+\midrule
+305 & 7\,900 & 166 \\
+455 & 57\,000 & $\sim$320 \\
+755 & 46\,000 & 350 to 414 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At the end $p_\text{base}/p_\infty \approx 0.57$, in the range of a power-off base at
+$M = 1.8$. During the first 300 iterations, $T$ at the base stays at the \unit{100}{K}
+limit of \ent{limitTemperature}.
+
+\cmd{rhoCentralFoam} reads no \file{fvOptions}, so it has no such limit. In three tests
+from the uniform free stream, $T$ at the base fell to 0 and the solver stopped at
+iterations 74 to 256. The parameters of the local time step did not change this. For
+$M > 1$ the sweep thus runs the pimple template first on $h0$ and starts the central
+case from it.
+
+\begin{caution}
+The central run started this way on $h0$ at $M = 1.8$ did not converge: $C_D$ went from
+0.44 to 0.89 in 584 iterations and still increased, mostly from the viscous force
+(\cref{sec:ts-central-divergence}). Do not run the supersonic sweep until this defect
+is corrected.
+\end{caution}

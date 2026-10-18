@@ -9,7 +9,7 @@
 #     ./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3 --solver pimple
 #
 # Copies case-<solver> (default central) plus a mesh built by mesh/Allmesh.
-# See docs/WORKFLOW.md.
+# See docs/guide, chapter Cases.
 # Keep run directories out of /mnt/c.
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)

@@ -10,7 +10,7 @@
 # constant/meshInfo, so it follows the fins if the geometry changes.
 #
 # For drag at zero incidence you probably do not need it; for the tip vortex
-# at incidence you do.  See docs/WORKFLOW.md section 7.
+# at incidence you do.  See docs/guide, chapter Cases.
 cd "${0%/*}" || exit 1
 . "${WM_PROJECT_DIR:?source the OpenFOAM bashrc first}/bin/tools/RunFunctions"
 LC_ALL=C; export LC_ALL

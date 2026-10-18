@@ -16,7 +16,7 @@ FoamFile
 // ============================================================================
 //  Air as a calorically perfect gas with Sutherland viscosity.
 //
-//  Each entry of thermoType selects one model; docs/SOLVERS.md gives the
+//  Each entry of thermoType selects one model; docs/guide gives the
 //  equation and the source for every one of them.
 //
 //    hePsiThermo             energy-based thermo using psi = 1/(R T), the
@@ -36,7 +36,7 @@ FoamFile
 //      M 1.8 -> T0 = 475 K      Cp error ~ 1.8 %
 //
 //  Above about M 2.5 (T0 > 600 K) replace `hConst` with `janaf`, which is what
-//  the rhoCentralFoam tutorials use.  See docs/SOLVERS.md.
+//  the rhoCentralFoam tutorials use.  See docs/guide.
 // ============================================================================
 
 thermoType

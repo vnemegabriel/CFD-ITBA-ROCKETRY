@@ -1,0 +1,485 @@
+\chapter{Mesh}\label{ch:mesh}
+
+\section{Mesh generator}
+
+The mesh generator is cfMesh (\cmd{cartesianMesh}). It makes an octree mesh from
+one maximum cell size. All other sizes are refinement levels. Each level divides
+the cell size by 2:
+\[
+  \Delta = \frac{\texttt{maxCellSize}}{2^{\,\text{level}}}
+\]
+
+\begin{table}[htbp]
+\centering
+\caption{Cell size of each level with \texttt{maxCellSize 1.6}.}\label{tab:levels}
+\begin{tabular}{@{}cccccccc@{}}
+\toprule
+Level & 2 & 4 & 5 & 6 & 7 & 8 & 9 \\
+Size [mm] & 400 & 100 & 50 & 25 & 12.5 & 6.25 & 3.13 \\
+\midrule
+Level & 10 & 11 & & & & & \\
+Size [mm] & 1.56 & 0.78 & & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A level has an effect only on its patch or its region. If a level is incorrect, the
+cells in that region are too large or too small. No other region changes.
+
+\section{Make a mesh}\label{sec:allmesh}
+
+\subsection{Command}
+
+\begin{shell}
+mesh/Allmesh <mesh-dir> [stl-file] [--maxCellSize <m>] [--nLayers <n>]
+             [--thicknessRatio <r>] [--full]
+\end{shell}
+
+\begin{longtable}{@{}P{0.25\linewidth} P{0.27\linewidth} P{0.40\linewidth}@{}}
+\caption{Arguments of \texttt{Allmesh}.}\label{tab:allmesh-args}\\
+\toprule
+Argument & Default & Function \\
+\midrule
+\endfirsthead
+\toprule
+Argument & Default & Function \\
+\midrule
+\endhead
+\file{<mesh-dir>} & mandatory & Directory of the new mesh. It must not exist. \\
+\file{[stl-file]} & \file{mesh/stl/Aconcagua_biconvex117_roll45.stl}; with \ent{--full}, \file{Aconcagua_biconvex117.stl} & Geometry (\cref{sec:geometry-requirements}). \\
+\ent{--maxCellSize <m>} & \file{meshDict} (\val{1.6}) & Sets \ent{maxCellSize} in the copy of \file{meshDict}. \\
+\ent{--nLayers <n>} & \file{meshDict} (\val{10}) & Sets \ent{nLayers} of \val{cone}, \val{walls} and \val{tail}. \\
+\ent{--thicknessRatio <r>} & \file{meshDict} (\val{1.2}) & Sets \ent{thicknessRatio} of \val{cone}, \val{walls} and \val{tail}. \\
+\ent{--full} & half mesh & Mesh of the whole rocket, fins at $0^\circ$, $90^\circ$, $180^\circ$, $270^\circ$. Without it, the mesh is the half $z \geq 0$ (\cref{sec:half-mesh}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Procedure}
+
+\begin{steps}
+\item Run \cmd{mesh/Allmesh <mesh-dir>} with the options of the mesh.
+\item Read the summary at the end of the output. It gives the number of cells, the
+  cell types, the maximum non-orthogonality, the maximum skewness and the failed
+  checks.
+\item If the output shows \val{negative cell volumes}, do not use the mesh. Change
+  \file{meshDict} and make a new mesh in a new directory.
+\item Measure the first cell on the walls (\cref{sec:layers}):
+\begin{shell}
+./post/firstLayer.py <mesh-dir>
+\end{shell}
+\item Do the checks of \cref{sec:examine-mesh}.
+\end{steps}
+
+\begin{caution}
+A mesh with negative cell volumes is not usable. The other checks of
+\ent{-allGeometry} that fail on these meshes (small determinant in the layer cells,
+face tets, concave cells) are of a different category and do not stop the use of
+the mesh.
+\end{caution}
+
+\subsection{Steps that Allmesh does}
+
+\file{Allmesh} does the steps of \cref{fig:allmesh} in the mesh directory. If an
+application writes \val{FOAM FATAL} in its log, \file{Allmesh} shows the error and
+stops. \file{Allmesh} reads each log, because \cmd{runApplication} returns 0 also
+when the application fails.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\linewidth,height=0.85\textheight,keepaspectratio]{figures/pdf/allmesh.pdf}
+  \caption{Steps of \texttt{Allmesh}.}
+  \label{fig:allmesh}
+\end{figure}
+
+\subsection{Result}
+
+\begin{tabularx}{\linewidth}{@{}P{0.32\linewidth} L@{}}
+\toprule
+Item & Contents \\
+\midrule
+\file{<mesh-dir>/constant/polyMesh/} & The mesh. \\
+\file{<mesh-dir>/system/} & A copy of \file{mesh/system/} with the options applied. Each mesh keeps the \file{meshDict} that made it. \\
+\file{<mesh-dir>/meshInfo} & A copy of \file{mesh/meshInfo}, with the record of the mesh (\cref{sec:meshinfo}). \\
+\file{<mesh-dir>/meshHash} & Fingerprint of the mesh. \file{newCase.sh} writes it the first time that a case uses the mesh (\cref{sec:nektar-same}). \\
+\file{<mesh-dir>/log.*} & One log for each application. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+\file{Allmesh} does not write into a directory that exists. To make the mesh again,
+remove the directory or use a new name.
+
+\subsection{Function of the .fms file}
+
+An STL file contains only triangles and solid names. It does not contain edges. The
+\file{.fms} file contains the triangles, the patches and the feature edges.
+\cmd{surfaceFeatureEdges} marks an edge as a feature edge when the angle between the
+two adjacent triangles is more than $60^\circ$. \cmd{cartesianMesh} then moves the
+mesh vertices onto these edges.
+
+The rocket has no sharp edge: the fin edges, the fin root, the shoulder and the base
+edge are rounded, and each round has facets of less than $30^\circ$. With a limit of
+$30^\circ$, small triangles where the root fillet meets the body gave 172 false
+feature edges, and \cmd{cartesianMesh} bent the cells along them. With $60^\circ$,
+only the edges of the domain box (12) and of the nose (88) remain.
+
+\section{meshDict}
+
+File: \file{mesh/system/meshDict}. Each mesh directory has its own copy.
+
+\subsection{Global entries}
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+Entry & Value & Function \\
+\midrule
+\ent{surfaceFile} & \val{"geometry.fms"} & Surface that \file{Allmesh} makes in step 5. \\
+\ent{maxCellSize} & \val{1.6} & Maximum cell size in m. All levels refer to it. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{localRefinement}
+
+Surface refinement for each patch. \ent{refinementThickness} is the distance from
+the wall in which the cells have the level of the patch. Outside this distance, the
+cell size increases to \ent{maxCellSize} one level at a time.
+
+\begin{tabularx}{\linewidth}{@{}l c c c L@{}}
+\toprule
+Patch & Level & Size & Thickness & Reason \\
+\midrule
+\val{cone} & 8 & \unit{6.25}{mm} & \unit{0.060}{m} & The bow shock is in this band. \\
+\val{walls} & 8 & \unit{6.25}{mm} & \unit{0.050}{m} & Body boundary layer. \\
+\val{tail} & 8 & \unit{6.25}{mm} & \unit{0.050}{m} & The expansion on the boattail sets the base pressure. \\
+\val{fins} & 9 & \unit{3.13}{mm} & \unit{0.020}{m} & Fin chord. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{objectRefinements}\label{sec:object-refinements}
+
+Volume refinement in regions. A \val{box} has a centre and three lengths. A
+\val{cone} has two points on the axis and a radius at each point.
+
+\begin{longtable}{@{}l l c c P{0.40\linewidth}@{}}
+\caption{Refinement regions (values for the Aconcagua).}\label{tab:regions}\\
+\toprule
+Region & Type & Level & Size & Extent \\
+\midrule
+\endfirsthead
+\toprule
+Region & Type & Level & Size & Extent \\
+\midrule
+\endhead
+\val{shoulder} & hollow cone & 9 & \unit{3.13}{mm} & $x$ from 2.81 to \unit{2.85}{m}, $r$ from 0.065 to \unit{0.090}{m}: the body-boattail shoulder. \\
+\val{baseEdge} & hollow cone & 10 & \unit{1.56}{mm} & $x$ from 2.94 to \unit{2.97}{m}, $r$ from 0.045 to \unit{0.065}{m}: the base edge, where the base shear layer starts. \\
+\val{nearField} & box & 5 & \unit{50}{mm} & $x$ from $-0.20$ to \unit{3.20}{m}, $y$ and $z$ $\pm\unit{0.50}{m}$. \\
+\val{baseWake} & cone & 8 & \unit{6.25}{mm} & $x$ from 2.94 to \unit{3.30}{m}, radius \unit{0.08}{m}. \\
+\val{nearWake} & cone & 7 & \unit{12.5}{mm} & $x$ from 2.90 to \unit{3.80}{m}, radius \unit{0.14}{m}. \\
+\val{midWake} & cone & 6 & \unit{25}{mm} & $x$ from 2.85 to \unit{5.00}{m}, radius \unit{0.26}{m}. \\
+\val{wake} & box & 4 & \unit{100}{mm} & $x$ from 1.0 to \unit{9.0}{m}, $y$ and $z$ $\pm\unit{0.80}{m}$. \\
+\val{farWake} & box & 2 & \unit{400}{mm} & $x$ from 1.0 to \unit{27.0}{m}, $y$ and $z$ $\pm\unit{2.0}{m}$. \\
+\val{noseTip} & sphere & 9 & \unit{3.13}{mm} & Centre $(0,0,0)$, radius \unit{0.040}{m}. \\
+\val{noseApex} & sphere & 11 & \unit{0.78}{mm} & Centre $(0,0,0)$, radius \unit{0.010}{m}. \\
+\bottomrule
+\end{longtable}
+
+\val{noseTip} has the level of the fins. \val{noseApex} makes the curve of the tip
+and keeps the layers thinner than the radius of the nose. Without \val{noseApex}, the
+full mesh $h2$ had 13 negative cell volumes at the tip.
+
+The wake regions decrease the cell size one level at a time behind the base. They
+are cones on the $x$ axis. At an angle of attack, the wake moves
+$\tan\alpha$ for each metre towards $+y$ (\cref{tab:wake-offset}).
+
+\begin{table}[htbp]
+\centering
+\caption{Offset of the wake from the axis at the end of each wake region.}\label{tab:wake-offset}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Region & Radius & Length behind the base & Offset at $4^\circ$ & Offset at $8^\circ$ \\
+\midrule
+\val{baseWake} & \unit{0.08}{m} & \unit{0.36}{m} & \unit{0.03}{m} & \unit{0.05}{m} \\
+\val{nearWake} & \unit{0.14}{m} & \unit{0.85}{m} & \unit{0.06}{m} & \unit{0.12}{m} \\
+\val{midWake} & \unit{0.26}{m} & \unit{2.1}{m} & \unit{0.15}{m} & \unit{0.30}{m} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $4^\circ$ the wake stays inside the three regions. At $8^\circ$ it leaves
+\val{midWake} approximately \unit{1.85}{m} behind the base.
+
+Each region is written as \texttt{\#eval\{ <value>*\$sx \}} along $x$ and
+\texttt{\#eval\{ <value>*\$sr \}} across, with $s_x = \texttt{lBody}/2.955$ and
+$s_r = \texttt{rBody}/0.0755$. \file{Allmesh} writes \ent{lBody} and \ent{rBody} from
+\file{meshInfo} into the copy of \file{meshDict}. A rocket of another size thus gets
+the regions moved and scaled with it.
+
+\begin{caution}
+\cmd{foamDictionary -set} evaluates the \texttt{\#eval} entries and writes the
+numbers. \file{Allmesh} writes \ent{lBody} and \ent{rBody} with \cmd{sed} before the
+first \cmd{foamDictionary -set}. Do not set \ent{lBody} with \cmd{foamDictionary} in
+a copy that was already written.
+\end{caution}
+
+\subsection{boundaryLayers}\label{sec:layers}
+
+cfMesh extrudes the layers from the surface mesh. The first cell thickness $t_1$
+thus comes from the surface cell size $h$, \ent{nLayers} $n$ and \ent{thicknessRatio}
+$r$. The dictionary does not set a \yplus{} target.
+
+\begin{longtable}{@{}P{0.32\linewidth} P{0.24\linewidth} P{0.36\linewidth}@{}}
+\caption{Entries of \texttt{boundaryLayers}.}\label{tab:layers}\\
+\toprule
+Entry & Value & Function \\
+\midrule
+\endfirsthead
+\toprule
+Entry & Value & Function \\
+\midrule
+\endhead
+\ent{nLayers} & \val{1} & Layers on the patches without an entry in \ent{patchBoundaryLayers}: the six faces of the domain. \\
+\ent{patchBoundaryLayers/cone, walls, tail} & \ent{nLayers 10}, \ent{thicknessRatio 1.2} & Layers on the body. \file{Allmesh} options change them. \\
+\ent{patchBoundaryLayers/fins} & \ent{nLayers 3}, \ent{thicknessRatio 1.2}, \ent{allowDiscontinuity 1} & More layers tangled the cells at the leading edge of the old \unit{6}{mm} fin. This limit was not measured again on the \unit{11.7}{mm} fin with rounded edges. \\
+\ent{optimiseLayer}, \ent{untangleLayers} & \val{1}, \val{1} & Smooth and repair the layer cells. \\
+\ent{optimisationParameters} & \ent{nSmoothNormals 5}, \ent{maxNumIterations 5}, \ent{featureSizeFactor 0.3}, \ent{reCalculateNormals 1}, \ent{relThicknessTol 0.03} & Parameters of the layer optimization. \\
+\bottomrule
+\end{longtable}
+
+\begin{caution}
+cfMesh splits the layer only on the patches that have an entry in
+\ent{patchBoundaryLayers}. With only the global \ent{nLayers 10}, the body got no
+layers, and the faces of the domain got 10. Keep an entry for each wall patch.
+\end{caution}
+
+The layer rule is
+\[
+  t_1 = h \, \frac{r - 1}{r^{\,n} - 1},
+\]
+if the whole layer were one surface cell thick. \cmd{cartesianMesh} makes it
+thinner: the measured first cell is 0.41 times the rule. The rule thus keeps $t_1$
+equal on all meshes, but it does not give its value. \file{post/firstLayer.py
+<mesh-dir>} measures it. It gives $y$, the distance from the cell centre to the wall
+face (as \ent{yPlus} uses it), and $t_1 = 2y$ for each wall patch, weighted by the
+face area.
+
+\begin{table}[htbp]
+\centering
+\caption{Meshes of the sweep and their first cell.}\label{tab:meshes}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Mesh & \ent{maxCellSize} & $h$, body & $n$ & $r$ & $t_1$, rule & $t_1$, measured \\
+\midrule
+$h0$ & 2.2627 & \unit{8.84}{mm} & 12 & 1.1878 & \unit{0.241}{mm} & \unit{0.097}{mm} \\
+$h1$ & 1.6    & \unit{6.25}{mm} & 10 & 1.2    & \unit{0.241}{mm} & \unit{0.100}{mm} \\
+$h2$ & 1.1314 & \unit{4.42}{mm} & 8  & 1.229  & \unit{0.241}{mm} & \unit{0.096}{mm} \\
+$h3$ & 0.8    & \unit{3.13}{mm} & 7  & 1.2    & \unit{0.241}{mm} & \unit{0.101}{mm} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Thus $y \approx \unit{0.05}{mm}$ on the body. Where a region refines the wall, the
+layer is thinner: under \val{finRoots} (level 11) $t_1$ is approximately
+\unit{0.014}{mm}, and on the boattail approximately \unit{0.04}{mm}.
+
+\Cref{tab:yplus-estimate} gives \yplus{} from the flat-plate friction at the aft body
+($x \approx \unit{2.8}{m}$), where \yplus{} is lowest.
+
+\begin{table}[htbp]
+\centering
+\caption{Estimate of \yplus{} at the first cell centre, $y = \unit{0.05}{mm}$.}\label{tab:yplus-estimate}
+\begin{tabular}{@{}ccc@{}}
+\toprule
+$M$ & $u_\tau/\nu$ [1/mm] & \yplus{} \\
+\midrule
+0.3 & $\sim$110 & $\sim$5.5 \\
+0.6 & $\sim$230 & $\sim$11.5 \\
+0.8 & $\sim$330 & $\sim$16.5 \\
+1.2 & $\sim$550 & $\sim$27.5 \\
+1.8 & $\sim$950 & $\sim$47.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+From $M = 0.6$ to $1.2$ the first cell is in the buffer layer, and at $M = 0.3$ at its
+lower limit. \ent{nut} is \ent{nutUSpaldingWallFunction}, which follows Spalding's law
+through the buffer layer (\cref{sec:wall-treatment}). These values are estimates.
+The measured mean \yplus{} on \val{walls} was 2.4 at $M = 0.3$, 6.9 at $M = 0.8$ and
+16.6 at $M = 1.8$ on $h0$. Measure \yplus{} on each run (\cref{sec:outputs}).
+
+\subsection{edgeMeshRefinement}\label{sec:edge-refinement}
+
+\begin{tabularx}{\linewidth}{@{}P{0.36\linewidth} l L@{}}
+\toprule
+Entry & Value & Function \\
+\midrule
+\ent{finEdges/edgeFile} & \val{"finEdges.obj"} & Leading and trailing edges of the fins. \\
+\ent{finEdges/additionalRefinementLevels} & \val{10} & \unit{1.56}{mm} with \ent{maxCellSize 1.6}. \\
+\ent{finEdges/refinementThickness} & \unit{0.010}{m} & Width of the band around each edge. \\
+\ent{finRoots/edgeFile} & \val{"finRoots.obj"} & Root of each fin, from the leading to the trailing edge. \\
+\ent{finRoots/additionalRefinementLevels} & \val{11} & \unit{0.78}{mm} with \ent{maxCellSize 1.6}. \\
+\ent{finRoots/refinementThickness} & \unit{0.008}{m} & Width of the band around each root. \\
+\bottomrule
+\end{tabularx}
+
+\begin{caution}
+\val{finRoots} also refines the body wall. The layer thickness follows the surface
+cell. At level 11 the first body layer near the root is approximately
+\unit{0.014}{mm}, against \unit{0.10}{mm} on the rest of the body, and \yplus{} there
+is approximately 7 times lower.
+\end{caution}
+
+\section{Domain}\label{sec:domain}
+
+\file{Allmesh} step 4 sets the domain with \cmd{surfaceGenerateBoundingBox}, which
+takes six distances in metres from the bounding box of the rocket. The upstream and
+downstream distances are fixed in \file{Allmesh}. The lateral distances come from
+the STL file: \file{Allmesh} calculates them so that the side walls are at
+$|y| = |z| = \unit{11.775}{m}$ for any rocket. The box is thus symmetric about
+$z = 0$, which the half mesh needs (\cref{sec:half-mesh}).
+
+\begin{table}[htbp]
+\centering
+\caption{Limits of the domain.}\label{tab:domain}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Direction & Distance from the rocket & Limit \\
+\midrule
+Upstream ($-x$) & \unit{17.73}{m} & $x = \unit{-17.73}{m}$ \\
+Downstream ($+x$) & \unit{38.415}{m} & $x = \unit{41.37}{m}$ \\
+Lateral ($\pm y$, $\pm z$) & from the STL file & $\pm\unit{11.775}{m}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{caution}
+\file{Allmesh} calculates the lateral distances with \cmd{awk}, and fixes
+\cmd{LC_ALL=C}. With the locale \texttt{es\_ES}, \cmd{awk} wrote \val{11,775} and the
+domain was incorrect (\cref{sec:ts-locale}).
+\end{caution}
+
+At $M = 1.8$ the Mach angle is $33.7^\circ$. The Mach cone from the nose crosses the
+lateral boundary at approximately $x = \unit{17.6}{m}$. The pressure boundary
+condition on \val{box} thus must let the wave go out (\cref{sec:bc}).
+
+\subsection{Half mesh}\label{sec:half-mesh}
+
+At $\alpha = 0$ the flow has the symmetry of the fins. At an angle of attack in the
+$x$--$y$ plane, the plane $z = 0$ stays a plane of symmetry. By default
+\file{Allmesh} meshes the whole rocket with the fins at $45^\circ$ and keeps the half
+$z \geq 0$.
+
+\begin{steps}
+\item The box is symmetric about $z = 0$. The octree thus splits on $z = 0$, and the
+  cells of the full mesh do not cross it, except approximately 0.1\,\% near the wall.
+\item \cmd{topoSet} selects the cells with the centre at $z \geq 0$, and
+  \cmd{subsetMesh} keeps them. The faces of the cut go to \val{oldInternalFaces}.
+\item The smoothing of \cmd{cartesianMesh} leaves the cut up to \unit{1.7}{mm} off the
+  plane. \file{snapPlane.py} sets $z = 0$ on each point of the cut.
+\item \file{createPatchDictHalf} makes the cut the patch \val{symm}, of type
+  \val{symmetry}.
+\item \file{meshInfo} gets \ent{sector half}, \ent{symmetryFraction 0.5} and
+  $\texttt{Aref} = \pi r_\text{body}^2/2$. The coefficients are thus those of the
+  full rocket. \file{Allrun} then permits $\alpha$ but not $\beta$.
+\end{steps}
+
+The half mesh takes the meshing time and the memory of the full mesh, because
+\cmd{cartesianMesh} makes the full mesh.
+
+\begin{caution}
+Do not mesh $z \geq 0$ directly with \ent{zMin} on $z = 0$. \cmd{cartesianMesh} then
+treats \ent{zMin} as a domain face that touches the wall. It gives \ent{zMin} the
+layers of the wall, and the wall layers fan out at the corner: 9\,002 faces with
+interpolation weight below 0.05 on $h1$.
+\end{caution}
+
+\section{createPatchDict}
+
+\file{surfaceGenerateBoundingBox} makes six patches with fixed names.
+\cmd{createPatch} merges them:
+
+\begin{tabularx}{\linewidth}{@{}l l L@{}}
+\toprule
+New patch & Type & Source patches \\
+\midrule
+\val{inlet} & \val{patch} & \val{xMin} \\
+\val{outlet} & \val{patch} & \val{xMax} \\
+\val{box} & \val{patch} & \val{yMin}, \val{yMax}, \val{zMin}, \val{zMax} \\
+\val{symm} (half mesh) & \val{symmetry} & \val{oldInternalFaces} \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+The \file{.fms} file gives no type to its patches, so \cmd{cartesianMesh} makes all
+of them \val{wall}. \cmd{createPatch} makes the domain patches of type \val{patch}.
+Only \val{cone}, \val{walls}, \val{tail} and \val{fins} stay \val{wall}. The wall
+functions and the \ent{yPlus} function object need the type \val{wall}.
+\file{Allmesh} reads the type of each patch in \ent{wallPatches} and stops if a type
+is not \val{wall}.
+
+\section{meshInfo}\label{sec:meshinfo}
+
+File: \file{mesh/meshInfo}. \file{Allmesh} copies it into the mesh directory.
+\file{newCase.sh} copies it to \file{constant/meshInfo} in the case, where it
+replaces the \file{meshInfo} of the template.
+
+\begin{longtable}{@{}P{0.20\linewidth} P{0.15\linewidth} P{0.18\linewidth} P{0.37\linewidth}@{}}
+\caption{Entries of \texttt{meshInfo}.}\label{tab:meshinfo}\\
+\toprule
+Entry & Value & Written by & Function \\
+\midrule
+\endfirsthead
+\toprule
+Entry & Value & Written by & Function \\
+\midrule
+\endhead
+\ent{sector} & \val{full} & user, \file{Allmesh} & \val{quarter}, \val{half} or \val{full}. \file{Allrun} uses it to check the flow angles. \\
+\ent{symmetryFraction} & \val{1} & user, \file{Allmesh} & Fraction of the rocket in the mesh. \\
+\ent{fins} & \val{true} & user & \file{Allrefine} stops if it is not \val{true}. \\
+\ent{nCells} & --- & \file{Allmesh}, \file{Allrefine} & Number of cells. \\
+\ent{Aref} & \unit{0.0179081}{m\textsuperscript{2}} & user, \file{Allmesh} & Reference area: $\pi r_\text{body}^2$, half of it for a half mesh. \\
+\ent{lRef} & \unit{0.151}{m} & user & Reference length: the body diameter. \\
+\ent{rBody} & \unit{0.0755}{m} & user & Body radius. Scales the regions across the axis. \\
+\ent{lBody} & \unit{2.955}{m} & user & Rocket length. Scales the regions along the axis. \\
+\ent{finRootR}, \ent{finTipR} & 0.075, \unit{0.2355}{m} & user & Radii of the fin root and the fin tip. \ent{finTipR} sets the regions of \file{Allrefine}. \\
+\ent{finTipSmear} & \unit{0.004}{m} & user & Width of the tip chamfer. \\
+\ent{finX0}, \ent{finX1} & 2.52953, \unit{2.93031}{m} & user & $x$ of the front and the rear of the fins. \\
+\ent{wallPatches} & \val{(cone walls tail fins)} & user & Patches in the force integration and in \ent{wallShearStress}. \\
+\ent{maxCellSize}, \ent{finLevel}, \ent{nLayers}, \ent{thicknessRatio}, \ent{meshDir} & --- & \file{Allmesh} & Record of the mesh. \\
+\bottomrule
+\end{longtable}
+
+\begin{note}
+\ent{Aref} must agree with \ent{sector}. The \file{case-central/constant/meshInfo}
+file of the template has the values of a \val{quarter} mesh. \file{newCase.sh}
+replaces it, so these values have no effect.
+\end{note}
+
+\section{Examine a mesh}\label{sec:examine-mesh}
+
+\begin{steps}
+\item Read the summary of \file{Allmesh}. There must be no negative cell volume.
+\item Examine the patch names and types in \file{constant/polyMesh/boundary}.
+  \val{cone}, \val{walls}, \val{tail} and \val{fins} must be \val{wall}.
+\item Measure $t_1$ with \file{post/firstLayer.py}. The median on \val{walls} must
+  agree with \cref{tab:meshes}.
+\item Open the mesh in ParaView. Look at the cells on the fin edges, on the base edge
+  and on the boattail shoulder.
+\item Compare the number of cells with \cref{tab:mesh-quality}.
+\end{steps}
+
+\begin{table}[htbp]
+\centering
+\caption{Measured quality of the meshes of the sweep.}\label{tab:mesh-quality}
+\small
+\begin{tabular}{@{}lrcccc@{}}
+\toprule
+Mesh & Cells & Neg.\ volumes & Skewness & Non-orth. & $t_1$, \val{walls} \\
+\midrule
+$h0$ & 1\,074\,798 & 0 & 2.37 & $65.7^\circ$ & \unit{0.097}{mm} \\
+$h1$ & 2\,198\,939 & 0 & 1.72 & $66.0^\circ$ & \unit{0.100}{mm} \\
+$h2$ & 4\,285\,770 & 0 & 1.58 & $65.6^\circ$ & \unit{0.096}{mm} \\
+$h3$ & 10\,020\,768 & 0 & 1.41 & $65.9^\circ$ & \unit{0.101}{mm} \\
+\bottomrule
+\end{tabular}
+\end{table}

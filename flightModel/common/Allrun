@@ -89,7 +89,7 @@ STARTISO=$(date -Iseconds)
 
 [ "$NP" -gt 1 ] && runApplication decomposePar -force
 
-# ---- measurement: docs/MEASUREMENTS.md section 5 -----------------------------
+# ---- measurement: docs/guide, Measurement of the computer ------------------
 ML=""; PERF=""; EPID=""; MPID=""; SNAP=""
 stopMeasure() {
     [ -n "$MPID" ] && kill -TERM "$MPID" 2> /dev/null && wait "$MPID"

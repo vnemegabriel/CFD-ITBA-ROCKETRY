@@ -5,7 +5,7 @@
     machineLog.py sample <csv> [seconds]         one CSV line every interval until SIGTERM
     machineLog.py summary <csv> [perf] [energy]  totals, as foamDictionary entries
 
-perf and energy are the -x, -I outputs of perf stat.  See docs/MEASUREMENTS.md.
+perf and energy are the -x, -I outputs of perf stat.  See docs/guide, Measurement of the computer.
 """
 import csv
 import glob

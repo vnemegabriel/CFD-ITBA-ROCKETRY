@@ -1,0 +1,6 @@
+flowchart LR
+  CC["case-central/<br/>all shared files"] -- "--solver central<br/>copy all" --> RUN1[("run, rhoCentralFoam")]
+  CC -- "--solver pimple<br/>copy all except<br/>central.exclude" --> RUN2[("run, rhoPimpleFoam")]
+  CP["case-pimple/<br/>only what differs"] -- "copy on top" --> RUN2
+  MESH[("mesh-dir")] -- "link polyMesh<br/>copy meshInfo" --> RUN1
+  MESH -- "link polyMesh<br/>copy meshInfo" --> RUN2

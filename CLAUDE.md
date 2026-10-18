@@ -5,8 +5,11 @@ plantilla `rhoPimpleFoam` para M < 1 y una `rhoCentralFoam` para M > 1 que
 arranca desde una corrida pimple al mismo Mach, barrido de Mach en serie.
 
 Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
-queda en inglés (mesh, solver, y+, wall function, skewness). Los `docs/` están
-en castellano; los scripts, en inglés.
+queda en inglés (mesh, solver, y+, wall function, skewness). La documentación
+es la guía en LaTeX de `flightModel/docs/guide/`, en inglés técnico
+simplificado (ASD-STE100) con estructura ISO/IEC/IEEE 26514; los scripts,
+en inglés. Un cambio de procedimiento cambia la guía en el mismo commit;
+compilala con `make` ahí (lualatex) y commiteá también el PDF.
 
 **Pocos comentarios en el código.** Para explicar están los docs. Un comentario
 se justifica sólo cuando el código no lo puede decir — por ejemplo que los seis
@@ -45,7 +48,7 @@ en cada corrida.
 
 ```
 flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
-flightModel/common/       Allrun, Allrefine
+flightModel/common/       Allrun, Allrefine, machineLog.py
 flightModel/case-central/ plantilla rhoCentralFoam, M > 1
 flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
@@ -54,12 +57,14 @@ flightModel/runCase.sh    un sweep*.txt en serie, sobre mallas ya hechas: sweepS
                           en el socket 0 y sweepSubsonic.txt en el 1, a la vez
 flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
                           firstLayer.py (t1 e y de la primera celda)
+flightModel/flightData/   telemetría de la TeleMega, cdFlight.py (Cd del vuelo)
+flightModel/docs/guide/   la guía de usuario: LaTeX, diagramas Mermaid con Pele
 ```
 
 El Python es `mesh/makeRocket.py`, que escribe el STL, `mesh/snapPlane.py`,
 que aplana el corte de la media malla, `post/firstLayer.py`, que mide la
 primera capa, y `common/machineLog.py`, que registra la máquina durante cada
-corrida (`docs/MEASUREMENTS.md` §5); sólo usan la biblioteca estándar. La
+corrida (guía, «Measurement of the computer»); sólo usan la biblioteca estándar. La
 malla se define en `mesh/system/meshDict` y todo ahí es un **nivel**: un
 entero que parte una celda al medio, local a un patch o a una caja, sin
 acoplarse a nada más.
@@ -78,11 +83,11 @@ acoplarse a nada más.
   la aleta vieja de 6 mm y borde de ataque en filo; la actual tiene 11.7 mm
   y bordes con radio de 1 mm, y no se volvió a medir.
 - **Los cantos de las aletas llevan radio.** Con filo, las capas de las dos
-  caras chocan en el borde (skewness 25–33). Está en `docs/MESH.md` §3.3.
+  caras chocan en el borde (skewness 25–33). Está en la guía, capítulo Geometry.
 - **La raíz de las aletas lleva un filete de 3 mm** (`makeRocket.py
   --finRootRadius`). Sin él las capas de la aleta y del cuerpo se cierran en
-  la esquina. Está en `docs/MESH.md` §3.3.
-- Antes de cortar o cambiar algo, grepeá `docs/` además del código.
+  la esquina. Está en la guía, capítulo Geometry.
+- Antes de cortar o cambiar algo, grepeá `docs/guide/chapters/` además del código.
 - Una tarea por sesión. Un commit por tarea.
 
 ## Trampas conocidas
@@ -90,7 +95,7 @@ acoplarse a nada más.
 - **Con `localEuler` el Courant del log no significa nada.** rhoCentralFoam lo
   calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
   escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
-  central en `Euler` global hasta 2026-10-12. `docs/SOLVERS.md` §5.1.
+  central en `Euler` global hasta 2026-10-12. Guía, «Local time step».
 - **Los scripts que hacen cuentas con `awk` fijan `LC_ALL=C`.** Con
   `es_ES` (newton) `awk` lee y escribe números con coma: `Allmesh` le pasó
   `11,775` a `surfaceGenerateBoundingBox` y armó un dominio equivocado.

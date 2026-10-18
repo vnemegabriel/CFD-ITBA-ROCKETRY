@@ -3,26 +3,28 @@
 `rhoPimpleFoam` with `transonic yes` and local time stepping (`localEuler`).
 Same turbulence model, gas, boundary conditions, function objects and flight
 condition as `case-central/`. For M > 1 it makes the initial field of the
-central case: from the uniform free stream the central case crashes at the
-base ([SOLVERS.md §17](../docs/SOLVERS.md)).
+central case: from the uniform free stream the central case stops at the base
+(user guide, Solvers and models > Start of the supersonic cases).
 
 This directory holds only the files that differ from `case-central/`.
 `../newCase.sh --solver pimple` copies `case-central/` without the files in
 `central.exclude`, and then copies this directory on top.
 
 ```bash
-../newCase.sh ~/runs/m03 --mesh ~/meshes/h1 --Minf 0.3 --solver pimple
-../newCase.sh ~/runs/m03-h2 --mesh ~/meshes/h2 --Minf 0.3 --solver pimple --init ~/runs/m03
+../newCase.sh ~/runs/m03-h1 --mesh ~/meshes/h1 --Minf 0.3 --solver pimple
+../newCase.sh ~/runs/m03-h2 --mesh ~/meshes/h2 --Minf 0.3 --solver pimple --init ~/runs/m03-h1
 ```
 
-| File | Function | Reference |
+| File | Function | User guide |
 |---|---|---|
-| `config.json` | `maxCo`, `minIter`, `endIter`, stop criterion in iterations | [SOLVERS.md §16](../docs/SOLVERS.md) |
-| `system/fvSolution.j2` | `PIMPLE`, including the LTS controls | [SOLVERS.md §16.3](../docs/SOLVERS.md) |
-| `system/fvSchemes` | `localEuler` and the bounded second-order schemes | [SOLVERS.md §16.2](../docs/SOLVERS.md) |
-| `system/fvOptions` | `limitTemperature`, 100–1000 K | [SOLVERS.md §16.4](../docs/SOLVERS.md) |
-| `system/controlDict.j2` | Time in iterations; `FOs/FOcommon` and `FOs/FOrunTimeControl.j2` from `case-central/` | [SOLVERS.md §5](../docs/SOLVERS.md) |
+| `config.json` | `maxCo`, `minIter`, `endIter`, stop criterion in iterations | Solvers and models > config.json |
+| `system/fvSolution.j2` | `PIMPLE`, including the local-time-step controls | rhoPimpleFoam template > PIMPLE |
+| `system/fvSchemes` | `localEuler` and the bounded second-order schemes | rhoPimpleFoam template > Schemes |
+| `system/fvOptions` | `limitTemperature`, 100–1000 K | rhoPimpleFoam template |
+| `system/controlDict.j2` | Time in iterations; `FOs/FOcommon` and `FOs/FOrunTimeControl.j2` from `case-central/` | Solvers and models > Local time step |
 | `central.exclude` | Files of `case-central/` that this template replaces or does not use | |
 
 To change a file that both templates use (`0.orig/`, `constant/`,
 `flowConditions`, `FOs/FOcommon`), change it in `case-central/`.
+
+The user guide is `../docs/guide/aconcagua-user-guide.pdf`.

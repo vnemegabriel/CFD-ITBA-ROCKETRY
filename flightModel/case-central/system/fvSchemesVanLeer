@@ -21,7 +21,7 @@ FoamFile
 //  the `reconstruct(...)` interpolations, not divSchemes.
 //
 //  Follows $FOAM_TUTORIALS/compressible/rhoCentralFoam/biconic25-55Run35,
-//  the shipped supersonic external RANS case.  docs/SOLVERS.md gives the
+//  the shipped supersonic external RANS case.  docs/guide gives the
 //  references for the flux scheme and the limiter.
 // ============================================================================
 

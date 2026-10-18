@@ -228,11 +228,11 @@ def main():
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
     ax.scatter([m for _, m, _ in tel], [c for _, _, c in tel], s=3, color="0.75",
-               label="TeleMega, cada muestra")
+               label="TeleMega, each sample")
     ax.plot([b[0] for b in bins], [b[1] for b in bins], color="k", lw=2,
-            label="TeleMega, mediana cada ΔM = 0.025")
+            label="TeleMega, median in bins of ΔM = 0.025")
     ax.fill_between([b[0] for b in bins], [b[2] for b in bins], [b[3] for b in bins],
-                    color="k", alpha=0.15, lw=0, label="TeleMega, cuartiles")
+                    color="k", alpha=0.15, lw=0, label="TeleMega, quartiles")
     if ork:
         ax.plot([m for m, _ in ork], [c for _, c in ork], color="tab:green", lw=1.5,
                 ls="--", label="OpenRocket")
@@ -251,18 +251,19 @@ def main():
     for mesh in sorted({r[3] for r in runs}):
         handles.append(Line2D([], [], color="0.3", marker=marker.get(mesh, "x"), ls="none",
                               mfc="none", ms=8))
-        labels.append("malla %s" % mesh)
+        labels.append("mesh %s" % mesh)
     if any(r[1] > 1 and r[4] == "pimple" for r in runs):
         handles.append(Line2D([], [], color="0.3", marker="o", ls="none", mfc="none", mew=2, ms=8))
-        labels.append("hueco: pimple supersónico (sólo arranque)")
+        labels.append("hollow: supersonic pimple (start run only)")
     ax.set_xlabel("Mach")
     ax.set_ylabel("Cd  (Aref = π·0.0755² m²)")
-    ax.set_title("Aconcagua, IREC Midland: Cd del vuelo (costeo) contra CFD, α = 0 y 8°")
+    ax.set_title("Aconcagua, IREC Midland: flight Cd (coast) against CFD, α = %s°"
+                 % ", ".join("%g" % x for x in a.alphas))
     ax.set_xlim(0.2, 1.95)
     ax.set_ylim(0, 0.9)
     ax.grid(alpha=0.3)
     ax.legend(handles, labels, fontsize=8, loc="upper right", ncol=2)
-    ax.text(0.99, 0.02, "masa %.2f kg (OpenRocket); atmósfera de Midland ajustada con GPS: "
+    ax.text(0.99, 0.02, "mass %.2f kg (OpenRocket); Midland atmosphere fitted to the GPS: "
             "T0 = %.1f K, %.1f K/km, p0 = %.0f Pa" % (a.mass, T0, L * 1000, p0),
             transform=ax.transAxes, ha="right", fontsize=7, color="0.4")
     fig.tight_layout()

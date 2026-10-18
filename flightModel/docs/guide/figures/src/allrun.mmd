@@ -1,0 +1,19 @@
+flowchart LR
+  subgraph prep["Preparation"]
+    direction TB
+    A["Check the mesh and the<br/>flow angles against the sector"] --> B["restore0Dir: 0.orig/ → 0/"]
+    B --> C{"initFrom?"}
+    C -- "yes" --> D["mapFields + changeDictionary;<br/>stop if a log has no End"]
+    C -- "no" --> E
+    D --> E["Binding: rankfile,<br/>one process per core"]
+    E --> F["decomposePar -force"]
+  end
+  subgraph runrec["Run and record"]
+    direction TB
+    G["Start the measurement:<br/>machineLog.py, perf -a"] --> H["perf stat → time →<br/>mpirun --bind-to core solver"]
+    H --> I["Stop the measurement<br/>(also on exit, by trap)"]
+    I --> J["reconstructPar -latestTime"]
+    J --> K["Append run_&lt;date&gt;<br/>to run.info"]
+    K --> L["Compress the logs,<br/>remove processor*, notify"]
+  end
+  prep --> runrec

@@ -10,7 +10,7 @@
 # stream in the x-y plane; the mesh does not change.
 # M < 1 runs rhoPimpleFoam.  M > 1 runs rhoCentralFoam, started on h0 from a
 # rhoPimpleFoam run at the same Mach: from the uniform free stream the base
-# wake empties and rhoCentralFoam crashes (docs/SOLVERS.md section 17).
+# wake empties and rhoCentralFoam crashes (docs/guide, Start of the supersonic cases).
 #
 # Coast, t > 4 s: pInf and Tinf of Midland at the height where the TeleMega
 # passes each Mach (flightData/cdFlight.py: pad 896 m MSL, 305.0 K, 7.2 K/km).

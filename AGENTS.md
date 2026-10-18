@@ -5,8 +5,11 @@ plantilla `rhoPimpleFoam` para M < 1 y una `rhoCentralFoam` para M > 1 que
 arranca desde una corrida pimple al mismo Mach, barrido de Mach en serie.
 
 Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
-queda en inglés (mesh, solver, y+, wall function, skewness). Los `docs/` están
-en castellano; los scripts, en inglés.
+queda en inglés (mesh, solver, y+, wall function, skewness). La documentación
+es la guía en LaTeX de `flightModel/docs/guide/`, en inglés técnico
+simplificado (ASD-STE100) con estructura ISO/IEC/IEEE 26514; los scripts,
+en inglés. Un cambio de procedimiento cambia la guía en el mismo commit;
+compilala con `make` ahí (lualatex) y commiteá también el PDF.
 
 **Pocos comentarios en el código.** Para explicar están los docs. Un comentario
 se justifica sólo cuando el código no lo puede decir — por ejemplo que los seis
@@ -24,9 +27,9 @@ resolver bien la malla, en orden:
 2. La estela de base, que es una fracción grande del Cd de un cohete.
 3. La fricción de pared, que depende de y+.
 
-El barrido va a α = 0, 8 y 16°, impuesto con el campo de velocidad
+El barrido va a α = 0, 4 y 8°, impuesto con el campo de velocidad
 (`--alpha`): la malla es la misma. Los conos de estela del `meshDict` siguen
-el eje x, y a 16° la estela sale de ellos a menos de 0.4 m de la base.
+el eje x; a 8° la estela sale de `midWake` a unos 1.85 m de la base.
 No pagues celdas por el vórtice de punta de aleta.
 
 **Un solo juego de mallas para todo el barrido:** h1, h2, h3 para la
@@ -44,8 +47,8 @@ en cada corrida.
 ## La estructura
 
 ```
-flightModel/mesh/         stl/Aconcagua.stl, Allmesh, meshInfo, system/
-flightModel/common/       Allrun, Allrefine
+flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
+flightModel/common/       Allrun, Allrefine, machineLog.py
 flightModel/case-central/ plantilla rhoCentralFoam, M > 1
 flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
 flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
@@ -54,11 +57,14 @@ flightModel/runCase.sh    un sweep*.txt en serie, sobre mallas ya hechas: sweepS
                           en el socket 0 y sweepSubsonic.txt en el 1, a la vez
 flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
                           firstLayer.py (t1 e y de la primera celda)
+flightModel/flightData/   telemetría de la TeleMega, cdFlight.py (Cd del vuelo)
+flightModel/docs/guide/   la guía de usuario: LaTeX, diagramas Mermaid con Pele
 ```
 
 El Python es `mesh/makeRocket.py`, que escribe el STL, `mesh/snapPlane.py`,
-que aplana el corte de la media malla, y `post/firstLayer.py`, que mide la
-primera capa; sólo usan la biblioteca estándar. La
+que aplana el corte de la media malla, `post/firstLayer.py`, que mide la
+primera capa, y `common/machineLog.py`, que registra la máquina durante cada
+corrida (guía, «Measurement of the computer»); sólo usan la biblioteca estándar. La
 malla se define en `mesh/system/meshDict` y todo ahí es un **nivel**: un
 entero que parte una celda al medio, local a un patch o a una caja, sin
 acoplarse a nada más.
@@ -71,20 +77,25 @@ acoplarse a nada más.
   negativos, no-ortogonalidad y skewness en unos minutos. Un cambio sin número
   al lado no está terminado.
 - **`checkMesh` con volúmenes negativos = malla inservible.** Los otros
-  chequeos de `-allGeometry` que fallan hoy (skewness ~15, determinante chico
-  en ~490 k celdas de capa) son de otra categoría y no bloquean.
-- **Las aletas van con `nLayers 3`.** Más enreda la extrusión: el borde de
-  ataque es un filo y la aleta tiene 6 mm de espesor. Está medido en
-  `docs/TROUBLESHOOTING.md`.
-- Antes de cortar o cambiar algo, grepeá `docs/` además del código.
+  chequeos de `-allGeometry` que fallan hoy (determinante chico en las celdas
+  de capa, face tets, celdas cóncavas) son de otra categoría y no bloquean.
+- **Las aletas van con `nLayers 3`.** Más enreda la extrusión. Se midió con
+  la aleta vieja de 6 mm y borde de ataque en filo; la actual tiene 11.7 mm
+  y bordes con radio de 1 mm, y no se volvió a medir.
+- **Los cantos de las aletas llevan radio.** Con filo, las capas de las dos
+  caras chocan en el borde (skewness 25–33). Está en la guía, capítulo Geometry.
+- **La raíz de las aletas lleva un filete de 3 mm** (`makeRocket.py
+  --finRootRadius`). Sin él las capas de la aleta y del cuerpo se cierran en
+  la esquina. Está en la guía, capítulo Geometry.
+- Antes de cortar o cambiar algo, grepeá `docs/guide/chapters/` además del código.
 - Una tarea por sesión. Un commit por tarea.
 
-## Cuidados
+## Trampas conocidas
 
 - **Con `localEuler` el Courant del log no significa nada.** rhoCentralFoam lo
   calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
   escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
-  central en `Euler` global hasta 2026-10-12. `docs/SOLVERS.md` §5.1.
+  central en `Euler` global hasta 2026-10-12. Guía, «Local time step».
 - **Los scripts que hacen cuentas con `awk` fijan `LC_ALL=C`.** Con
   `es_ES` (newton) `awk` lee y escribe números con coma: `Allmesh` le pasó
   `11,775` a `surfaceGenerateBoundingBox` y armó un dominio equivocado.

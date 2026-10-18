@@ -1,0 +1,58 @@
+\chapter{Glossary}\label{app:glossary}
+
+\section{Terms and abbreviations}
+
+\begin{longtable}{@{}P{0.24\linewidth} P{0.70\linewidth}@{}}
+\toprule
+Term & Definition \\
+\midrule
+\endhead
+Binding & The assignment of each MPI process to fixed CPU cores. \\
+Boattail & The cone at the rear of the body, from the body diameter to the base. \\
+Chain & A sequence of runs at one flight condition, each started from the run on the coarser mesh. \\
+Coast & The flight phase after the motor burnout, $t > \unit{4}{s}$. \\
+CFD & Computational fluid dynamics. \\
+DOF & Degree of freedom: one unknown of the discrete system. \\
+GCI & Grid convergence index \citep{celik2008}. \\
+IPC & Instructions per cycle. \\
+ISA & International Standard Atmosphere. \\
+LTS & Local time stepping (\ent{localEuler}). \\
+Mesh $h0$ to $h3$ & The meshes of the sweep (\cref{tab:meshes}). \\
+MSL & Mean sea level. \\
+RANS & Reynolds-averaged Navier--Stokes equations. \\
+Run & One case directory and its executions. \\
+SST & Shear-stress transport ($k$--$\omega$ SST model). \\
+Sweep & A file with one run on each line, and its execution by \file{runCase.sh}. \\
+Template & \file{case-central/} or \file{case-pimple/}: the files from which \file{newCase.sh} makes a case. \\
+TVD & Total variation diminishing. \\
+$y^+$ & Distance of the first cell centre from the wall, in wall units: $y\,u_\tau/\nu$. \\
+\bottomrule
+\end{longtable}
+
+\section{Symbols}
+
+\begin{longtable}{@{}P{0.24\linewidth} P{0.50\linewidth} P{0.18\linewidth}@{}}
+\toprule
+Symbol & Definition & Unit \\
+\midrule
+\endhead
+$A_\text{ref}$ & Reference area & m\textsuperscript{2} \\
+$a$ & Speed of sound & m/s \\
+$C_D$, $C_L$, $C_N$ & Drag, lift and normal-force coefficients & -- \\
+$C_m$ & Pitching-moment coefficient about the nose tip & -- \\
+$C_p$ & Pressure coefficient & -- \\
+$c_p$, $c_v$ & Specific heats & J/(kg\,K) \\
+$d$ & Body diameter & m \\
+$k$, $\omega$ & Turbulent kinetic energy, specific dissipation rate & m\textsuperscript{2}/s\textsuperscript{2}, 1/s \\
+$M$ & Mach number & -- \\
+$p$, $T$, $\rho$ & Pressure, temperature, density & Pa, K, kg/m\textsuperscript{3} \\
+$Pr$, $Pr_t$ & Laminar and turbulent Prandtl numbers & -- \\
+$R$ & Gas constant of air & J/(kg\,K) \\
+$Re$ & Reynolds number & -- \\
+$t_1$ & Thickness of the first wall cell & m \\
+$\alpha$, $\beta$ & Angle of attack, angle of sideslip & deg \\
+$\gamma$ & Ratio of specific heats & -- \\
+$\mu$, $\nu$, $\nu_t$ & Dynamic, kinematic and eddy viscosity & Pa\,s, m\textsuperscript{2}/s \\
+$\tau_w$ & Wall shear stress & Pa \\
+\bottomrule
+\end{longtable}

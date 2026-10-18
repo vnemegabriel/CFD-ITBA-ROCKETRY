@@ -1,0 +1,65 @@
+% Aconcagua CFD -- User Guide
+% Build: make  (lualatex + bibtex, see Makefile)
+\documentclass[11pt,a4paper,twoside,openright]{report}
+
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{TeX Gyre Heros}
+\setmonofont{DejaVu Sans Mono}[Scale=0.85]
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage[a4paper,inner=30mm,outer=25mm,top=28mm,bottom=30mm,headheight=14pt]{geometry}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs,longtable,tabularx,array}
+\usepackage[skip=5pt plus 2pt]{parskip}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[obeyspaces,spaces,hyphens]{url}
+\usepackage{xurl}
+\usepackage[hidelinks,pdfusetitle,bookmarksnumbered]{hyperref}
+\usepackage[nameinlink,capitalise,noabbrev]{cleveref}
+
+\input{settings}
+
+\hypersetup{
+  pdftitle={Aconcagua CFD -- User Guide},
+  pdfauthor={ITBA Rocketry},
+  pdfsubject={CFD drag of the Aconcagua rocket with OpenFOAM v2412},
+}
+
+\begin{document}
+
+\input{chapters/frontmatter}
+
+\cleardoublepage
+\pagenumbering{arabic}
+\input{chapters/overview}
+\input{chapters/setup}
+\input{chapters/geometry}
+\input{chapters/mesh}
+\input{chapters/cases}
+\input{chapters/sweeps}
+\input{chapters/solvers}
+\input{chapters/results}
+\input{chapters/nektar}
+\input{chapters/flight}
+\input{chapters/validation}
+\input{chapters/troubleshooting}
+
+\appendix
+\crefalias{chapter}{appendix}
+\input{chapters/quickref}
+\input{chapters/glossary}
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{document}
