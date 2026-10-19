@@ -27,7 +27,7 @@ Option & Function \\
 \ent{--pInf <Pa>}, \ent{--Tinf <K>} & Free-stream static pressure and temperature. \\
 \ent{--alpha <deg>}, \ent{--beta <deg>} & Angle of attack and angle of sideslip. \\
 \ent{--Ti <->}, \ent{--nuRatio <->} & Free-stream turbulence intensity and ratio $\nu_t/\nu$. \\
-\ent{--np <N>} & Number of subdomains in \file{system/decomposeParDict}. \\
+\ent{--np <N>} & Number of processes, written as \ent{numberOfSubdomains} in \file{system/decomposeParDict}. Default: every physical core of the computer, or of the socket of \ent{--socket}. \\
 \ent{--socket <S>} & Binds the run to socket \val{S}, one process per physical core (\cref{sec:binding}). \val{none} disables the binding. \\
 \ent{--refine tip}, \ent{--refine fins} & Runs \file{Allrefine} on the new case (\cref{sec:refine}). \\
 \ent{--init <run-dir>} & Starts from the latest time of another run (\cref{sec:init}). \\
@@ -74,7 +74,7 @@ For \file{newCase.sh}, \ent{--mesh} and \ent{--init} are paths. Only
   (\cref{sec:config-json}), and removes the \file{*.j2} file.
 \item It writes each flow option into \file{system/flowConditions}. It stops if the
   entry does not exist.
-\item It writes \ent{--np} into \file{decomposeParDict} and \ent{--socket} into the
+\item It writes \ent{--np}, or the number of physical cores, into \file{decomposeParDict} and \ent{--socket} into the
   file \file{socket}. With \ent{--init}, it writes the path of the other run into
   \file{initFrom} and into \file{run.info}.
 \item With \ent{--refine}, it runs \file{Allrefine}.

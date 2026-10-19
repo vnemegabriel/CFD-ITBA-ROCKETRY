@@ -9,8 +9,9 @@
 # solution starts this one; a bare name lives in runs-dir.
 #
 # --np and --socket apply to every case; an option on a line of the sweep file
-# overrides them.  Default --np: the physical cores of one socket.  On a
-# computer with several sockets, run one sweep file on each socket.
+# overrides them.  Without --np anywhere, each case takes every physical core
+# of the computer, or those of --socket (newCase.sh).  On a computer with
+# several sockets, run one sweep file on each socket.
 #
 # The script reads the sweep file while it runs: do not edit it in place until
 # it ends.
@@ -30,12 +31,10 @@ MESHES=${3:-$HOME/meshes}
 
 [ -f "$SWEEP" ] || { echo "no sweep file: $SWEEP"; exit 1; }
 [ -n "${WM_PROJECT_DIR:-}" ] || { echo "source the OpenFOAM bashrc first"; exit 1; }
-if [ -z "$NP" ]; then
-    NP=$(lscpu -p=SOCKET,CORE | grep -v '^#' | awk -F, -v s="${SOCKET:-0}" '$1 == s {print $2}' | sort -un | wc -l)
-fi
-DEFAULTS=(--np "$NP")
+DEFAULTS=()
+[ -n "$NP" ] && DEFAULTS+=(--np "$NP")
 [ -n "$SOCKET" ] && DEFAULTS+=(--socket "$SOCKET")
-echo "processes for each case: $NP${SOCKET:+, socket $SOCKET}"
+echo "processes for each case: ${NP:-every physical core${SOCKET:+ of socket $SOCKET}}, unless a line gives --np"
 mkdir -p "$RUNS"
 
 while read -r NAME REST; do

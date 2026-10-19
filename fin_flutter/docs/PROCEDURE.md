@@ -100,8 +100,10 @@ Los diagramas `docs/figures/*.svg` salen de `docs/figures/src/*.mmd` (`node docs
 los gráficos `docs/figures/*.png` los escribe `fin_flutter`.
 
 > **Una corrida por vez.** Los costos de este documento dependen de que la máquina no
-> esté corriendo otra cosa al lado. En nemepad (8 cores físicos) una sola corrida de 8
-> procesos.
+> esté corriendo otra cosa al lado. Sin `--np`, cada corrida toma todos los cores físicos
+> de la máquina (en nemepad, 8). Para fijarlo: `--np N` en `newCase.sh`, en
+> `runCase.sh --np N` (todo el archivo) o en una línea del sweep (sólo esa corrida, gana
+> sobre la de `runCase.sh`); `python3 -m finflutter sweep --np N` lo escribe en cada línea.
 
 ---
 
@@ -274,7 +276,7 @@ Los valores salen de `flightModel/flightData/cdFlight.py` (mismo cálculo que el
 
 ```bash
 cd flightModel
-./runCase.sh sweepFlutter.txt                # --np y --socket son opciones de runCase.sh
+./runCase.sh sweepFlutter.txt                # todos los cores físicos; --np N para fijarlo
 ```
 
 Para el forzado alcanza con la corrida **pimple** de cada Mach (§9.2): el forzado corre

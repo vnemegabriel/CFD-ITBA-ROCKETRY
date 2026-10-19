@@ -3,6 +3,7 @@
 #
 #     ./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --np 16
+#                  (without --np: every physical core, or those of --socket)
 #     ./newCase.sh ~/runs/a05 --mesh ~/meshes/base --Minf 0.8 --alpha 5 --refine tip
 #     ./newCase.sh ~/runs/m06 --mesh ~/meshes/base --Minf 0.6 --np 8 --socket 1
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --init ~/runs/m18
@@ -19,7 +20,7 @@
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
-usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 RUN=$1; shift
 OPTIONS="$*"
@@ -119,7 +120,12 @@ for k in "${!SET[@]}"; do
     foamDictionary -entry "$k" -set "${SET[$k]}" system/flowConditions > /dev/null
     echo "flowConditions: $k = ${SET[$k]}"
 done
-[ -n "$NP" ] && foamDictionary -entry numberOfSubdomains -set "$NP" system/decomposeParDict > /dev/null
+# default: every physical core of the computer, or of the socket of --socket
+if [ -z "$NP" ]; then
+    NP=$(lscpu -p=SOCKET,CORE | grep -v '^#' | awk -F, -v s="$SOCKET" 's == "" || s == "none" || $1 == s {print $1","$2}' | sort -u | wc -l)
+fi
+foamDictionary -entry numberOfSubdomains -set "$NP" system/decomposeParDict > /dev/null
+echo "processes: $NP"
 [ -n "$SOCKET" ] && echo "$SOCKET" > socket
 
 [ -n "$REFINE" ] && ./Allrefine "$REFINE"

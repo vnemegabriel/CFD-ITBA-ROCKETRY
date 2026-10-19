@@ -207,7 +207,8 @@ def cmd_sweep(a):
             M = float(o["--Minf"])
             cond = f"--Minf {o['--Minf']} --pInf {o['--pInf']} --Tinf {o['--Tinf']}"
             tag = parts[0].replace("-pimple", "").replace("-a00-", "-").replace("m", "f", 1)
-            common = f"--mesh {a.mesh} --solver forced --alpha 0  {cond}  --init {parts[0]}"
+            np_ = f"--np {a.np} " if a.np else ""
+            common = f"{np_}--mesh {a.mesh} --solver forced --alpha 0  {cond}  --init {parts[0]}"
             lines.append(f"{tag+'-zero':<18} {common} --flutterModes {files['zero']}")
             for k in a.modes:
                 lines.append(f"{tag+f'-p{k}':<18} {common} --flutterModes {files[(k, 1)]}")
@@ -333,6 +334,7 @@ def main(argv):
     r.add_argument("-o", "--out", required=True); r.add_argument("--modes-dir", default="~/flutter/aconcagua")
     r.add_argument("--modes", type=int, nargs="+", default=[1, 2, 3, 4]); r.add_argument("--amplitude", type=float, default=5e-4)
     r.add_argument("--fmax", type=float, default=1500.0); r.add_argument("--mesh", default="h0")
+    r.add_argument("--np", type=int, help="processes of every forced run; default: every physical core")
     r.add_argument("--linearity-machs", type=float, nargs="+", default=[1.05, 1.86])
     r.add_argument("--base-solver", default="pimple", help="solver of the base runs to start from (pimple or central)")
     r.set_defaults(f=cmd_sweep)

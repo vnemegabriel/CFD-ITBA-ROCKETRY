@@ -4,8 +4,8 @@
 #
 #     ./runCase.sh [--np <N>] [--socket <S>] sweepSubsonic.txt [runs-dir] [meshes-dir]
 #
-# The number of processes and the socket are options of runCase.sh, not of
-# the lines, so the file is the same on every computer.
+# Without --np each case takes every physical core of the computer (or of
+# --socket).  runCase.sh --np sets it for the file; --np on a line, for that run.
 # M 0.3, 0.6 and 0.8 here; sweepSupersonic.txt has the other Mach numbers.  On a computer with
 # two sockets, run one file on each socket (--socket 0, --socket 1).
 #
