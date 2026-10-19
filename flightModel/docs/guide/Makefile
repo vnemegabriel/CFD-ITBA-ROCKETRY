@@ -12,6 +12,6 @@ figures:
 	node figures/render.mjs
 
 clean:
-	rm -f $(DOC).{aux,bbl,blg,log,out,toc,lof,lot}
+	rm -f $(DOC).aux $(DOC).bbl $(DOC).blg $(DOC).log $(DOC).out $(DOC).toc $(DOC).lof $(DOC).lot
 
 .PHONY: figures clean
