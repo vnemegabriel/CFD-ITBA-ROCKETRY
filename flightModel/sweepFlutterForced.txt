@@ -1,0 +1,58 @@
+# One run per line:  <name> <newCase.sh options>.  Written by
+#     python -m finflutter sweep cases/aconcagua.yaml ../flightModel/sweepSupersonic.txt ../flightModel/sweepFlutter.txt -o ../flightModel/sweepFlutterForced.txt
+# Run it with ./runCase.sh [--np <N>] [--socket <S>] <this file>.
+# Forced-motion runs of the fin flutter analysis (fin_flutter/docs/PROCEDURE.md, step 7):
+# per Mach, A = 0 (noise of the base flow) and one pulse per mode; at the
+# linearity Mach numbers also 2A for modes [1, 2].  Each starts from its base run.
+
+f18-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f18-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f18-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f18-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f18-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f12-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f12-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f12-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f12-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f12-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f105-h0-zero       --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f105-h0-p1         --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f105-h0-p2         --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f105-h0-p3         --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f105-h0-p4         --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+f105-h0-p1x2       --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A1mm
+f105-h0-p2x2       --mesh h0 --solver forced --alpha 0  --Minf 1.05 --pInf 56495 --Tinf 276.08  --init m105-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A1mm
+
+f11-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f11-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f11-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f11-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f11-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f13-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.3 --pInf 63307 --Tinf 282.80  --init m13-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f13-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.3 --pInf 63307 --Tinf 282.80  --init m13-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f13-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.3 --pInf 63307 --Tinf 282.80  --init m13-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f13-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.3 --pInf 63307 --Tinf 282.80  --init m13-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f13-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.3 --pInf 63307 --Tinf 282.80  --init m13-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f14-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.4 --pInf 66137 --Tinf 285.42  --init m14-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f14-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.4 --pInf 66137 --Tinf 285.42  --init m14-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f14-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.4 --pInf 66137 --Tinf 285.42  --init m14-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f14-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.4 --pInf 66137 --Tinf 285.42  --init m14-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f14-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.4 --pInf 66137 --Tinf 285.42  --init m14-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f16-h0-zero        --mesh h0 --solver forced --alpha 0  --Minf 1.6 --pInf 72011 --Tinf 290.59  --init m16-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f16-h0-p1          --mesh h0 --solver forced --alpha 0  --Minf 1.6 --pInf 72011 --Tinf 290.59  --init m16-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f16-h0-p2          --mesh h0 --solver forced --alpha 0  --Minf 1.6 --pInf 72011 --Tinf 290.59  --init m16-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f16-h0-p3          --mesh h0 --solver forced --alpha 0  --Minf 1.6 --pInf 72011 --Tinf 290.59  --init m16-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f16-h0-p4          --mesh h0 --solver forced --alpha 0  --Minf 1.6 --pInf 72011 --Tinf 290.59  --init m16-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+
+f186-h0-zero       --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/none
+f186-h0-p1         --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
+f186-h0-p2         --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A0.5mm
+f186-h0-p3         --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m3-A0.5mm
+f186-h0-p4         --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m4-A0.5mm
+f186-h0-p1x2       --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A1mm
+f186-h0-p2x2       --mesh h0 --solver forced --alpha 0  --Minf 1.86 --pInf 81341 --Tinf 298.16  --init m186-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m2-A1mm

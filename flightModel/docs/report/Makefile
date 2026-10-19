@@ -9,6 +9,6 @@ $(DOC).pdf: $(DOC).tex ../guide/references.bib ../../flightData/cdFlight.png
 	@grep -E 'Warning.*(undefined|multiply)' $(DOC).log || true
 
 clean:
-	rm -f $(DOC).{aux,bbl,blg,log,out}
+	rm -f $(DOC).aux $(DOC).bbl $(DOC).blg $(DOC).log $(DOC).out
 
 .PHONY: clean

@@ -25,7 +25,7 @@ archivos produce, cómo se verifica y en qué estado está. Los números marcado
 | 2 | FE de la aleta (MITC4 + CLT, espesor variable) | hecho | f₁ 237, f₂ 795, f₃ 1367 Hz; 40×16 a < 1 % de 80×32 en f₁, f₂ |
 | 3 | Cota con piston theory | hecho | ver §5 |
 | 4 | Exportar modos a OpenFOAM | hecho | interpolación = nodos FE a 1e-9 (test) |
-| 5 | Flujo base viscoso a más Mach | archivos listos | `sweepFlutter*.txt`, *pendiente de correr* |
+| 5 | Flujo base viscoso a más Mach | archivos listos | `sweepFlutter.txt`, *pendiente de correr* |
 | 6 | Chequeo estático con α = 4° | código listo | probado con M 0.8; *pendiente* a M > 1 |
 | 7 | Movimiento forzado (`case-forced`, rhoPimpleFoam) | **bloqueado** | la malla se mueve y `genForces.dat` se escribe; pero el transitorio diverge en el paso 6–8 **también con la malla quieta** (§9.6) |
 | 8 | GAF Q(M, k) y linealidad | código listo | identificación exacta sobre datos sintéticos (test) |
@@ -75,7 +75,7 @@ Qué viaja entre `fin_flutter` (Python) y `flightModel` (OpenFOAM):
 | `finflutter/lco.py` | Energía por ciclo y amplitud de LCO |
 | `finflutter/cli.py` | Los comandos `python3 -m finflutter <comando>` |
 | `flightModel/case-forced/` | Plantilla OpenFOAM del movimiento forzado |
-| `flightModel/sweepFlutter*.txt`, `sweepFlutterForced*.txt` | Corridas base y forzadas |
+| `flightModel/sweepFlutter.txt`, `sweepFlutterForced.txt` | Corridas base y forzadas |
 
 ---
 
@@ -261,20 +261,20 @@ transónica y el máximo:
 
 | M | t [s] | h sobre el pad [m] | p∞ [Pa] | T∞ [K] | archivo |
 |---|---|---|---|---|---|
-| 1.05 | 9.98 | 4016 | 56495 | 276.08 | `sweepFlutter*.txt` |
-| 1.1 | 9.44 | 3826 | 57837 | 277.45 | `sweepFlutter*.txt` |
-| 1.2 | 8.45 | 3451 | 60547 | 280.15 | `sweepSupersonic*.txt` |
-| 1.3 | 7.56 | 3084 | 63307 | 282.80 | `sweepFlutter*.txt` |
-| 1.4 | 6.75 | 2719 | 66137 | 285.42 | `sweepFlutter*.txt` |
-| 1.6 | 5.32 | 2001 | 72011 | 290.59 | `sweepFlutter*.txt` |
-| 1.8 | 4.06 | 1275 | 78354 | 295.82 | `sweepSupersonic*.txt` |
-| 1.86 | 3.54 | 950 | 81341 | 298.16 | `sweepFlutter*.txt` (máximo, fin de la combustión) |
+| 1.05 | 9.98 | 4016 | 56495 | 276.08 | `sweepFlutter.txt` |
+| 1.1 | 9.44 | 3826 | 57837 | 277.45 | `sweepFlutter.txt` |
+| 1.2 | 8.45 | 3451 | 60547 | 280.15 | `sweepSupersonic.txt` |
+| 1.3 | 7.56 | 3084 | 63307 | 282.80 | `sweepFlutter.txt` |
+| 1.4 | 6.75 | 2719 | 66137 | 285.42 | `sweepFlutter.txt` |
+| 1.6 | 5.32 | 2001 | 72011 | 290.59 | `sweepFlutter.txt` |
+| 1.8 | 4.06 | 1275 | 78354 | 295.82 | `sweepSupersonic.txt` |
+| 1.86 | 3.54 | 950 | 81341 | 298.16 | `sweepFlutter.txt` (máximo, fin de la combustión) |
 
 Los valores salen de `flightModel/flightData/cdFlight.py` (mismo cálculo que el barrido).
 
 ```bash
 cd flightModel
-./runCase.sh sweepFlutter.nemepad.txt        # nemepad: 8 cores; newton: sweepFlutter.txt
+./runCase.sh sweepFlutter.txt                # --np y --socket son opciones de runCase.sh
 ```
 
 Para el forzado alcanza con la corrida **pimple** de cada Mach (§9.2): el forzado corre
@@ -364,9 +364,9 @@ Las arma un comando, que también escribe los archivos de modos en `~/flutter/ac
 ```bash
 cd fin_flutter
 python3 -m finflutter sweep cases/aconcagua.yaml \
-    ../flightModel/sweepSupersonic.nemepad.txt ../flightModel/sweepFlutter.nemepad.txt \
-    -o ../flightModel/sweepFlutterForced.nemepad.txt
-cd ../flightModel && ./runCase.sh sweepFlutterForced.nemepad.txt
+    ../flightModel/sweepSupersonic.txt ../flightModel/sweepFlutter.txt \
+    -o ../flightModel/sweepFlutterForced.txt
+cd ../flightModel && ./runCase.sh sweepFlutterForced.txt
 ```
 
 Son 44 corridas: 8 Mach × 5, más 4 de linealidad.
@@ -427,7 +427,7 @@ En este orden, cada uno con una corrida corta (10–20 pasos, ~3 min):
 3. **Costo:** con el transitorio estable, medir sin otra corrida al lado y probar
    `endTime` 6 ms en lugar de 20 ms (el pulso cae a los ~3.4 ms). Si dt puede ser
    2 µs, el costo baja a la mitad.
-4. Recién ahí, `./runCase.sh sweepFlutterForced.nemepad.txt`.
+4. Recién ahí, `./runCase.sh sweepFlutterForced.txt`.
 
 ### 9.8 Antes de correr: `check`
 
@@ -599,8 +599,8 @@ Cada paso, en orden. Si "tenés que ver" no se cumple, no sigas: andá a "si no"
 | 0 | `pytest tests` en `fin_flutter/` | `12 passed` | no sigas: algo de la instalación o del código está roto |
 | 1 | `python3 -m finflutter figures cases/aconcagua.yaml` | `geometry.png` con la planta de 57.5° y el mapa de espesor; `modes.png` con 237/795/1367/1867 Hz | si cambió `makeRocket.py`, es esperable que cambien; si no cambió, revisá `cases/aconcagua.yaml` |
 | 2 | Tap test (§12) y `python3 -m finflutter tap …` | f₁, f₂ medidas a ±10 % de 237 y 795 Hz | f más bajas: la raíz no está empotrada o el supuesto `taper: scaled` está mal; no sigas con g supuesto |
-| 3 | `./runCase.sh sweepFlutter.nemepad.txt` | cada `m*-a00-h0-pimple` con `status ok` en `run.info` | Guía, Troubleshooting |
-| 4 | `python3 -m finflutter sweep …` (§9.3) | `sweepFlutterForced.nemepad.txt` y los archivos en `~/flutter/aconcagua/` | revisá que las líneas base tengan `--solver pimple --alpha 0 --mesh h0` |
+| 3 | `./runCase.sh sweepFlutter.txt` | cada `m*-a00-h0-pimple` con `status ok` en `run.info` | Guía, Troubleshooting |
+| 4 | `python3 -m finflutter sweep …` (§9.3) | `sweepFlutterForced.txt` y los archivos en `~/flutter/aconcagua/` | revisá que las líneas base tengan `--solver pimple --alpha 0 --mesh h0` |
 | 5 | Una sola corrida forzada; `Allrun` corre `check` | `ready`, y en el log `Solving for cellDisplacement` con residual > 0 durante el pulso | `check` dice qué arreglar; si diverge, §9.6–9.7 |
 | 6 | `python3 -m finflutter gaf …` por Mach; `linearity` en M 1.05 y 1.86 | `gaf_M*.png` suave en k; linealidad < 5 % | > 5 %: bajá la amplitud a la mitad y repetí |
 | 7 | `python3 -m finflutter flutter … --g-file tap.json` | residuo de Roger < 5 % en cada Mach; `margin.png` | residuo grande: más lags o menos rango de k |

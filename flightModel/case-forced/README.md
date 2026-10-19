@@ -10,7 +10,7 @@ it drops.
 > time steps, also with a static mesh. `fin_flutter/docs/PROCEDURE.md`, step 7.
 
 ```bash
-../newCase.sh ~/runs/f12-h0-p1 --mesh ~/meshes/h0 --solver forced --np 8 \
+../newCase.sh ~/runs/f12-h0-p1 --mesh ~/meshes/h0 --solver forced \
     --Minf 1.2 --pInf 60547 --Tinf 280.15 \
     --init ~/runs/m12-a00-h0-pimple --flutterModes ~/flutter/aconcagua/pulse-m1-A0.5mm
 ```

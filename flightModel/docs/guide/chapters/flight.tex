@@ -13,7 +13,17 @@ python3 flightData/cdFlight.py [--csv <telemetry>] [--mass <kg>] [--runs <runs-d
 \end{shell}
 
 \file{python3 flightData/cdFlight.py -h} gives the defaults. The mass is the mass after
-burnout: $C_D$ is proportional to it.
+burnout, read from the OpenRocket simulation in \file{flightData/Aconcagua.ork} or
+given with \ent{--mass}: $C_D$ is proportional to it.
+
+\paragraph{Telemetry format.} A CSV file with a comma between fields and a dot as
+decimal sign, without thousands separators, with the column names of the TeleMega
+export (AltOS): \ent{time}, \ent{state_name}, \ent{pressure}, \ent{speed},
+\ent{accel_x}, \ent{tilt}, \ent{pad_range}, \ent{pad_dist}, \ent{nsat}. The script
+stops on a decimal comma and on a value outside the physical limits of
+\ent{LIMITS} in the script, with the line and the column. To use another flight
+computer, convert its export to these names and units first. The accelerometer
+saturates during the motor burn; the script uses only the coast.
 
 \section{Method}
 

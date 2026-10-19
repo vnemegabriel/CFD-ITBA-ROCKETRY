@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Cd of the IREC flight from the TeleMega, against the CFD runs and OpenRocket.
 
-    cdFlight.py [--csv AconcaguaIREC_TeleMega.csv] [--mass 24.52] [--runs ~/runs]
-                [--ork rocket.ork] [--out cdFlight.png]
+    cdFlight.py [--csv AconcaguaIREC_TeleMega.csv] [--ork Aconcagua.ork] [--mass <kg>]
+                [--runs ~/runs] [--out cdFlight.png]
 
-Everything comes from the telemetry:
+The CSV uses a dot as decimal sign and a comma between fields, with the column
+names of the TeleMega export (AltOS); load() stops on a cell outside the
+physical limits of LIMITS.  The mass after burnout comes from the OpenRocket
+simulation in the .ork file, or from --mass.
+
+Everything else comes from the telemetry:
 
 - Atmosphere of Midland: pad pressure p0 is the mean before launch.  T0 and the
   lapse rate come from fitting p = p0 (1 - L h/T0)^(g/RL) to the GPS height
@@ -39,11 +44,18 @@ COLS = ("time", "state_name", "pressure", "speed", "accel_x", "tilt",
         "pad_range", "pad_dist", "nsat")
 
 
+# Physical limits of a sounding-rocket flight; a value outside them is a unit,
+# format or sensor error, not data.
+LIMITS = {"time": (-60, 4000), "pressure": (1e4, 1.2e5), "speed": (-400, 1000),
+          "accel_x": (-400, 400), "tilt": (0, 180), "pad_range": (0, 5e4),
+          "pad_dist": (0, 5e4), "nsat": (0, 40)}
+
+
 def num(s):
-    try:
-        return float(s.strip().replace(".", "").replace(",", "."))
-    except ValueError:
-        return float("nan")
+    s = s.strip()
+    if "," in s:
+        raise ValueError("decimal comma in %r: the CSV must use a dot as decimal sign" % s)
+    return float(s) if s else float("nan")
 
 
 def load(path):
@@ -53,10 +65,13 @@ def load(path):
         head[0] = head[0].lstrip("#")
         idx = {k: head.index(k) for k in COLS}
         rows = []
-        for row in r:
+        for line, row in enumerate(r, 2):
             if len(row) <= max(idx.values()):
                 continue
             d = {k: (row[i] if k == "state_name" else num(row[i])) for k, i in idx.items()}
+            for k, (lo, hi) in LIMITS.items():
+                if not lo <= d[k] <= hi:
+                    raise ValueError("%s line %d: %s = %g is outside [%g, %g]" % (path, line, k, d[k], lo, hi))
             rows.append(d)
     return rows
 
@@ -180,27 +195,36 @@ def openrocket(path):
     br = next(sim.iter("databranch"))
     types = br.get("types").split(",")
     it, im, ic = types.index("Time"), types.index("Mach number"), types.index("Drag coefficient")
-    pts = []
+    imass = types.index("Mass")
+    pts, mass = [], None
     for p in br.iter("datapoint"):
         v = p.text.split(",")
         if burnout < float(v[it]) < apogee:
             pts.append((float(v[im]), float(v[ic])))
-    return sorted(pts)
+            if mass is None:
+                mass = float(v[imass])
+    return sorted(pts), mass
 
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default=os.path.join(here, "AconcaguaIREC_TeleMega.csv"))
-    ap.add_argument("--mass", type=float, default=24.52)
+    ap.add_argument("--mass", type=float, help="mass after burnout [kg]; default: from --ork")
     ap.add_argument("--runs", default=os.path.expanduser("~/runs"))
-    ap.add_argument("--ork", default=os.path.expanduser("~/Downloads/207 - Aconcagua.ork"))
+    ap.add_argument("--ork", default=os.path.join(here, "Aconcagua.ork"))
     ap.add_argument("--vmin", type=float, default=60)
     ap.add_argument("--tstart", type=float, default=4.0)
     ap.add_argument("--tanchor", type=float, default=18.0)
     ap.add_argument("--alphas", type=lambda s: [float(x) for x in s.split(",")], default=[0.0, 8.0])
     ap.add_argument("--out", default=os.path.join(here, "cdFlight.png"))
     a = ap.parse_args()
+    ork, ork_mass = openrocket(a.ork) if os.path.exists(a.ork) else ([], None)
+    if a.mass is None:
+        if ork_mass is None:
+            ap.error("give --mass, or an --ork file with a simulation")
+        a.mass = ork_mass
+    print("mass after burnout: %.2f kg" % a.mass)
 
     rows = load(a.csv)
     atm = atmosphere(rows)
@@ -224,7 +248,6 @@ def main():
     tel = drag(traj, a.mass, a.tstart, a.vmin)
     bins = binned(tel, 0.025)
     runs = [r for r in cfd(a.runs) if r[2] in a.alphas]
-    ork = openrocket(a.ork) if os.path.exists(a.ork) else []
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
     ax.scatter([m for _, m, _ in tel], [c for _, _, c in tel], s=3, color="0.75",

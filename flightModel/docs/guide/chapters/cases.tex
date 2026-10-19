@@ -215,7 +215,19 @@ boundary layer in place. The two runs can use different solvers. After
   \val{fixedValue} patch its own entry, not a regular expression.
 \item It stops if the log of \cmd{mapFields} or of \cmd{changeDictionary} does not end
   with \val{End}.
+\item It deletes \file{0/rho}. The solver calculates \ent{rho} again from \ent{p} and
+  \ent{T}.
 \end{steps}
+
+\begin{caution}
+A cell of this mesh that \cmd{mapFields} does not find in the other mesh keeps the
+value of \file{0.orig}; such cells occur where the two meshes differ near the wall,
+for example at the fin tips. \file{0.orig} has no \ent{rho}, so these cells get a
+density equal to the numerical value of the pressure. \cmd{rhoPimpleFoam} reads
+\file{0/rho} if it is there, and the run fails in the first steps. For this reason
+\file{Allrun} deletes \file{0/rho} after the mapping. Apply the same rule to any
+field that the solver calculates from others.
+\end{caution}
 
 The free-stream entries of the patches (\ent{freestreamValue}, \ent{inletValue},
 \ent{fieldInf}) are not mapped. They keep the values of this run. The other run must
@@ -257,9 +269,9 @@ File & Function \\
 
 \begin{steps}
 \item Make the base run at the same Mach number on the same mesh with
-  \ent{--solver pimple} (\file{sweepFlutter*.txt}).
+  \ent{--solver pimple} (\file{sweepFlutter.txt}).
 \item Write the modes file with \cmd{python3 -m finflutter modes} or the whole sweep
-  with \cmd{python3 -m finflutter sweep} (\file{sweepFlutterForced*.txt}).
+  with \cmd{python3 -m finflutter sweep} (\file{sweepFlutterForced.txt}).
 \item Make the case with \ent{--solver forced --init <base-run> --flutterModes <file>}.
   \file{newCase.sh} also writes the path of \file{fin_flutter} into
   \file{finflutterPath}.
