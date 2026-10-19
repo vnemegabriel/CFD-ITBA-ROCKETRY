@@ -276,12 +276,77 @@ processes the effective clock is \unit{4.4}{GHz} and the IPC about 1, consistent
 memory-bound solver. These measurements are the basis of the cost comparison with
 Nektar++.
 
+\section{Second sweep: fitted atmosphere}\label{sec:sweep2}
+
+The second sweep uses the fitted atmosphere and $\alpha = 0, 4, 8^\circ$, with the
+measurement of the computer on each run. \Cref{tab:sweep2} gives the runs that
+finished.
+
+\begin{table}[htbp]
+\centering
+\caption{$C_D$ of the second sweep (mean of the last 1000 iterations).}\label{tab:sweep2}
+\begin{tabular}{@{}c ccc c c@{}}
+\toprule
+$M$ & $0^\circ$, $h_0$ & $4^\circ$, $h_0$ & $8^\circ$, $h_0$ & $0^\circ$, $h_1$ & Flight \\
+\midrule
+0.3 & 0.383 & 0.462 & 0.713 & 0.352 & 0.369 \\
+0.6 & 0.361 & 0.451 & 0.700 & 0.331 & 0.337 \\
+0.8 & 0.354 & 0.433 & 0.700 & 0.342 & 0.320 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With the real atmosphere, $C_D$ on $h_0$ is 1--2\,\% above the ISA sweep. On $h_1$ it is
+3--8\,\% below $h_0$ and within $-5$\,\% to $+7$\,\% of the flight. $m08$-$a08$-$h_1$
+gives 0.676.
+
+\paragraph{Failure of the $h_1$ runs at incidence.} Five of the six $h_1$ runs at
+$\alpha \neq 0$ stopped at iterations 2 to 7 with a floating point exception in the
+turbulence model. A repetition with the computer cold failed at the same iteration, so
+the failure is deterministic; a repetition without the mapped \texttt{rDeltaT} failed
+too. The cause: 7083 cells of $h_1$ near the fin tips are not inside $h_0$, so
+\texttt{mapFields} leaves them with the values of \texttt{0.orig}, and \texttt{0.orig}
+has no density field. These cells got $\rho$ equal to the numerical value of
+$p_\infty$, about $4\times10^4$, and the first pressure solution reached
+$3\times10^9$\,Pa. With \texttt{0/rho} deleted after the mapping, the run continues with
+a minimum local time step of $4\times10^{-8}$\,s instead of $2\times10^{-12}$\,s.
+
+\paragraph{Thermal state of the computer.} In the long runs the CPU reached its
+\unit{100}{\textdegree C} limit and one memory module \unit{88.5}{\textdegree C}, above
+its \unit{85}{\textdegree C} rating. The effective clock varied from 3.5 to
+\unit{4.4}{GHz} between runs with the same CPU profile, so the wall time of these runs
+is not a comparable cost without the cycle counts.
+
+\section{Reference values for verification}\label{sec:verification}
+
+A replication of the first run of the guide (mesh $h_0$, $M = 0.8$, $\alpha = 0$,
+\texttt{pInf} 47\,509\,Pa, \texttt{Tinf} 266.17\,K, \texttt{rhoPimpleFoam}) must give:
+
+\begin{table}[htbp]
+\centering
+\caption{Reference values of the first run.}\label{tab:verification}
+\begin{tabular}{@{}lc@{}}
+\toprule
+Quantity & Value \\
+\midrule
+Cells of $h_0$ & 1\,074\,798 \\
+Negative cell volumes & 0 \\
+$t_1$ on the body walls & \unit{0.097}{mm} \\
+$C_D$, mean of the last 1000 iterations & 0.354 \\
+Mean \yplus{} on the body walls & 6.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A difference in $C_D$ larger than the stop tolerance (0.007) shows a different geometry,
+mesh or setup. A small difference in the number of cells can come from another
+version of cfMesh.
+
 \section{Status and next steps}
 
 \begin{enumerate}
-\item The instrumented subsonic sweep with the fitted atmosphere and
-  $\alpha = 0, 4, 8^\circ$ is running on $h_0$ and $h_1$; $h_2$ follows, $h_3$ waits
-  for the workstation.
+\item The second sweep (\cref{sec:sweep2}): repeat the five $h_1$ runs at incidence
+  with the corrected \texttt{Allrun}, then $h_2$; $h_3$ waits for the workstation.
 \item Mesh convergence and grid convergence index for $C_D$ at each condition.
 \item Diagnosis and correction of the central-run divergence, then the supersonic sweep
   and the transonic drag rise.

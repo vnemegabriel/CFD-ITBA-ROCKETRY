@@ -1,0 +1,117 @@
+\chapter{Concepts you need}\label{ch:concepts}
+
+This chapter is for a reader with little CFD practice. It gives each concept that the
+workflow uses, why the workflow needs it, and where to learn more. Do the OpenFOAM
+tutorials of \cref{tab:tutorials} before your first run of this case.
+
+\section{An OpenFOAM case}
+
+An OpenFOAM case is a directory with three parts:
+
+\begin{tabularx}{\linewidth}{@{}P{0.18\linewidth} L@{}}
+\toprule
+Directory & Contents \\
+\midrule
+\file{0/} & The initial and boundary conditions of each field ($p$, $\mathbf{U}$, $T$, \ldots). The templates keep them in \file{0.orig/} and copy them to \file{0/} at the start. \\
+\file{constant/} & The mesh (\file{polyMesh/}) and the physical models (gas, turbulence). \\
+\file{system/} & The numerical settings: time control (\file{controlDict}), discretization (\file{fvSchemes}), linear solvers (\file{fvSolution}), parallel decomposition. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Each file is a dictionary of \texttt{keyword value;} entries. \cmd{foamDictionary}
+reads and writes them from the shell. The OpenFOAM user guide explains the structure.
+
+\section{Finite volumes and the mesh}
+
+The finite-volume method divides the domain into cells and solves the conservation of
+mass, momentum and energy for each cell: what enters through the faces equals what
+leaves plus what accumulates \citep{versteeg2007,moukalled2016}. The value at a face
+comes from the values at the cell centres with an interpolation scheme. The accuracy
+thus depends on the size and the shape of the cells where the flow changes fast:
+shocks, the boundary layer, the wake. A refined mesh reduces the discretization error;
+the mesh-convergence study of \cref{sec:gci} measures it.
+
+Mesh quality has three common measures. \emph{Non-orthogonality} is the angle between a
+face normal and the line between the two cell centres. \emph{Skewness} is the distance
+of that line from the face centre. A \emph{negative volume} is an inverted cell, which
+makes the mesh unusable.
+
+\section{Compressible flow regimes}
+
+The Mach number $M = U/a$ sets the physics and the numerics \citep{anderson2003}:
+
+\begin{tabularx}{\linewidth}{@{}l L@{}}
+\toprule
+Regime & What happens \\
+\midrule
+$M < 0.3$ & Density changes are small. \\
+$0.3 < M < 0.8$ & Compressible, without shocks. \\
+$0.8 < M < 1.2$ & Transonic: local shocks, a fast rise of the drag. \\
+$M > 1.2$ & Supersonic: a bow shock at the nose, oblique shocks at the fins, an expansion and a wake at the base. Information travels only downstream, inside the Mach cone. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+This is why the workflow uses two solvers (\cref{sec:two-solvers}) and different outlet
+conditions (\cref{sec:bc}).
+
+\section{Turbulence, RANS and \texorpdfstring{$y^+$}{y+}}
+
+The flow around a rocket is turbulent. A RANS model solves for the mean flow and
+models the effect of the turbulent fluctuations with an eddy viscosity $\nu_t$
+\citep{wilcox2006,pope2000}. The $k$--$\omega$ SST model of this workflow solves two
+equations, for the turbulent kinetic energy $k$ and its specific dissipation rate
+$\omega$.
+
+Near a wall the velocity changes over a very small distance. $y^+ = y\,u_\tau/\nu$ is
+the distance of the first cell centre from the wall in wall units. Below $y^+ \approx 5$
+the cell is in the viscous sublayer; above $y^+ \approx 30$, in the log layer; between
+them, in the buffer layer. A wall function gives the wall shear stress from the first
+cell when the mesh does not resolve the sublayer (\cref{sec:wall-treatment}).
+
+\section{Steady solution by pseudo-time marching}
+
+The workflow wants the steady flow. The solvers march in a pseudo-time from an initial
+field until the solution stops changing (\cref{sec:lts}). Each iteration reduces the
+\emph{residuals}, the error of the discrete equations, and the force coefficients become
+flat. The run stops when the mean of $C_D$ over a window is constant
+(\cref{sec:stop-criterion}). The \emph{Courant number} $Co = U\,\Delta t/\Delta x$ limits
+the step of each cell: a large step makes the march unstable.
+
+\section{Force coefficients}
+
+The force on the rocket, divided by the dynamic pressure $\tfrac12\rho_\infty U_\infty^2$
+and a reference area, gives the coefficients. $C_D$ (drag) and $C_L$ (lift) are along
+and normal to the free stream; $C_A$ (axial) and $C_N$ (normal) are along and normal to
+the body axis. $C_m$ is the moment coefficient about a reference point. The centre of
+pressure is where the normal force acts; a rocket is stable if it is behind the centre
+of gravity.
+
+\section{Learning path}
+
+\begin{table}[htbp]
+\centering
+\caption{OpenFOAM tutorials to do before this case, in this sequence. Paths are relative to \texttt{\$FOAM\_TUTORIALS}.}\label{tab:tutorials}
+\begin{tabularx}{\linewidth}{@{}P{0.46\linewidth} L@{}}
+\toprule
+Tutorial & What it teaches \\
+\midrule
+\file{incompressible/icoFoam/cavity/cavity} & The case structure, a run, ParaView. \\
+\file{incompressible/simpleFoam/pitzDaily} & A RANS model, wall functions, convergence of a steady solution. \\
+\file{compressible/rhoPimpleFoam/RAS/aerofoilNACA0012} & The pressure-based compressible solver with RANS on an external flow. \\
+\file{compressible/rhoCentralFoam/forwardStep} & The density-based solver and a supersonic flow with shocks. \\
+\file{compressible/rhoCentralFoam/wedge15Ma5} & An oblique shock with an exact solution (\cref{sec:supersonic-validation}). \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+To copy and run a tutorial:
+\begin{shell}
+cp -r $FOAM_TUTORIALS/incompressible/icoFoam/cavity/cavity ~/cavity
+cd ~/cavity && ./Allrun   # or: blockMesh && icoFoam
+\end{shell}
+
+For the theory, read the finite-volume method in \citet{versteeg2007} or, with OpenFOAM
+examples, \citet{moukalled2016}; compressible flow in \citet{anderson2003}; turbulence
+modelling in \citet{wilcox2006}.

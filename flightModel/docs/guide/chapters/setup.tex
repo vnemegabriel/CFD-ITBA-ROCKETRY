@@ -13,29 +13,116 @@ Item & Requirement \\
 \midrule
 \endhead
 OpenFOAM & ESI v2412 with cfMesh (\cmd{cartesianMesh}), and its Open MPI. \\
-Tools & \cmd{bash}, \cmd{rsync}, \cmd{awk}, GNU \cmd{sed}, \cmd{xz}, \cmd{/usr/bin/time}, \cmd{jinja2-cli}. \\
+Tools & \cmd{bash}, \cmd{rsync}, \cmd{awk}, GNU \cmd{sed}, \cmd{xz}, \cmd{/usr/bin/time}, \cmd{jinja2-cli}, \cmd{git}. \\
 Python 3 & Standard library; \cmd{matplotlib} for \file{cdFlight.py}. \\
-\cmd{perf} & Optional: counts the CPU cycles and the energy of each run. \\
+\cmd{perf} & Optional: counts the CPU cycles and the energy of each run. Native Linux only. \\
 Memory & Proportional to the number of cells. Measure \ent{maxRSSkB} of a run on the coarsest mesh (\cref{sec:runinfo}) and scale it with the number of cells before you run a finer mesh. \cmd{cartesianMesh} needs the memory of the full rocket also for a half mesh. \\
 \bottomrule
 \end{longtable}
 
-\section{Prepare the shell}
+\section{Choose an installation}\label{sec:install}
 
-Do this step in each new shell:
+\begin{tabularx}{\linewidth}{@{}P{0.20\linewidth} P{0.26\linewidth} L@{}}
+\toprule
+Computer & Installation & Note \\
+\midrule
+Any (Windows, macOS, Linux) & Container (\cref{sec:install-container}) & The same environment on all computers. Recommended for a first replication. \\
+Ubuntu or Debian & Native (\cref{sec:install-native}) & Best performance; needed for the measurement with \cmd{perf}. \\
+Windows & Native in WSL 2 (\cref{sec:install-native}) & Ubuntu in WSL 2, then the native procedure. \\
+macOS & Container & No native OpenFOAM package. On Apple silicon the container runs emulated, slower. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Container}\label{sec:install-container}
+
+The repository has a container recipe, \file{container/Dockerfile}, with OpenFOAM,
+cfMesh, Open MPI and all the tools. The meshes and the runs go to a volume, so they stay
+when the container stops.
+
+\begin{steps}
+\item Install Docker (Docker Desktop on Windows and macOS).
+\item Get the repository:
+\begin{shell}
+git clone https://github.com/vnemegabriel/CFD-ITBA-ROCKETRY.git
+cd CFD-ITBA-ROCKETRY
+\end{shell}
+\item Build the image once:
+\begin{shell}
+docker build -t aconcagua-cfd -f container/Dockerfile .
+\end{shell}
+  On Apple silicon, add \ent{--platform linux/amd64}.
+\item Start a shell in the container:
+\begin{shell}
+docker run --rm -it -v "$PWD":/work -v aconcagua-data:/data aconcagua-cfd
+\end{shell}
+  The shell starts in \file{/work/flightModel} with OpenFOAM loaded;
+  \file{~/meshes} and \file{~/runs} are in the volume \texttt{aconcagua-data}.
+\item Do the first run (\cref{sec:first-run}).
+\end{steps}
+
+\begin{note}
+Apptainer (Singularity) can run the same image on a computing cluster without root:
+\cmd{apptainer build aconcagua.sif docker-daemon://aconcagua-cfd:latest}.
+\end{note}
+
+\subsection{Native installation on Ubuntu, Debian or WSL 2}\label{sec:install-native}
+
+\begin{steps}
+\item On Windows only: install WSL 2 with Ubuntu (\cmd{wsl --install -d Ubuntu}), and
+  do the next steps in the Ubuntu terminal.
+\item Add the OpenFOAM repository of ESI and install OpenFOAM with its modules:
+\begin{shell}
+curl -s https://dl.openfoam.com/add-debian-repo.sh | sudo bash
+sudo apt-get install openfoam2412-default
+\end{shell}
+\item Install the tools:
+\begin{shell}
+sudo apt-get install rsync xz-utils gawk time git python3-matplotlib pipx
+pipx install jinja2-cli
+\end{shell}
+\item Get the repository (\cmd{git clone}, as in \cref{sec:install-container}).
+\item Load OpenFOAM in each new shell, or add the line to \file{~/.bashrc}:
 \begin{shell}
 source /usr/lib/openfoam/openfoam2412/etc/bashrc
 \end{shell}
+  If OpenFOAM is in another place, use the \file{etc/bashrc} of that installation.
+  All scripts stop with \val{source the OpenFOAM bashrc first} if this step is
+  missing.
+\end{steps}
 
 \begin{caution}
-On WSL, put the mesh and run directories on the Linux file system, not in
-\file{/mnt/c}: the input and output of OpenFOAM become several times slower.
+On WSL, put the repository, the meshes and the runs on the Linux file system
+(\file{~/...}), not in \file{/mnt/c}: the input and output of OpenFOAM become several
+times slower there.
 \end{caution}
+
+\section{First run}\label{sec:first-run}
+
+The first run checks the installation on the coarsest mesh of the study, $h_0$. $h_0$
+always starts the chains of runs (\cref{sec:study-design}), so this run is also the
+first run of a real study.
+
+\begin{steps}
+\item Make the mesh (\cref{sec:allmesh}):
+\begin{shell}
+cd flightModel
+mesh/Allmesh ~/meshes/h0 $(grep '^h0 ' meshes.txt | cut -d' ' -f2-)
+\end{shell}
+\item Make and run one case at the first sweep condition of \file{sweepSubsonic.txt}:
+\begin{shell}
+./newCase.sh ~/runs/m08-a00-h0 --mesh ~/meshes/h0 --solver pimple --alpha 0 \
+    --Minf 0.8 --pInf 47509 --Tinf 266.17
+cd ~/runs/m08-a00-h0 && ./Allrun
+\end{shell}
+\item Compare the number of cells, $C_D$ and $t_1$ with the reference values of the
+  technical report. A difference larger than the stop tolerance shows a different
+  geometry, mesh or setup.
+\end{steps}
 
 \section{Prepare the computer for a study}\label{sec:prepare-computer}
 
 The cost of a run is a measurement only if the computer runs at a known, constant
-state (\cref{sec:measurement}). Before a study:
+state (\cref{sec:measurement}). Before a study on a native installation:
 
 \begin{steps}
 \item Fix the CPU frequency policy: the \val{performance} governor or platform
@@ -45,24 +132,23 @@ state (\cref{sec:measurement}). Before a study:
   \file{/etc/sysctl.d/}.
 \item Prevent suspension during the study (power settings, or \cmd{systemd-inhibit}).
 \item Give the memory and the CPU sufficient cooling. Above its temperature limit,
-  memory refreshes more often and loses bandwidth; a CPU lowers its clock.
+  memory refreshes more often and loses bandwidth; a CPU lowers its clock. The
+  record of each run gives the highest temperatures (\cref{tab:measured}).
 \item Run one case on each CPU socket, with nothing heavy beside it. Runs on one
   socket share the memory bandwidth.
 \end{steps}
 
 \section{Build this guide}\label{sec:build-guide}
 
-The guide needs LuaLaTeX, BibTeX and the TeX Gyre fonts. The diagrams need Node.js,
-the npm package \texttt{pele} and Google Chrome.
+The guide needs LuaLaTeX, BibTeX and the TeX Gyre fonts (TeX Live). The diagrams are in
+the repository as PDF files (\file{figures/pdf/}), so the guide compiles without other
+tools.
 
 \begin{steps}
-\item Go to \file{docs/guide/}.
-\item If you changed a diagram in \file{figures/src/*.mmd}, render the diagrams:
-\begin{shell}
-npm install
-make figures
-\end{shell}
-  Pele renders the Mermaid source to SVG; headless Chrome prints it to a vector PDF,
-  because Pele sets the colours with CSS variables.
-\item Compile with \cmd{make}. Commit the source, \file{figures/pdf/} and the PDF.
+\item Go to \file{docs/guide/} and compile with \cmd{make}.
+\item Only if you change a diagram: edit \file{figures/src/<name>.mmd} (Mermaid), and
+  render it with \cmd{npm install} once, then \cmd{make figures}. This needs Node.js,
+  the npm package \texttt{pele} and Google Chrome or Chromium (set \cmd{CHROME} to its
+  executable if it is not \cmd{google-chrome}).
+\item Commit the source, \file{figures/pdf/} and the PDF together.
 \end{steps}

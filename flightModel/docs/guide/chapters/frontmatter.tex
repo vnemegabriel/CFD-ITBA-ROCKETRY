@@ -65,15 +65,17 @@ solver. For each step it gives the procedure and the principle that justifies it
 
 \section*{Audience}
 
-People who replicate or extend the workflow. You must know how to use a Linux shell,
-the basics of compressible flow and of RANS turbulence models, and the
-finite-volume method.
+Engineering students and engineers who replicate or extend the workflow, on any
+computer. You need a basic course of fluid mechanics and the use of a command line.
+\Cref{ch:concepts} gives the CFD concepts that the workflow uses and a learning path
+for a reader with little CFD practice.
 
 \section*{Scope}
 
 The directory \file{flightModel/}: geometry, mesh, case templates, sweeps,
 post-processing, measurement of the computer and flight data. The guide applies to
-any Linux computer with the software of \cref{tab:requirements}.
+any computer: with the container on Windows, macOS or Linux, or with a native
+installation on Linux (\cref{sec:install}).
 
 \section*{How to use this guide}
 
@@ -82,7 +84,8 @@ any Linux computer with the software of \cref{tab:requirements}.
 If you want to & Read \\
 \midrule
 Understand the workflow & \cref{ch:overview} \\
-Make the first run & \cref{ch:setup}, then \cref{sec:make-case,sec:run-case} \\
+Learn the CFD concepts first & \cref{ch:concepts} \\
+Install and make the first run & \cref{sec:install,sec:first-run} \\
 Run a study & \cref{ch:sweeps} \\
 Change the geometry or the mesh & \cref{ch:geometry,ch:mesh} \\
 Know why the solver is set up as it is & \cref{ch:solvers} \\

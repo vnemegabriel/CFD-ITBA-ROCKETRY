@@ -210,12 +210,13 @@ boundary layer in place. The two runs can use different solvers. After
 \end{steps}
 
 \begin{caution}
-A cell of this mesh that is not in the other mesh keeps the value of \file{0.orig}.
-Between h0 and h1 there are 7083 such cells, near the fin tips. \file{0.orig} has no
-\ent{rho}, so \cmd{mapFields} gives these cells a density equal to the free-stream
-pressure ($\approx 4\times10^4$). \cmd{rhoPimpleFoam} reads \file{0/rho} if it is
-there, and the runs at $\alpha \neq 0$ then stop with a floating point exception at
-step 2.
+A cell of this mesh that \cmd{mapFields} does not find in the other mesh keeps the
+value of \file{0.orig}; such cells occur where the two meshes differ near the wall,
+for example at the fin tips. \file{0.orig} has no \ent{rho}, so these cells get a
+density equal to the numerical value of the pressure. \cmd{rhoPimpleFoam} reads
+\file{0/rho} if it is there, and the run fails in the first steps. For this reason
+\file{Allrun} deletes \file{0/rho} after the mapping. Apply the same rule to any
+field that the solver calculates from others.
 \end{caution}
 
 The free-stream entries of the patches (\ent{freestreamValue}, \ent{inletValue},
