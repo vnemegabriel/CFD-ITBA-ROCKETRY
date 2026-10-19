@@ -70,22 +70,27 @@ A sweep file has one case on each line: a name, then the options of \file{newCas
 in the file.
 
 \begin{shell}
-m08-a00-h1  --np <N> --mesh h1 --solver pimple --alpha 0 --Minf 0.8 --pInf <Pa> --Tinf <K> --init m08-a00-h0
+m08-a00-h1  --mesh h1 --solver pimple --alpha 0 --Minf 0.8 --pInf <Pa> --Tinf <K> --init m08-a00-h0
 \end{shell}
 
 \begin{shell}
-./runCase.sh <sweep-file> [runs-dir] [meshes-dir]   # default: ~/runs, ~/meshes
+./runCase.sh [--np <N>] [--socket <S>] <sweep-file> [runs-dir] [meshes-dir]
 \end{shell}
+
+The defaults are the physical cores of one socket, \file{~/runs} and \file{~/meshes}.
+The sweep files do not contain the number of processes, so the same file works on any
+computer. An option on a line of the file overrides the option of \file{runCase.sh}.
 
 For each line, \file{runCase.sh} skips the case if its directory exists, stops if the
 mesh does not exist, runs \file{newCase.sh}, and runs \file{Allrun}. A failed run does
 not stop the sweep. Thus, after a stop, run \file{runCase.sh} again: it continues from
 the first case that does not exist.
 
-\paragraph{Processes and sockets.} Give each case as many processes as the physical
-cores of one socket, and bind them (\cref{sec:binding}). On a computer with several
-sockets, run one sweep file on each socket at the same time, with \ent{--socket}. Each
-chain must stay in one file, because the files run in parallel.
+\paragraph{Processes and sockets.} One process for each physical core of one socket,
+bound to its core (\cref{sec:binding}), is the default. On a computer with two sockets,
+run \file{sweepSubsonic.txt} with \ent{--socket 0} and \file{sweepSupersonic.txt} with
+\ent{--socket 1} at the same time. Each chain must stay in one file, because the files
+run in parallel.
 
 \subsection{Start a sweep}
 

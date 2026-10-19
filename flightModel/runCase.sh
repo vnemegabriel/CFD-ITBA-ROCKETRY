@@ -1,5 +1,5 @@
 #!/bin/bash
-# ./runCase.sh <sweep-file> [runs-dir] [meshes-dir]
+# ./runCase.sh [--np <N>] [--socket <S>] <sweep-file> [runs-dir] [meshes-dir]
 #                                    default: ~/runs, ~/meshes
 #
 # Makes and runs every case in the sweep file, one after the other.  Each line
@@ -8,16 +8,34 @@
 # exists is skipped, so re-running resumes.  --init names the run whose
 # solution starts this one; a bare name lives in runs-dir.
 #
+# --np and --socket apply to every case; an option on a line of the sweep file
+# overrides them.  Default --np: the physical cores of one socket.  On a
+# computer with several sockets, run one sweep file on each socket.
+#
 # The script reads the sweep file while it runs: do not edit it in place until
 # it ends.
 set -u
 ROOT=$(cd "$(dirname "$0")" && pwd)
-SWEEP=${1:?usage: runCase.sh <sweep-file> [runs-dir] [meshes-dir]}
+NP=""; SOCKET=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --np)     NP=$2; shift 2 ;;
+        --socket) SOCKET=$2; shift 2 ;;
+        *)        break ;;
+    esac
+done
+SWEEP=${1:?usage: runCase.sh [--np <N>] [--socket <S>] <sweep-file> [runs-dir] [meshes-dir]}
 RUNS=${2:-$HOME/runs}
 MESHES=${3:-$HOME/meshes}
 
 [ -f "$SWEEP" ] || { echo "no sweep file: $SWEEP"; exit 1; }
 [ -n "${WM_PROJECT_DIR:-}" ] || { echo "source the OpenFOAM bashrc first"; exit 1; }
+if [ -z "$NP" ]; then
+    NP=$(lscpu -p=SOCKET,CORE | grep -v '^#' | awk -F, -v s="${SOCKET:-0}" '$1 == s {print $2}' | sort -un | wc -l)
+fi
+DEFAULTS=(--np "$NP")
+[ -n "$SOCKET" ] && DEFAULTS+=(--socket "$SOCKET")
+echo "processes for each case: $NP${SOCKET:+, socket $SOCKET}"
 mkdir -p "$RUNS"
 
 while read -r NAME REST; do
@@ -29,7 +47,7 @@ while read -r NAME REST; do
         continue
     fi
 
-    MESH=""; OPTS=()
+    MESH=""; OPTS=("${DEFAULTS[@]}")
     set -- $REST
     while [ $# -gt 0 ]; do
         case "$1" in
