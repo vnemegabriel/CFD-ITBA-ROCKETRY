@@ -43,7 +43,8 @@ restore0Dir
 # ---- initial field from another run ------------------------------------------
 # mapFields brings the internal field and the patch values of that run's latest
 # time.  A fixedValue patch must keep this run's value, so changeDictionary
-# puts it back.
+# puts it back.  A cell that mapFields does not find in the other mesh keeps the
+# value of 0.orig, and 0.orig has no rho: the solver makes rho again from p and T.
 if [ -f initFrom ]; then
     SRC=$(cat initFrom)
     TSRC=$(foamListTimes -case "$SRC" -latestTime 2>/dev/null)
@@ -62,6 +63,7 @@ if [ -f initFrom ]; then
     if ! tail -n 3 log.mapFields | grep -q "^End" || ! tail -n 3 log.changeDictionary | grep -q "^End"; then
         echo "!! starting from $SRC failed: see log.mapFields, log.changeDictionary"; exit 1
     fi
+    rm -f 0/rho
     echo "initial field: $SRC, time $TSRC"
 fi
 

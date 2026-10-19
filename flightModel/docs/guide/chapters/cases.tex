@@ -205,7 +205,18 @@ boundary layer in place. The two runs can use different solvers. After
 \item It runs \cmd{changeDictionary} to write back the values of step 1.
 \item It stops if the log of \cmd{mapFields} or of \cmd{changeDictionary} does not end
   with \val{End}.
+\item It deletes \file{0/rho}. The solver calculates \ent{rho} again from \ent{p} and
+  \ent{T}.
 \end{steps}
+
+\begin{caution}
+A cell of this mesh that is not in the other mesh keeps the value of \file{0.orig}.
+Between h0 and h1 there are 7083 such cells, near the fin tips. \file{0.orig} has no
+\ent{rho}, so \cmd{mapFields} gives these cells a density equal to the free-stream
+pressure ($\approx 4\times10^4$). \cmd{rhoPimpleFoam} reads \file{0/rho} if it is
+there, and the runs at $\alpha \neq 0$ then stop with a floating point exception at
+step 2.
+\end{caution}
 
 The free-stream entries of the patches (\ent{freestreamValue}, \ent{inletValue},
 \ent{fieldInf}) are not mapped. They keep the values of this run. The other run must
