@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+#include "${FOAM_CASE}/system/flowDerived"
+#include "${FOAM_CASE}/constant/meshInfo"
+
+application     rhoPimpleFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         {{ endTime }};
+
+// fixed physical step: genForces.dat comes out on a uniform time grid
+deltaT          {{ deltaT }};
+adjustTimeStep  no;
+
+writeControl    adjustable;
+writeInterval   {{ writeInterval }};
+purgeWrite      0;
+writeFormat     binary;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+
+functions
+{
+    #include "${FOAM_CASE}/system/FOs/FOcommon"
+    #include "${FOAM_CASE}/system/FOs/FOgenForces"
+
+    residuals
+    {
+        type            solverInfo;
+        libs            (utilityFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   1;
+        fields          (U p e k omega);
+        writeResidualFields no;
+    }
+}

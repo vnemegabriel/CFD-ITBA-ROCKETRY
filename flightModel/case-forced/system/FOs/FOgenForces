@@ -1,0 +1,104 @@
+    // Generalised aerodynamic forces on the modes of fin 0, every time step:
+    //     F_k = -sum_f (p_f - pRef) (S_f . n) w_k(x_f)
+    // with the imposed modal coordinates eta_k(t).  Columns of
+    // postProcessing/genForces/<startTime>/genForces.dat:
+    //     t  eta_1 .. eta_n  F_1 .. F_n
+    genForces
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        name            genForces;
+        pRef            $pInf;
+        patch           fins;
+
+        codeOptions
+        #{
+            -I$(FOAM_CASE)/system \
+            -I$(LIB_SRC)/finiteVolume/lnInclude \
+            -I$(LIB_SRC)/meshTools/lnInclude
+        #};
+
+        codeInclude
+        #{
+            #include "flutterModes.H"
+            #include "volFields.H"
+            #include "OFstream.H"
+        #};
+
+        codeData
+        #{
+            scalar pRef_;
+            word patch_;
+            bool active_;
+            List<scalarField> shapes_;
+            autoPtr<OFstream> os_;
+        #};
+
+        codeRead
+        #{
+            pRef_ = dict.get<scalar>("pRef");
+            patch_ = dict.get<word>("patch");
+            active_ = isFile(mesh().time().globalPath()/"constant"/"flutterModes");
+            if (!active_)
+            {
+                Info<< "genForces: no constant/flutterModes, inactive" << endl;
+            }
+        #};
+
+        codeExecute
+        #{
+            if (!active_)
+            {
+                return true;
+            }
+            const auto& M = flutter::modes(mesh().time());
+            const label pi = mesh().boundaryMesh().findPatchID(patch_);
+            const vectorField& Sf = mesh().Sf().boundaryField()[pi];
+            const vectorField& Cf = mesh().Cf().boundaryField()[pi];
+            const scalarField& p =
+                mesh().lookupObject<volScalarField>("p").boundaryField()[pi];
+            const label n = M.w.size();
+            if (shapes_.size() != n)
+            {
+                shapes_.setSize(n);
+                forAll(shapes_, k)
+                {
+                    shapes_[k].setSize(Cf.size());
+                    forAll(Cf, f)
+                    {
+                        shapes_[k][f] = M.shape(k, Cf[f]);
+                    }
+                }
+            }
+            const scalarField pn((p - pRef_)*(Sf & M.en));
+            scalarField F(n, Zero);
+            forAll(F, k)
+            {
+                F[k] = -sum(pn*shapes_[k]);
+            }
+            reduce(F, sumOp<scalarField>());
+
+            const scalar t = mesh().time().value();
+            if (Pstream::master())
+            {
+                if (!os_)
+                {
+                    const fileName dir = mesh().time().globalPath()/"postProcessing"
+                        /"genForces"/mesh().time().timeName();
+                    mkDir(dir);
+                    os_.reset(new OFstream(dir/"genForces.dat"));
+                    os_() << "# signal " << M.signal << "  pRef " << pRef_
+                        << "\n# t";
+                    for (label k = 1; k <= n; ++k) os_() << " eta_" << k;
+                    for (label k = 1; k <= n; ++k) os_() << " F_" << k;
+                    os_() << nl;
+                    os_().precision(10);
+                }
+                os_() << t;
+                for (label k = 0; k < n; ++k) os_() << ' ' << M.eta(k, t);
+                for (label k = 0; k < n; ++k) os_() << ' ' << F[k];
+                os_() << nl;
+                os_().flush();
+            }
+        #};
+    }

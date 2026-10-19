@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Case:     Aconcagua - external aero, rhoPimple  |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+
+solvers
+{
+    p
+    {
+        solver          GAMG;
+        smoother        GaussSeidel;
+        tolerance       1e-8;
+        relTol          0.01;
+    }
+    pFinal
+    {
+        $p;
+    }
+
+    "(rho|U|e|k|omega)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-9;
+        relTol          0.1;
+    }
+    "(rho|U|e|k|omega)Final"
+    {
+        $U;
+        relTol          0;
+    }
+    "pcorr.*"
+    {
+        $p;
+        relTol          0;
+    }
+    "cellDisplacement.*"
+    {
+        solver          GAMG;
+        smoother        GaussSeidel;
+        tolerance       1e-9;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor        yes;
+    transonic                yes;
+    nOuterCorrectors         {{ nOuterCorrectors }};
+    nCorrectors              2;
+    nNonOrthogonalCorrectors 1;
+    correctPhi               no;
+    moveMeshOuterCorrectors  no;
+
+    pMinFactor               0.05;
+    pMaxFactor               6;
+}
+
+
+// ************************************************************************* //

@@ -7,21 +7,26 @@
 #     ./newCase.sh ~/runs/m06 --mesh ~/meshes/base --Minf 0.6 --np 8 --socket 1
 #     ./newCase.sh ~/runs/m12 --mesh ~/meshes/base --Minf 1.2 --init ~/runs/m18
 #     ./newCase.sh ~/runs/m03 --mesh ~/meshes/base --Minf 0.3 --solver pimple
+#     ./newCase.sh ~/runs/f12 --mesh ~/meshes/h0 --Minf 1.2 --solver forced --init ~/runs/m12
+#                  --flutterModes ~/flutter/pulse1   (fin_flutter: python -m finflutter modes)
 #
 # Copies case-<solver> (default central) plus a mesh built by mesh/Allmesh.
+# A template other than central holds only what differs from its parent
+# (file parent, default central); <parent>.exclude lists the parent's files
+# it drops.
 # See docs/guide, chapter Cases.
 # Keep run directories out of /mnt/c.
 set -e
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 RUN=$1; shift
 OPTIONS="$*"
 
 [ -n "$WM_PROJECT_DIR" ] || { echo "source the OpenFOAM bashrc first"; exit 1; }
 declare -A SET
-NP=""; SOCKET=""; REFINE=""; MESH=""; INIT=""; SOLVER=central
+NP=""; SOCKET=""; REFINE=""; MESH=""; INIT=""; SOLVER=central; MODES=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --alpha|--beta|--Ti|--nuRatio|--Minf|--pInf|--Tinf)
@@ -32,6 +37,7 @@ while [ $# -gt 0 ]; do
         --refine) REFINE=$2; shift 2 ;;
         --init)   INIT=$2;   shift 2 ;;
         --solver) SOLVER=$2; shift 2 ;;
+        --flutterModes) MODES=${2/#\~/$HOME}; shift 2 ;;
         *) echo "unknown option $1"; usage ;;
     esac
 done
@@ -40,7 +46,7 @@ done
 [ -d "$MESH/constant/polyMesh" ] || { echo "no mesh in $MESH: run mesh/Allmesh $MESH first"; exit 1; }
 
 case "$REFINE" in ''|tip|fins) ;; *) echo "--refine takes tip or fins"; usage ;; esac
-case "$SOLVER" in central|pimple) ;; *) echo "--solver takes central or pimple"; usage ;; esac
+[ -d "$ROOT/case-$SOLVER" ] || { echo "--solver: no template $ROOT/case-$SOLVER"; usage; }
 TEMPLATE=case-$SOLVER
 if [ -n "$INIT" ]; then
     [ -d "$INIT/system" ] || { echo "--init $INIT is not a run directory"; exit 1; }
@@ -52,13 +58,21 @@ mkdir -p "$RUN"
 
 COPY=(rsync -a --exclude 'constant/polyMesh' --exclude 'log.*' --exclude '/0'
       --exclude 'processor*' --exclude 'postProcessing' --exclude '[1-9]*')
-if [ "$TEMPLATE" = case-central ]; then
-    "${COPY[@]}" "$ROOT/case-central/" "$RUN/"
-else
-    # case-pimple holds only what differs from case-central
-    "${COPY[@]}" --exclude-from "$ROOT/$TEMPLATE/central.exclude" "$ROOT/case-central/" "$RUN/"
-    "${COPY[@]}" --exclude '/central.exclude' "$ROOT/$TEMPLATE/" "$RUN/"
-fi
+chain() {
+    if [ "$1" = central ]; then echo central; return; fi
+    chain "$(cat "$ROOT/case-$1/parent" 2>/dev/null || echo central)"
+    echo "$1"
+}
+PARENT=""
+for T in $(chain "$SOLVER"); do
+    if [ -n "$PARENT" ]; then
+        while read -r X; do
+            [ -n "$X" ] && rm -rf "${RUN:?}/${X#/}"
+        done < "$ROOT/case-$T/$PARENT.exclude"
+    fi
+    "${COPY[@]}" --exclude '/*.exclude' --exclude '/parent' "$ROOT/case-$T/" "$RUN/"
+    PARENT=$T
+done
 MESH=$(cd "$MESH" && pwd)
 if [ -n "$REFINE" ]; then
     cp -r "$MESH/constant/polyMesh" "$RUN/constant/"
@@ -66,6 +80,13 @@ else
     ln -s "$MESH/constant/polyMesh" "$RUN/constant/polyMesh"
 fi
 cp "$MESH/meshInfo" "$RUN/constant/meshInfo"
+if [ -n "$MODES" ]; then
+    [ -f "$MODES" ] || { echo "!! no such flutterModes file: $MODES"; exit 1; }
+    cp "$MODES" "$RUN/constant/flutterModes"
+    (cd "$ROOT/../fin_flutter" && pwd) > "$RUN/finflutterPath"
+elif [ -f "$RUN/system/flutterModes.H" ]; then
+    echo "!! $TEMPLATE needs constant/flutterModes: --flutterModes <file> (python -m finflutter modes)"; exit 1
+fi
 cp "$ROOT/common/Allrun" "$ROOT/common/Allrefine" "$ROOT/common/machineLog.py" "$RUN/"
 chmod +x "$RUN"/Allrun "$RUN"/Allrefine
 
@@ -115,7 +136,7 @@ fi
 TH=constant/thermophysicalProperties
 MW=$(foamDictionary -entry mixture/specie/molWeight -value $TH)
 CP=$(foamDictionary -entry mixture/thermodynamics/Cp -value $TH)
-fd() { foamDictionary -entry "$1" -value "$2"; }
+fd() { foamDictionary -entry "$1" -value "$2" 2>/dev/null || echo none; }
 {
     echo "meshHash    \"$HASH\";"
     echo "flow"

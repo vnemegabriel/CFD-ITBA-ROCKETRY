@@ -32,6 +32,14 @@ case "$SECTOR" in
         fi ;;
 esac
 
+# ---- forced motion: fin_flutter/docs/PROCEDURE.md, step 7 -------------------
+if [ -f constant/flutterModes ]; then
+    PYTHONPATH=$(cat finflutterPath 2> /dev/null)${PYTHONPATH:+:$PYTHONPATH}; export PYTHONPATH
+    python3 -c "import finflutter" 2> /dev/null ||
+        { echo "!! a forced run needs fin_flutter: no finflutterPath here (newCase.sh writes it)"; exit 1; }
+    python3 -m finflutter check . || { echo "!! fix the problems above, then run Allrun again"; exit 1; }
+fi
+
 # ---- processors --------------------------------------------------------------
 if [ -n "$1" ]; then
     foamDictionary -entry numberOfSubdomains -set "$1" system/decomposeParDict > /dev/null
@@ -58,6 +66,10 @@ if [ -f initFrom ]; then
         done
     } > system/changeDictionaryDict.init
     runApplication -overwrite mapFields "$SRC" -consistent -sourceTime latestTime
+    # a field the source run does not have keeps its initial value
+    for f in 0/*.unmapped; do
+        [ -e "$f" ] && mv "$f" "${f%.unmapped}"
+    done
     runApplication -overwrite changeDictionary -dict system/changeDictionaryDict.init -time 0
     if ! tail -n 3 log.mapFields | grep -q "^End" || ! tail -n 3 log.changeDictionary | grep -q "^End"; then
         echo "!! starting from $SRC failed: see log.mapFields, log.changeDictionary"; exit 1

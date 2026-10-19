@@ -31,7 +31,8 @@ Option & Function \\
 \ent{--socket <S>} & Binds the run to socket \val{S}, one process per physical core (\cref{sec:binding}). \val{none} disables the binding. \\
 \ent{--refine tip}, \ent{--refine fins} & Runs \file{Allrefine} on the new case (\cref{sec:refine}). \\
 \ent{--init <run-dir>} & Starts from the latest time of another run (\cref{sec:init}). \\
-\ent{--solver central}, \ent{--solver pimple} & Template \file{case-central/} (default) or \file{case-pimple/}. \\
+\ent{--solver <name>} & Template \file{case-<name>/}: \val{central} (default), \val{pimple} or \val{forced} (\cref{sec:forced}). \\
+\ent{--flutterModes <file>} & Copies the file to \file{constant/flutterModes}. Mandatory for a template that has \file{system/flutterModes.H}. \\
 \bottomrule
 \end{longtable}
 
@@ -55,12 +56,16 @@ For \file{newCase.sh}, \ent{--mesh} and \ent{--init} are paths. Only
 \begin{steps}
 \item It stops if \ent{--mesh} is missing, if the mesh has no
   \file{constant/polyMesh}, or if \file{<run-dir>} exists.
-\item It copies \file{case-central/} into \file{<run-dir>}, without the mesh, the logs,
-  \file{0/}, \file{processor*}, \file{postProcessing/} and the time directories. With
-  \ent{--solver pimple}, it leaves out the files in \file{case-pimple/central.exclude}
-  and then copies \file{case-pimple/} on top (\cref{fig:templates}).
+\item It copies the chain of templates into \file{<run-dir>}, without the mesh, the
+  logs, \file{0/}, \file{processor*}, \file{postProcessing/} and the time directories.
+  The chain starts at \file{case-central/}. Each other template names its parent in the
+  file \file{parent} (default \val{central}) and holds only the files that differ: the
+  script removes the files that \file{<parent>.exclude} lists and copies the template on
+  top (\cref{fig:templates}). \val{pimple}: central, pimple. \val{forced}: central,
+  pimple, forced.
 \item It links \file{constant/polyMesh} to the mesh. With \ent{--refine} it copies it.
-\item It copies \file{<mesh-dir>/meshInfo} to \file{constant/meshInfo}.
+\item It copies \file{<mesh-dir>/meshInfo} to \file{constant/meshInfo}, and the file of
+  \ent{--flutterModes} to \file{constant/flutterModes}.
 \item It copies \file{common/Allrun}, \file{common/Allrefine} and
   \file{common/machineLog.py} into the case.
 \item It writes \file{run.info} with the case name, the date, the commit of the
@@ -202,7 +207,12 @@ boundary layer in place. The two runs can use different solvers. After
 \item It runs \cmd{mapFields <run-dir> -consistent -sourceTime latestTime}. This maps
   the internal field and the patch values. The other run can have another mesh of
   the same domain and patches.
-\item It runs \cmd{changeDictionary} to write back the values of step 1.
+\item It gives back their names to the fields that \cmd{mapFields} renamed
+  \file{*.unmapped}: the fields that the other run does not have, for example
+  \file{pointDisplacement}, keep their initial values.
+\item It runs \cmd{changeDictionary} to write back the values of step 1. It writes one
+  entry for each patch: in a field that \file{Allrun} must change, give each
+  \val{fixedValue} patch its own entry, not a regular expression.
 \item It stops if the log of \cmd{mapFields} or of \cmd{changeDictionary} does not end
   with \val{End}.
 \end{steps}
@@ -215,6 +225,52 @@ have a time directory with the solution.
 \cmd{mapFields} can stop with a segmentation fault when the source and the target
 are the same mesh, which is the case of the supersonic start. \file{Allrun} then
 stops the run (\cref{sec:ts-mapfields}).
+\end{caution}
+
+\section{Forced motion of a fin}\label{sec:forced}
+
+\file{case-forced/} moves fin 0 as a sum of structural modes with an imposed time
+signal, and writes the generalised aerodynamic forces on the modes at each time step.
+The fin flutter analysis uses it. The procedure, the files and the post-processing are
+in \file{fin_flutter/docs/PROCEDURE.md}.
+
+\begin{longtable}{@{}P{0.34\linewidth} P{0.60\linewidth}@{}}
+\caption{Contents of \texttt{case-forced/} (parent \val{pimple}).}\label{tab:forced}\\
+\toprule
+File & Function \\
+\midrule
+\endfirsthead
+\toprule
+File & Function \\
+\midrule
+\endhead
+\file{system/controlDict.j2} & Physical time with a fixed \ent{deltaT} from \file{config.json}. \\
+\file{system/fvSchemes} & \ent{ddt backward}; \ent{div(meshPhi,p)} for \ent{transonic} on a moving mesh. \\
+\file{system/fvSolution.j2} & PIMPLE with \ent{nOuterCorrectors} from \file{config.json}; \ent{correctPhi no}, because \ent{pcorr} takes about 1000 iterations each time step; solver of \ent{cellDisplacement}. \\
+\file{constant/dynamicMeshDict} & \ent{displacementLaplacian}, diffusivity \ent{quadratic inverseDistance (fins)}. \\
+\file{0.orig/pointDisplacement} & \val{codedFixedValue} on \val{fins}: the modes times the signal. \\
+\file{0.orig/U} & \val{movingWallVelocity} on \val{fins}. \\
+\file{system/flutterModes.H} & Reads \file{constant/flutterModes}. \\
+\file{system/FOs/FOgenForces} & Writes \file{postProcessing/genForces/<t0>/genForces.dat}. \\
+\bottomrule
+\end{longtable}
+
+\begin{steps}
+\item Make the base run at the same Mach number on the same mesh with
+  \ent{--solver pimple} (\file{sweepFlutter*.txt}).
+\item Write the modes file with \cmd{python3 -m finflutter modes} or the whole sweep
+  with \cmd{python3 -m finflutter sweep} (\file{sweepFlutterForced*.txt}).
+\item Make the case with \ent{--solver forced --init <base-run> --flutterModes <file>}.
+  \file{newCase.sh} also writes the path of \file{fin_flutter} into
+  \file{finflutterPath}.
+\item Run it. When the case has \file{constant/flutterModes}, \file{Allrun} first runs
+  \cmd{python3 -m finflutter check .} and stops if it reports a problem.
+\end{steps}
+
+\begin{caution}
+The template is not usable yet: on \val{h0} the time-accurate run diverges after 6 to 8
+time steps also with a static mesh (\file{PROCEDURE.md}, step 7). Use \val{pimple} for the forced runs. \cmd{rhoCentralFoam} is explicit: on the
+viscous mesh \val{h0} its time step is approximately $10^{-9}$\,s.
 \end{caution}
 
 \section{Refine the mesh near the fins (optional)}\label{sec:refine}

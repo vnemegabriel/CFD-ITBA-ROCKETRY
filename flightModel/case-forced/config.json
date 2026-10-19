@@ -1,0 +1,6 @@
+{
+    "endTime": 0.02,
+    "deltaT": 1e-06,
+    "writeInterval": 0.005,
+    "nOuterCorrectors": 3
+}

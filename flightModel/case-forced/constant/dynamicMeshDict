@@ -1,0 +1,20 @@
+/*--------------------------------*- C++ -*----------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      dynamicMeshDict;
+}
+
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+
+motionSolverLibs (fvMotionSolvers);
+
+motionSolver    displacementLaplacian;
+
+displacementLaplacianCoeffs
+{
+    diffusivity     quadratic inverseDistance (fins);
+}

@@ -73,11 +73,11 @@ Path & Contents \\
 \file{mesh/Allmesh}, \file{mesh/snapPlane.py} & Make one mesh; flatten the cut of a half mesh. \\
 \file{mesh/system/} & \file{meshDict} and the other dictionaries of the mesh. \\
 \file{mesh/meshInfo} & Reference values and geometry data that the cases read. \\
-\file{case-central/}, \file{case-pimple/} & Case templates. \file{case-pimple/} holds only the files that differ. \\
+\file{case-central/}, \file{case-pimple/}, \file{case-forced/} & Case templates. \file{case-pimple/} and \file{case-forced/} hold only the files that differ from their parent. \\
 \file{common/} & \file{Allrun}, \file{Allrefine}, \file{machineLog.py}: copied into each case. \\
 \file{newCase.sh} & Makes one case. \\
 \file{runMesh.sh}, \file{meshes.txt} & Make the meshes of a study. \\
-\file{runCase.sh}, \file{sweep*.txt} & Make and run the cases of a sweep. \\
+\file{runCase.sh}, \file{sweep*.txt} & Make and run the cases of a sweep. \file{sweepFlutter*.txt}: base and forced runs of the fin flutter analysis. \\
 \file{post/} & \file{monitor.sh}, \file{sweepTable.sh}, \file{firstLayer.py}. \\
 \file{flightData/} & Flight telemetry and \file{cdFlight.py}. \\
 \file{docs/guide/}, \file{docs/report/} & This guide; the technical report. \\

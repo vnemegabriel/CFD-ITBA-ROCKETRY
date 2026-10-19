@@ -1,0 +1,95 @@
+/*--------------------------------*- C++ -*----------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       pointVectorField;
+    object      pointDisplacement;
+}
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // one entry per patch: Allrun's changeDictionary writes value per patch
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    box
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    cone
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    walls
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    tail
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    symm
+    {
+        type            symmetry;
+    }
+    // w_k(x) n of fin 0 times the imposed modal coordinates eta_k(t)
+    fins
+    {
+        type            codedFixedValue;
+        value           uniform (0 0 0);
+        name            flutterFin;
+
+        codeOptions
+        #{
+            -I$(FOAM_CASE)/system
+        #};
+
+        codeInclude
+        #{
+            #include "flutterModes.H"
+        #};
+
+        code
+        #{
+            const auto& M = flutter::modes(this->db().time());
+            static pointField p0;
+            static List<scalarField> shapes;
+            if (p0.size() != this->size())
+            {
+                p0 = this->patch().localPoints();
+                shapes.setSize(M.w.size());
+                forAll(shapes, k)
+                {
+                    shapes[k].setSize(p0.size());
+                    forAll(p0, i)
+                    {
+                        shapes[k][i] = M.shape(k, p0[i]);
+                    }
+                }
+            }
+            const scalar t = this->db().time().value();
+            scalarField w(p0.size(), Zero);
+            forAll(shapes, k)
+            {
+                w += M.eta(k, t)*shapes[k];
+            }
+            operator==(w*M.en);
+        #};
+    }
+}
