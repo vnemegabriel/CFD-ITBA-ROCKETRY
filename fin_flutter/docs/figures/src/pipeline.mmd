@@ -1,0 +1,18 @@
+flowchart TB
+  subgraph S[Estructura - fin_flutter]
+    G[1. Geometría<br/>makeRocket.py → Fin] --> FE[2. FE MITC4 + CLT<br/>modos φ, Ω]
+    FE --> PT[3. Cota piston theory<br/>margen q_crit/q]
+    FE --> MX[4. Exportar modos<br/>constant/flutterModes]
+  end
+  subgraph C[CFD - flightModel]
+    M[5. Flujo base viscoso<br/>barrido Aconcagua h0, pimple → central<br/>sweepFlutter.txt] --> FO[7. Movimiento forzado<br/>case-forced, rhoPimpleFoam<br/>pulso A=0, A, 2A]
+    AL[barrido a α = 4°] --> ST[6. Chequeo estático<br/>F_k contra piston]
+    MX --> FO
+  end
+  subgraph A[Aeroelasticidad - fin_flutter]
+    FO --> Q[8. GAF Q_ij M,k<br/>FFT + linealidad]
+    Q --> R[9. Roger RFA + autovalores<br/>q_crit M, borde de flutter]
+    TAP[10. Tap test<br/>f, g medidos] --> R
+    R --> NL[11. No lineal<br/>energía por ciclo vs A → LCO]
+    FO -. armónico a lo largo<br/>del modo crítico .-> NL
+  end

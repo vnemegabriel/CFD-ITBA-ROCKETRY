@@ -1,0 +1,14 @@
+flowchart TB
+  MR[(flightModel/mesh/<br/>makeRocket.py)] -->|defaults del argparse| GEO[finflutter.geometry]
+  GEO --> FE[finflutter.structure]
+  FE -->|python -m finflutter modes| FM[(constant/flutterModes)]
+  FM --> BC[pointDisplacement<br/>codedFixedValue]
+  FM --> GF[functionObject<br/>genForces]
+  BC --> SOL[rhoPimpleFoam<br/>malla dinámica]
+  SOL --> GF
+  GF -->|postProcessing/genForces/0/genForces.dat| GAF[python -m finflutter gaf]
+  GAF -->|gaf_M*.npz| FL[python -m finflutter flutter]
+  TAP[(grabación del tap test)] -->|python -m finflutter tap| FL
+  FL -->|critical.json| FM2[(flutterModes con señal armónica)]
+  FM2 --> SOL2[corridas armónicas A1..A4]
+  SOL2 -->|genForces.dat| LCO[python -m finflutter lco]

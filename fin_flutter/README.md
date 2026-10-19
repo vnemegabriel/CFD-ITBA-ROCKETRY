@@ -5,12 +5,14 @@ Aeroelastic stability of a composite CFRP rocket fin (IREC 2026, Team 207, ITBA)
 ## Usage
 
 ```bash
-pip install -e .[test]
-python -m finflutter cases/ar1_8mm.yaml   # prints summary, writes results/ar1_8mm.json (tagged with git commit)
+pip install -e .[test]          # or run from this directory without installing
+python -m finflutter cases/aconcagua.yaml   # FE modes + piston-theory bound
 pytest tests
 ```
 
-The run is configured entirely by the case YAML: geometry, mesh, laminate (`layup`, `thickness_mm`, `vf`, `beta_deg`), clamped root intervals `clamp_x`, mode count, loss factor `g`, aero theory (`ackeret` | `lighthill`, `sides`), and the flight CSV.
+The complete procedure — geometry from `flightModel`, FE, forced-motion CFD, GAF, Roger RFA,
+tap test and the energy method for LCO — is in [docs/PROCEDURE.md](docs/PROCEDURE.md), with
+the status of each step. `python -m finflutter -h` lists the commands.
 
 ## Layout
 

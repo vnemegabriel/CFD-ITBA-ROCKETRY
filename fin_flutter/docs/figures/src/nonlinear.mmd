@@ -1,0 +1,9 @@
+flowchart TB
+  L[Análisis lineal en el punto de vuelo<br/>autovector v y frecuencia ω del modo menos amortiguado] --> H[Movimiento armónico impuesto<br/>η t = A · v · sin ωt]
+  H --> C{Amplitudes A1 &lt; A2 &lt; A3 &lt; A4}
+  C --> W[Energía por ciclo que el aire entrega<br/>W_a A = ∮ F · dη]
+  C --> D[Energía por ciclo que disipa la estructura<br/>W_d A = π A² Σ g_i Ω_i² v_i²]
+  W --> X{W_a = W_d ?}
+  D --> X
+  X -->|no se cruzan, W_a &lt; W_d| OK[Sin LCO en el rango probado]
+  X -->|se cruzan en A*| LCO[LCO de amplitud A*<br/>estable si d W_a − W_d /dA &lt; 0]

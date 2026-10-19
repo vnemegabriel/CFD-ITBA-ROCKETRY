@@ -1,3 +1,5 @@
-from .run import main
+import sys
 
-main()
+from .cli import main
+
+main(sys.argv[1:])

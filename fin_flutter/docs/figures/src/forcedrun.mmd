@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant U as Usuario
+  participant N as newCase.sh
+  participant A as Allrun
+  participant S as rhoPimpleFoam
+  participant B as BC codedFixedValue
+  participant F as FO genForces
+  U->>N: --solver forced --init mXX-a00-h0-pimple --flutterModes f
+  N->>A: caso con flutterModes
+  A->>S: mapFields desde la base pimple, arranca en t = 0
+  loop cada paso de tiempo
+    S->>B: pide el desplazamiento de los puntos de la aleta
+    B-->>S: d = Σ η_j t · φ_j x · n_aleta
+    S->>S: displacementLaplacian mueve la malla
+    S->>S: PIMPLE, 3 correcciones externas, dt fijo
+    S->>F: fin del paso
+    F->>F: F_i = −Σ p · φ_i · n_aleta·S_f
+    F-->>U: línea t, η_j, F_i en genForces.dat
+  end
