@@ -1,0 +1,9 @@
+geometry: {source: flightModel}     # planform and biconvex section from flightModel/mesh/makeRocket.py
+mesh: {nx: 40, ny: 16}
+laminate: {layup: ar1, vf: 0.5, beta_deg: 5.0, taper: scaled}   # D at the max thickness, scaled by (t/t_max)^3
+clamp_x: root
+modes: 10
+g: 0.02                   # structural loss factor, until the tap test measures it
+aero: {theory: ackeret, sides: 2}
+flight: {csv: data/flight_data.csv, mach_min: 1.05}
+q_factor: 20

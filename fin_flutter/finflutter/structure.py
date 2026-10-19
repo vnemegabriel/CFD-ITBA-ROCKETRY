@@ -34,7 +34,7 @@ def _shear_nat(xy, xi, eta):
     return B
 
 
-def _element(xy, D, Hs, rho, t):
+def _element(xy, D, Hs, rho, t, thickness=None):
     K, M, Sx, Mw = np.zeros((12, 12)), np.zeros((12, 12)), np.zeros((4, 4)), np.zeros((4, 4))
     tie = {k: _shear_nat(xy, *p) for k, p in {"A": (0, 1), "C": (0, -1), "B": (-1, 0), "D": (1, 0)}.items()}
     for xi in _G:
@@ -42,6 +42,8 @@ def _element(xy, D, Hs, rho, t):
             N, dN = _shape(xi, eta)
             J = dN @ xy
             dA = np.linalg.det(J)
+            tg = t if thickness is None else thickness(*(N @ xy))
+            r = tg / t
             dx = np.linalg.solve(J, dN)
             Bb = np.zeros((3, 12))
             Bb[0, 1::3], Bb[1, 2::3] = dx[0], dx[1]
@@ -49,23 +51,26 @@ def _element(xy, D, Hs, rho, t):
             gnat = np.vstack([(1 + eta) / 2 * tie["A"][0] + (1 - eta) / 2 * tie["C"][0],
                               (1 + xi) / 2 * tie["D"][1] + (1 - xi) / 2 * tie["B"][1]])
             Bs = np.linalg.solve(J, gnat)
-            K += (Bb.T @ D @ Bb + Bs.T @ Hs @ Bs) * dA
+            K += (r ** 3 * Bb.T @ D @ Bb + r * Bs.T @ Hs @ Bs) * dA
             Nw = np.zeros((3, 12))
             for i in range(3):
                 Nw[i, i::3] = N
-            M += Nw.T @ np.diag([rho * t, rho * t ** 3 / 12, rho * t ** 3 / 12]) @ Nw * dA
+            M += Nw.T @ np.diag([rho * tg, rho * tg ** 3 / 12, rho * tg ** 3 / 12]) @ Nw * dA
             Sx += np.outer(N, dx[0]) * dA
             Mw += np.outer(N, N) * dA
     return K, M, Sx, Mw
 
 
-def assemble(nodes, elems, lam, kappa=5 / 6):
-    """Global K, M (3 DOF/node) and w-DOF aero operators Sx = int N_i dN_j/dx, Mw = int N_i N_j."""
+def assemble(nodes, elems, lam, kappa=5 / 6, thickness=None):
+    """Global K, M (3 DOF/node) and w-DOF aero operators Sx = int N_i dN_j/dx, Mw = int N_i N_j.
+
+    thickness(x, y) -> t at a point: D scales with (t/lam["t"])^3, shear with t/lam["t"], mass with t.
+    """
     Hs = kappa * lam["G13"] * lam["t"] * np.eye(2)
     out = {k: ([], [], []) for k in "KMSW"}
     for e in elems:
         dof = (3 * e[:, None] + np.arange(3)).ravel()
-        for k, m, d in zip("KMSW", _element(nodes[e], lam["D"], Hs, lam["rho"], lam["t"]), (dof, dof, e, e)):
+        for k, m, d in zip("KMSW", _element(nodes[e], lam["D"], Hs, lam["rho"], lam["t"], thickness), (dof, dof, e, e)):
             r, c, v = out[k]
             r.append(np.repeat(d, len(d))); c.append(np.tile(d, len(d))); v.append(m.ravel())
     size = {"K": 3 * len(nodes), "M": 3 * len(nodes), "S": len(nodes), "W": len(nodes)}
