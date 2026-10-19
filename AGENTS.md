@@ -1,111 +1,116 @@
 # AGENTS.md — Aconcagua CFD
 
-Aerodinámica del cohete Aconcagua en OpenFOAM v2412. Malla con cfMesh, una
-plantilla `rhoPimpleFoam` para M < 1 y una `rhoCentralFoam` para M > 1 que
-arranca desde una corrida pimple al mismo Mach, barrido de Mach en serie.
+Aerodynamics of the Aconcagua rocket with OpenFOAM v2412. cfMesh meshes, a
+`rhoPimpleFoam` template for M < 1 and a `rhoCentralFoam` template for M > 1
+that starts from a pimple run at the same Mach number, Mach sweeps in series.
 
-Escribí en **castellano rioplatense**, no en inglés traducido. La jerga CFD
-queda en inglés (mesh, solver, y+, wall function, skewness). La documentación
-es la guía en LaTeX de `flightModel/docs/guide/`, en inglés técnico
-simplificado (ASD-STE100) con estructura ISO/IEC/IEEE 26514; los scripts,
-en inglés. Un cambio de procedimiento cambia la guía en el mismo commit;
-compilala con `make` ahí (lualatex) y commiteá también el PDF. Los resultados
-medidos van al informe de `flightModel/docs/report/`, no a la guía.
+Reply in the language of the person who asks; the maintainers use Rioplatense
+Spanish. CFD jargon stays in English (mesh, solver, y+, wall function,
+skewness). Code, comments, scripts and documentation are in English. The
+documentation is the LaTeX user guide in `flightModel/docs/guide/`, in
+Simplified Technical English (ASD-STE100) with the structure of ISO/IEC/IEEE
+26514. A change of a procedure changes the guide in the same commit: compile it
+with `make` there (lualatex) and commit the PDF too. The guide gives the method
+only; measured results go to the technical report in `flightModel/docs/report/`.
 
-**Pocos comentarios en el código.** Para explicar están los docs. Un comentario
-se justifica sólo cuando el código no lo puede decir — por ejemplo que los seis
-números de `surfaceGenerateBoundingBox` son metros y no múltiplos de la
-bounding box.
-
----
-
-## El objetivo
-
-**Curva de Cd contra Mach: 0.3, 0.6, 0.8, 1.2, 1.8.** Lo que tiene que
-resolver bien la malla, en orden:
-
-1. El choque, para M ≥ 0.8.
-2. La estela de base, que es una fracción grande del Cd de un cohete.
-3. La fricción de pared, que depende de y+.
-
-El barrido va a α = 0, 4 y 8°, impuesto con el campo de velocidad
-(`--alpha`): la malla es la misma. Los conos de estela del `meshDict` siguen
-el eje x; a 8° la estela sale de `midWake` a unos 1.85 m de la base.
-No pagues celdas por el vórtice de punta de aleta.
-
-**Un solo juego de mallas para todo el barrido:** h1, h2, h3 para la
-convergencia (sólo cambia `maxCellSize`, razón √2) y h0, más gruesa, para
-inicializar las corridas de h1 con `newCase.sh --init`. Media malla, con plano
-de simetría en z = 0 y aletas a 45°: `Allmesh` malla el cohete completo y lo
-corta en z = 0 con `subsetMesh`. Las capas dejan la primera celda del cuerpo
-igual en todas: t1 ≈ 0.10 mm medido (y ≈ 0.05 mm), y+ ~5 a M 0.3 y ~50 a
-M 1.8; `nutUSpaldingWallFunction` cubre el buffer. Medí t1 en cada malla
-nueva con `post/firstLayer.py`. No armes mallas por Mach. El y+ real medilo
-en cada corrida.
+**Few comments in the code.** The documentation explains. A comment is
+justified only when the code cannot say it — for example, that the six numbers
+of `surfaceGenerateBoundingBox` are metres and not multiples of the bounding
+box.
 
 ---
 
-## La estructura
+## The objective
+
+**Cd against Mach number: 0.3, 0.6, 0.8, 1.2, 1.8.** What the mesh must
+resolve, in this order:
+
+1. The shocks, for M ≥ 0.8.
+2. The base wake, a large part of the Cd of a rocket.
+3. The wall friction, which depends on y+.
+
+The sweep runs at α = 0, 4 and 8°, set with the velocity field (`--alpha`): the
+mesh is the same. The wake cones of `meshDict` follow the x axis; at 8° the
+wake leaves `midWake` about 1.85 m behind the base. Do not spend cells on the
+fin-tip vortex.
+
+**One set of meshes for the whole sweep:** h1, h2, h3 for the convergence
+study (only `maxCellSize` changes, ratio √2) and h0, coarser, which always
+starts the h1 runs (`newCase.sh --init`). Half mesh, with the symmetry plane at
+z = 0 and the fins at 45°: `Allmesh` meshes the whole rocket and cuts it at
+z = 0 with `subsetMesh`. The layers keep the first body cell equal on all
+meshes; `nutUSpaldingWallFunction` covers the buffer layer. Measure t1 on each
+new mesh with `post/firstLayer.py`. Do not make meshes per Mach number. Measure
+the real y+ on each run.
+
+---
+
+## The structure
 
 ```
 flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine, machineLog.py
-flightModel/case-central/ plantilla rhoCentralFoam, M > 1
-flightModel/case-pimple/  plantilla rhoPimpleFoam, M < 1 y arranque de M > 1: sólo lo que difiere del central
-flightModel/newCase.sh    plantilla + malla + condiciones -> una corrida
-flightModel/runMesh.sh    meshes.txt: construye las mallas que faltan
-flightModel/runCase.sh    un sweep*.txt en serie, sobre mallas ya hechas: sweepSupersonic.txt
-                          en el socket 0 y sweepSubsonic.txt en el 1, a la vez
-flightModel/post/         monitor.sh (gnuplot en vivo), sweepTable.sh (CSV),
-                          firstLayer.py (t1 e y de la primera celda)
-flightModel/flightData/   telemetría de la TeleMega, cdFlight.py (Cd del vuelo)
-flightModel/docs/guide/   la guía de usuario (sólo método): LaTeX, diagramas Mermaid con Pele
-flightModel/docs/report/  el informe técnico (resultados), en inglés, para la tesis
+flightModel/case-central/ rhoCentralFoam template, M > 1
+flightModel/case-pimple/  rhoPimpleFoam template, M < 1 and start of M > 1: only what differs from central
+flightModel/newCase.sh    template + mesh + conditions -> one run
+flightModel/runMesh.sh    meshes.txt: builds the meshes that are missing
+flightModel/runCase.sh    one sweep*.txt in series, on existing meshes; --np and --socket
+                          are its options, not lines of the sweep file
+flightModel/post/         monitor.sh (live gnuplot), sweepTable.sh (CSV),
+                          firstLayer.py (t1 and y of the first cell)
+flightModel/flightData/   TeleMega telemetry (dot decimal), Aconcagua.ork, cdFlight.py (flight Cd)
+flightModel/docs/guide/   the user guide (method only): LaTeX, Mermaid diagrams rendered with Pele
+flightModel/docs/report/  the technical report (results), for the thesis
 ```
 
-El Python es `mesh/makeRocket.py`, que escribe el STL, `mesh/snapPlane.py`,
-que aplana el corte de la media malla, `post/firstLayer.py`, que mide la
-primera capa, y `common/machineLog.py`, que registra la máquina durante cada
-corrida (guía, «Measurement of the computer»); sólo usan la biblioteca estándar. La
-malla se define en `mesh/system/meshDict` y todo ahí es un **nivel**: un
-entero que parte una celda al medio, local a un patch o a una caja, sin
-acoplarse a nada más.
+The Python is `mesh/makeRocket.py`, which writes the STL, `mesh/snapPlane.py`,
+which flattens the cut of the half mesh, `post/firstLayer.py`, which measures
+the first layer, `common/machineLog.py`, which records the computer during each
+run, and `flightData/cdFlight.py`. All use only the standard library, except
+matplotlib in `cdFlight.py`. The mesh is defined in `mesh/system/meshDict`, and
+everything there is a **level**: an integer that halves a cell, local to a
+patch or a box, not coupled to anything else.
 
 ---
 
-## Reglas
+## Rules
 
-- **Medí antes de proponer.** `mesh/Allmesh <dir>` da celdas, volúmenes
-  negativos, no-ortogonalidad y skewness en unos minutos. Un cambio sin número
-  al lado no está terminado.
-- **`checkMesh` con volúmenes negativos = malla inservible.** Los otros
-  chequeos de `-allGeometry` que fallan hoy (determinante chico en las celdas
-  de capa, face tets, celdas cóncavas) son de otra categoría y no bloquean.
-- **Las aletas van con `nLayers 3`.** Más enreda la extrusión. Se midió con
-  la aleta vieja de 6 mm y borde de ataque en filo; la actual tiene 11.7 mm
-  y bordes con radio de 1 mm, y no se volvió a medir.
-- **Los cantos de las aletas llevan radio.** Con filo, las capas de las dos
-  caras chocan en el borde (skewness 25–33). Está en la guía, capítulo Geometry.
-- **La raíz de las aletas lleva un filete de 3 mm** (`makeRocket.py
-  --finRootRadius`). Sin él las capas de la aleta y del cuerpo se cierran en
-  la esquina. Está en la guía, capítulo Geometry.
-- Antes de cortar o cambiar algo, grepeá `docs/guide/chapters/` además del código.
-- Una tarea por sesión. Un commit por tarea.
+- **Measure before you propose.** `mesh/Allmesh <dir>` gives cells, negative
+  volumes, non-orthogonality and skewness in a few minutes. A change without a
+  number next to it is not finished.
+- **`checkMesh` with negative volumes = unusable mesh.** The other
+  `-allGeometry` checks that fail today (small determinant in layer cells, face
+  tets, concave cells) are of another category and do not block.
+- **The fins use `nLayers 3`.** More tangles the extrusion. Measured on the old
+  6 mm fin with a sharp leading edge; the current fin is 11.7 mm thick with
+  1 mm edge radii, and it was not measured again.
+- **The fin edges have a radius.** With sharp edges, the layers of the two faces
+  collide at the edge. Guide, chapter Geometry.
+- **The fin root has a fillet** (`makeRocket.py --finRootRadius`). Without it the
+  layers of the fin and of the body close at the corner. Guide, chapter Geometry.
+- Before you cut or change something, grep `docs/guide/chapters/` as well as the
+  code.
+- One task per session. One commit per task.
 
-## Trampas conocidas
+## Known traps
 
-- **Con `localEuler` el Courant del log no significa nada.** rhoCentralFoam lo
-  calcula con el `deltaT 1` de `controlDict` (da ~1e7) y rhoPimpleFoam no lo
-  escribe. Mirá `Flow time scale min/max`. Esa lectura equivocada dejó al
-  central en `Euler` global hasta 2026-10-12. Guía, «Local time step».
-- **Los scripts que hacen cuentas con `awk` fijan `LC_ALL=C`.** Con
-  `es_ES` (newton) `awk` lee y escribe números con coma: `Allmesh` le pasó
-  `11,775` a `surfaceGenerateBoundingBox` y armó un dominio equivocado.
-- **No metas scripts de Python en heredocs de bash**: el `\n` dentro de un
-  f-string se convierte en salto de línea real y rompe el archivo.
-- **`runApplication` devuelve 0 aunque la aplicación muera** con FOAM FATAL
-  ERROR, así que `set -e` no lo agarra. `mesh/Allmesh` revisa cada log por eso.
-- Un `*/` dentro del banner de comentario de un dict de OpenFOAM cierra el
-  comentario antes de tiempo y el parser lee basura.
-- No edites un script de shell mientras corre: `sh` lo lee a medida que lo
-  ejecuta.
+- **With `localEuler` the Courant number in the log means nothing.**
+  rhoCentralFoam calculates it with `deltaT 1` of `controlDict` (it gives ~1e7)
+  and rhoPimpleFoam does not write it. Read `Flow time scale min/max`. This
+  misreading kept the central template on a global `Euler` step until
+  2026-10-12. Guide, "Local time step".
+- **Scripts that calculate with `awk` set `LC_ALL=C`.** In a locale with a
+  decimal comma (`es_ES`), `awk` reads and writes numbers with a comma:
+  `Allmesh` once gave `11,775` to `surfaceGenerateBoundingBox` and made a wrong
+  domain.
+- **Do not put Python scripts in bash here-documents**: a `\n` inside an f-string
+  becomes a real new line and breaks the file.
+- **`runApplication` returns 0 even when the application dies** with FOAM FATAL
+  ERROR, so `set -e` does not catch it. `mesh/Allmesh` and `Allrun` check each
+  log for this reason.
+- **`mapFields` leaves the cells it cannot find with the values of `0.orig`.**
+  `0.orig` has no `rho`, so those cells got rho = p∞ and the h1 runs at α ≠ 0
+  died at step 2. `Allrun` deletes `0/rho` after the mapping.
+- A `*/` inside the banner comment of an OpenFOAM dictionary closes the comment
+  early, and the parser reads garbage.
+- Do not edit a shell script while it runs: `sh` reads it as it executes it.
