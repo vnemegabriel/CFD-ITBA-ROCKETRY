@@ -260,7 +260,7 @@ def main():
         ax.plot([m for m, _ in ork], [c for _, c in ork], color="tab:green", lw=1.5,
                 ls="--", label="OpenRocket")
     marker = {"h0": "o", "h1": "s", "h2": "D", "h3": "^"}
-    color = {0: "tab:blue", 8: "tab:orange", 16: "tab:red"}
+    color = {0: "tab:blue", 4: "tab:purple", 8: "tab:orange", 16: "tab:red"}
     shift = {"h0": -0.012, "h1": 0.0, "h2": 0.012, "h3": 0.024}
     for name, m, al, mesh, solver, cd in runs:
         hollow = m > 1 and solver == "pimple"
