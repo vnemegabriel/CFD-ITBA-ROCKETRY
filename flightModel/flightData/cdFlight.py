@@ -2,7 +2,7 @@
 """Cd of the IREC flight from the TeleMega, against the CFD runs and OpenRocket.
 
     cdFlight.py [--csv AconcaguaIREC_TeleMega.csv] [--ork Aconcagua.ork] [--mass <kg>]
-                [--runs ~/runs] [--out cdFlight.png]
+                [--runs ~/runs] [--cna 18] [--rocketpy rocket_flight_data.csv] [--out cdFlight.png]
 
 The CSV uses a dot as decimal sign and a comma between fields, with the column
 names of the TeleMega export (AltOS); load() stops on a cell outside the
@@ -22,6 +22,13 @@ Everything else comes from the telemetry:
 - Height by integrating V cos(tilt) from the anchor; ambient p and T from that
   height and the fitted profile.
 - Drag D = -m accel_x in the coast (accel_x is the axial specific force).
+- Angle of attack: the lateral specific force (accel_y, accel_z) is the
+  centripetal term w^2 r of the sensor off the axis, fixed in the body, plus the
+  aerodynamic normal force N/m.  r and a bias are fitted on the last part of the
+  coast (--rfit), where N is small; alpha = m |a_lat - w^2 r - b| / (q Aref CNa),
+  with CNa from the CFD.  The sensor noise is in |a_lat|, so alpha is an upper limit.
+- RocketPy: the angle of attack of its simulation (GFS forecast wind) is drawn for
+  comparison; it is a model, not a measurement.
 """
 import argparse
 import csv
@@ -40,14 +47,15 @@ from matplotlib.lines import Line2D
 
 R, GAMMA, G = 287.05, 1.4, 9.7915
 AREF = math.pi * 0.0755 ** 2
-COLS = ("time", "state_name", "pressure", "speed", "accel_x", "tilt",
-        "pad_range", "pad_dist", "nsat")
+COLS = ("time", "state_name", "pressure", "speed", "accel_x", "accel_y", "accel_z",
+        "gyro_roll", "tilt", "pad_range", "pad_dist", "nsat")
 
 
 # Physical limits of a sounding-rocket flight; a value outside them is a unit,
 # format or sensor error, not data.
 LIMITS = {"time": (-60, 4000), "pressure": (1e4, 1.2e5), "speed": (-400, 1000),
-          "accel_x": (-400, 400), "tilt": (0, 180), "pad_range": (0, 5e4),
+          "accel_x": (-400, 400), "accel_y": (-400, 400), "accel_z": (-400, 400),
+          "gyro_roll": (-4000, 4000), "tilt": (0, 180), "pad_range": (0, 5e4),
           "pad_dist": (0, 5e4), "nsat": (0, 40)}
 
 
@@ -136,7 +144,8 @@ def trajectory(rows, atm, tanchor, tend):
         T = T0 - L * h
         p = p0 * (T / T0) ** (G / (R * L))
         out.append(dict(t=d["time"], state=d["state_name"], V=v, h=h, T=T, p=p,
-                        M=v / math.sqrt(GAMMA * R * T), ax=d["accel_x"], tilt=d["tilt"]))
+                        M=v / math.sqrt(GAMMA * R * T), ax=d["accel_x"], tilt=d["tilt"],
+                        ay=d["accel_y"], az=d["accel_z"], wr=math.radians(d["gyro_roll"])))
     return out
 
 
@@ -148,6 +157,38 @@ def drag(traj, mass, tstart, vmin):
         rho = s["p"] / (R * s["T"])
         out.append((s["t"], s["M"], -mass * s["ax"] / (0.5 * rho * s["V"] ** 2 * AREF)))
     return out
+
+
+def fit_line(x, y):
+    n, sx, sy = len(x), sum(x), sum(y)
+    sxx, sxy = sum(a * a for a in x), sum(a * b for a, b in zip(x, y))
+    k = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+    return k, (sy - k * sx) / n
+
+
+def aoa(traj, mass, tstart, rfit, cna):
+    coast = [s for s in traj if s["t"] >= tstart and s["state"] in ("fast", "coast")]
+    late = [s for s in coast if s["t"] >= rfit]
+    w2 = [s["wr"] ** 2 for s in late]
+    (ry, by), (rz, bz) = (fit_line(w2, [s[k] for s in late]) for k in ("ay", "az"))
+    out = []
+    for s in coast:
+        lat = math.hypot(s["ay"] - ry * s["wr"] ** 2 - by, s["az"] - rz * s["wr"] ** 2 - bz)
+        q = 0.5 * s["p"] / (R * s["T"]) * s["V"] ** 2
+        out.append((s["t"], s["M"], math.degrees(mass * lat / (q * AREF * cna))))
+    return out, math.hypot(ry, rz)
+
+
+def rocketpy(path, tstart):
+    with open(path, encoding="utf-8") as f:
+        r = csv.reader(f)
+        head = next(r)
+        it, ih = head.index("# Time (s)"), head.index("Altitude AGL (m)")
+        im, ia = head.index("Mach Number"), head.index("Angle of Attack (°)")
+        rows = [[float(x) for x in row] for row in r]
+    top = max(row[ih] for row in rows)
+    tapo = next(row[it] for row in rows if row[ih] == top)
+    return [(row[im], row[ia]) for row in rows if tstart <= row[it] <= tapo]
 
 
 def binned(pts, width):
@@ -216,7 +257,11 @@ def main():
     ap.add_argument("--vmin", type=float, default=60)
     ap.add_argument("--tstart", type=float, default=4.0)
     ap.add_argument("--tanchor", type=float, default=18.0)
+    ap.add_argument("--rfit", type=float, default=22.0, help="start of the coast fit of r and bias [s]")
+    ap.add_argument("--cna", type=float, default=18.0, help="CN-alpha [1/rad], CFD M 0.3-0.8")
     ap.add_argument("--alphas", type=lambda s: [float(x) for x in s.split(",")], default=[0.0, 8.0])
+    ap.add_argument("--rocketpy", default=os.path.join(here, "rocket_flight_data.csv"),
+                    help="RocketPy flight export with the angle of attack (optional)")
     ap.add_argument("--out", default=os.path.join(here, "cdFlight.png"))
     a = ap.parse_args()
     ork, ork_mass = openrocket(a.ork) if os.path.exists(a.ork) else ([], None)
@@ -247,6 +292,13 @@ def main():
 
     tel = drag(traj, a.mass, a.tstart, a.vmin)
     bins = binned(tel, 0.025)
+    att, rsens = aoa(traj, a.mass, a.tstart, a.rfit, a.cna)
+    abins = binned(att, 0.025)
+    print("\nsensor radius from the lateral acceleration: %.1f cm" % (rsens * 100))
+    print("%5s %9s %9s" % ("M", "alpha med", "alpha p75"))
+    for m in (1.8, 1.5, 1.2, 1.05, 1.0, 0.9, 0.8, 0.6, 0.4, 0.3, 0.2):
+        b = min(abins, key=lambda b: abs(b[0] - m))
+        print("%5.2f %8.2f° %8.2f°" % (b[0], b[1], b[3]))
     runs = [r for r in cfd(a.runs) if r[2] in a.alphas]
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
@@ -267,7 +319,23 @@ def main():
         col = color.get(int(al), "k")
         ax.plot(m + shift.get(mesh, 0), cd, marker.get(mesh, "x"), ms=8,
                 mfc="none" if hollow else col, mec=col, mew=2, ls="none")
+    ax2 = ax.twinx()
+    ax2.plot([b[0] for b in abins], [b[1] for b in abins], color="tab:red", lw=1.5,
+             label="flight α (right axis), median")
+    ax2.fill_between([b[0] for b in abins], [b[2] for b in abins], [b[3] for b in abins],
+                     color="tab:red", alpha=0.15, lw=0)
+    rp = rocketpy(a.rocketpy, a.tstart) if os.path.exists(a.rocketpy) else []
+    if rp:
+        ax2.plot([m for m, _ in rp], [x for _, x in rp], color="tab:red", lw=1.5, ls=":")
+    ax2.set_ylim(0, 3)
+    ax2.set_ylabel("flight angle of attack in the coast [deg]  (upper limit)", color="tab:red")
+    ax2.tick_params(axis="y", colors="tab:red")
     handles, labels = ax.get_legend_handles_labels()
+    handles.append(Line2D([], [], color="tab:red", lw=1.5))
+    labels.append("flight α (right axis), median and quartiles")
+    if rp:
+        handles.append(Line2D([], [], color="tab:red", lw=1.5, ls=":"))
+        labels.append("RocketPy α (right axis, GFS wind)")
     for al in sorted({int(r[2]) for r in runs}):
         handles.append(Line2D([], [], color=color.get(al, "k"), marker="o", ls="none", ms=8))
         labels.append("CFD α = %d°" % al)
@@ -287,7 +355,7 @@ def main():
     ax.grid(alpha=0.3)
     ax.legend(handles, labels, fontsize=8, loc="upper right", ncol=2)
     ax.text(0.99, 0.02, "mass %.2f kg (OpenRocket); Midland atmosphere fitted to the GPS: "
-            "T0 = %.1f K, %.1f K/km, p0 = %.0f Pa" % (a.mass, T0, L * 1000, p0),
+            "T0 = %.1f K, %.1f K/km, p0 = %.0f Pa; α with CNα = %g /rad" % (a.mass, T0, L * 1000, p0, a.cna),
             transform=ax.transAxes, ha="right", fontsize=7, color="0.4")
     fig.tight_layout()
     fig.savefig(a.out, dpi=150)

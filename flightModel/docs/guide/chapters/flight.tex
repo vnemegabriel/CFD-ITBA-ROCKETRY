@@ -19,7 +19,7 @@ given with \ent{--mass}: $C_D$ is proportional to it.
 \paragraph{Telemetry format.} A CSV file with a comma between fields and a dot as
 decimal sign, without thousands separators, with the column names of the TeleMega
 export (AltOS): \ent{time}, \ent{state_name}, \ent{pressure}, \ent{speed},
-\ent{accel_x}, \ent{tilt}, \ent{pad_range}, \ent{pad_dist}, \ent{nsat}. The script
+\ent{accel_x}, \ent{accel_y}, \ent{accel_z}, \ent{gyro_roll}, \ent{tilt}, \ent{pad_range}, \ent{pad_dist}, \ent{nsat}. The script
 stops on a decimal comma and on a value outside the physical limits of
 \ent{LIMITS} in the script, with the line and the column. To use another flight
 computer, convert its export to these names and units first. The accelerometer
@@ -67,20 +67,37 @@ saturates during the motor burn; the script uses only the coast.
 
 \section{Angle of attack of the flight}\label{sec:flight-alpha}
 
-A rolling rocket gives two lateral accelerations:
+The lateral accelerometers ($a_y$, $a_z$) measure two forces:
 
 \begin{itemize}
 \item a centripetal acceleration of a sensor off the axis, $\omega_\text{roll}^2 r$,
   fixed in the body axes;
-\item the aerodynamic normal force, fixed in space, which turns in the body axes at
-  the roll frequency.
+\item the aerodynamic normal force $N/m$.
 \end{itemize}
 
-The mean of the lateral acceleration, divided by $\omega_\text{roll}^2$, must give a
-constant radius $r$. The oscillation at the roll frequency gives the normal force
-$N$, so $C_N = N/(\tfrac12\rho V^2 A_\text{ref})$ and $\alpha \approx C_N/C_{N\alpha}$,
-with $C_{N\alpha}$ from the CFD. The sensor noise is in the oscillation, so the result
-is an upper limit of $\alpha$.
+\begin{steps}
+\item Fit $a_y$ and $a_z$ against $\omega_\text{roll}^2$ in the last part of the coast
+  (\ent{--rfit}), where $N$ is small. The fit gives the radius $r$ and a bias for
+  each axis. The radius must be constant; the flight gives about 2.9~cm.
+\item Subtract $\omega_\text{roll}^2 r$ and the bias from the measured acceleration.
+  The magnitude of the remainder is $N/m$.
+\item Calculate
+  \[
+    \alpha \approx \frac{m\,\lvert a_\text{lat} - \omega_\text{roll}^2 r - b\rvert}
+    {q\,A_\text{ref}\,C_{N\alpha}},
+  \]
+  with $C_{N\alpha}$ from the CFD (\ent{--cna}). The script plots the median and the
+  quartiles of $\alpha$ against the Mach number, on the right axis of the $C_D$ figure.
+\end{steps}
+
+The sensor noise is in $\lvert a_\text{lat}\rvert$, so the result is an upper limit of
+$\alpha$. With \ent{--rocketpy}, the script also plots the angle of attack of a RocketPy simulation
+of the same flight. This is a model with a forecast wind, not a measurement.
+
+The script does not use the tilt of the flight computer to find $\alpha$. The tilt
+oscillates at the roll frequency, with an amplitude of $1.7^\circ$ in the subsonic
+coast and about $3.5^\circ$ above Mach 1. The lateral force does not show an angle of
+attack of this size. The cause is not measured.
 
 \section{Sources of uncertainty}
 
@@ -91,6 +108,7 @@ Source & Effect \\
 Mass & $C_D \propto m$. A design mass is not a measurement. \\
 Wind & The speed is relative to the ground. \\
 Flight path & The gravity term uses the attitude as the direction of the path; valid at small $\alpha$. \\
+$C_{N\alpha}$ & One value for all Mach numbers, from the CFD at M 0.3 to 0.8; it scales $\alpha$ directly. \\
 Atmosphere & One lapse rate for the whole column; real layers deviate from it. \\
 \bottomrule
 \end{tabularx}
