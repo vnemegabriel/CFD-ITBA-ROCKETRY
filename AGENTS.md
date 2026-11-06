@@ -29,10 +29,10 @@ resolve, in this order:
 2. The base wake, a large part of the Cd of a rocket.
 3. The wall friction, which depends on y+.
 
-The sweep runs at α = 0, 4 and 8°, set with the velocity field (`--alpha`): the
-mesh is the same. The wake cones of `meshDict` follow the x axis; at 8° the
-wake leaves `midWake` about 1.85 m behind the base. Do not spend cells on the
-fin-tip vortex.
+The sweep runs at α = 0 and 2°, set with the velocity field (`--alpha`): the
+mesh is the same. The wake cones of `meshDict` follow the x axis; at 2° the
+wake stays inside `midWake` (about 0.08 m off the axis at its end, radius
+0.26 m). Do not spend cells on the fin-tip vortex.
 
 **One set of meshes for the whole sweep:** h1, h2, h3 for the convergence
 study (only `maxCellSize` changes, ratio √2) and h0, coarser, which always

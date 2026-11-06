@@ -286,7 +286,7 @@ def main():
 
     print("\nsweep conditions in the coast (Midland atmosphere):")
     print("%5s %7s %8s %9s %8s" % ("M", "t [s]", "h pad", "pInf", "Tinf"))
-    for m in (1.8, 1.2, 0.8, 0.6, 0.3):
+    for m in (1.8, 1.5, 1.2, 1.1, 1.0, 0.9, 0.8, 0.6, 0.3):
         s = min((s for s in traj if s["t"] >= a.tstart), key=lambda s: abs(s["M"] - m))
         print("%5.1f %7.2f %8.0f %9.0f %8.2f" % (m, s["t"], s["h"], s["p"], s["T"]))
 
