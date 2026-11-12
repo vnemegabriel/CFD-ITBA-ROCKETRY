@@ -14,7 +14,7 @@ Item & Requirement \\
 \endhead
 OpenFOAM & ESI v2412 with cfMesh (\cmd{cartesianMesh}), and its Open MPI. \\
 Tools & \cmd{bash}, \cmd{rsync}, \cmd{awk}, GNU \cmd{sed}, \cmd{xz}, \cmd{/usr/bin/time}, \cmd{jinja2-cli}, \cmd{git}. \\
-Python 3 & Standard library; \cmd{matplotlib} for \file{cdFlight.py}. \\
+Python 3 & Standard library; \cmd{matplotlib} for \file{cdFlight.py}; \cmd{numpy} and \cmd{vtk} for \file{flowCheck.py}. The versions are in \file{requirements.txt}. \\
 \cmd{perf} & Optional: counts the CPU cycles and the energy of each run. Native Linux only. \\
 Memory & Proportional to the number of cells. Measure \ent{maxRSSkB} of a run on the coarsest mesh (\cref{sec:runinfo}) and scale it with the number of cells before you run a finer mesh. \cmd{cartesianMesh} needs the memory of the full rocket also for a half mesh. \\
 \bottomrule
@@ -81,6 +81,13 @@ sudo apt-get install rsync xz-utils gawk time git python3-matplotlib pipx
 pipx install jinja2-cli
 \end{shell}
 \item Get the repository (\cmd{git clone}, as in \cref{sec:install-container}).
+\item Make the Python environment once, in the root of the repository:
+\begin{shell}
+sudo apt-get install python3-venv
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+\end{shell}
+  Git ignores \file{.venv}. Only \file{flowCheck.py} needs it (\cref{sec:flowcheck}).
 \item Load OpenFOAM in each new shell, or add the line to \file{~/.bashrc}:
 \begin{shell}
 source /usr/lib/openfoam/openfoam2412/etc/bashrc

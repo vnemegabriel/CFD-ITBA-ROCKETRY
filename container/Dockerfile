@@ -9,13 +9,14 @@
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
+COPY requirements.txt /tmp/requirements.txt
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
  && curl -s https://dl.openfoam.com/add-debian-repo.sh | bash \
  && apt-get install -y --no-install-recommends \
       openfoam2412-default \
       rsync xz-utils gawk time git python3 python3-matplotlib python3-pip gnuplot-nox \
- && pip3 install --no-cache-dir --break-system-packages jinja2-cli \
+ && pip3 install --no-cache-dir --break-system-packages jinja2-cli -r /tmp/requirements.txt \
  && rm -rf /var/lib/apt/lists/*
 
 # Meshes and runs go to /data (a volume), the repository to /work.

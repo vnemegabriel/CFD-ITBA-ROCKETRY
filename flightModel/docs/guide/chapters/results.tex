@@ -223,6 +223,53 @@ Columns & Source \\
 With a continued run, the coefficients and residuals come from the last start-time
 directory only.
 
+\section{Physical checks of a solution}\label{sec:flowcheck}
+
+\begin{shell}
+OMP_NUM_THREADS=1 VTK_SMP_MAX_THREADS=1 \
+    ../.venv/bin/python post/flowCheck.py <run-dir> [time]   # default: last time
+\end{shell}
+
+The script tests each cell against laws that do not need the shock position. In the
+container, use \cmd{python3}. \cmd{pvpython} of ParaView also runs it. Without the two
+variables, VTK uses all the cores.
+
+\begin{longtable}{@{}P{0.26\linewidth} P{0.36\linewidth} P{0.30\linewidth}@{}}
+\toprule
+Check & Law & Valid in \\
+\midrule
+\endhead
+$(s - s_\infty)/R \geq 0$ & Second law & Inviscid flow \\
+$p_0/p_{0\infty} \leq 1$ & Second law, $h_0$ constant & Inviscid flow \\
+$h_0/h_{0\infty} = 1$ & Energy, steady and adiabatic & Inviscid flow \\
+$p = p_\infty$ ahead of the Mach cone of the tip & No upstream influence & $M_\infty > 1$, all cells \\
+\bottomrule
+\end{longtable}
+
+The script does not mask the boundary layer and the wake. It gives the percentage of
+cells that fail each check (tolerance $10^{-3}$) in a table of region along $x$ against
+wall distance, and the worst cell of each wall-distance band.
+
+\begin{steps}
+\item Run the script on two meshes of the study at the same condition.
+\item Find the failures that do not decrease with the wall distance or with the
+  refinement. These are numerical errors. Failures that decrease are the boundary layer
+  and the wake.
+\item Open \file{<run-dir>/postProcessing/flowCheck/<time>/symmetry.vtp} in ParaView to
+  find them: the fields of the checks, the wall distance, the cell size and the shock
+  sensor $M_n = \vec{U}\cdot\nabla p/(a|\nabla p|)$ on the plane $z = 0$. A shock is
+  the surface $M_n = 1$.
+\end{steps}
+
+\begin{note}
+Do not use the $p_0$ check alone at the tolerance $10^{-3}$: the tolerances of the
+entropy and $h_0$ checks let $p_0$ exceed $p_{0\infty}$ with no error.
+\end{note}
+
+Time on one core for $1.1\cdot10^6$ cells: 2 minutes and 0.7 GB with the venv, 13
+minutes with \cmd{pvpython} 5.11. The two give the same tables to the second decimal: the
+VTK versions use different cells for the polyhedra.
+
 \section{Disk}
 
 \begin{itemize}

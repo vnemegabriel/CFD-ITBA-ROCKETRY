@@ -66,8 +66,10 @@ flightModel/docs/report/  the technical report (results), for the thesis
 The Python is `mesh/makeRocket.py`, which writes the STL, `mesh/snapPlane.py`,
 which flattens the cut of the half mesh, `post/firstLayer.py`, which measures
 the first layer, `common/machineLog.py`, which records the computer during each
-run, and `flightData/cdFlight.py`. All use only the standard library, except
-matplotlib in `cdFlight.py`. The mesh is defined in `mesh/system/meshDict`, and
+run, `flightData/cdFlight.py`, and `post/flowCheck.py`, which tests each cell
+against the second law and energy conservation. All use only the standard
+library, except matplotlib in `cdFlight.py` and numpy and vtk in `flowCheck.py`;
+`requirements.txt` pins them for the venv `.venv` in the repository root. The mesh is defined in `mesh/system/meshDict`, and
 everything there is a **level**: an integer that halves a cell, local to a
 patch or a box, not coupled to anything else.
 

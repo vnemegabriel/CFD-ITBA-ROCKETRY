@@ -21,6 +21,7 @@ nohup ./runCase.sh <sweep-file> > ~/log.<sweep> 2>&1 &
 # results
 ./post/monitor.sh ~/runs/<case>
 ./post/sweepTable.sh ~/runs > sweep.csv
+OMP_NUM_THREADS=1 VTK_SMP_MAX_THREADS=1 ../.venv/bin/python post/flowCheck.py ~/runs/<case>
 python3 flightData/cdFlight.py
 
 # binding of a running case
