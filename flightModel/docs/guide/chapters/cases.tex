@@ -234,9 +234,9 @@ The free-stream entries of the patches (\ent{freestreamValue}, \ent{inletValue},
 have a time directory with the solution.
 
 \begin{caution}
-\cmd{mapFields} can stop with a segmentation fault when the source and the target
-are the same mesh, which is the case of the supersonic start. \file{Allrun} then
-stops the run (\cref{sec:ts-mapfields}).
+\cmd{mapFields} of OpenFOAM v2412 can stop with a segmentation fault for some pairs
+of meshes, for example $h_1$ to $h_2$. \file{Allrun} then stops the run
+(\cref{sec:ts-mapfields}).
 \end{caution}
 
 \section{Forced motion of a fin}\label{sec:forced}

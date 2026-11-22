@@ -31,9 +31,25 @@ is the most expensive and least stable part of a run \citep[§5.4]{toolchain2026
   \label{fig:chains}
 \end{figure}
 
-A supersonic chain starts with a \cmd{rhoPimpleFoam} run on the coarsest mesh, because
-\cmd{rhoCentralFoam} from a uniform free stream fails at the base
+The supersonic chains use \cmd{rhoPimpleFoam}, as the subsonic ones
+(\cref{sec:two-solvers}). A supersonic run starts from a uniform free stream on $h_0$
 (\cref{sec:supersonic-start}).
+
+\subsection{The sweep of rhoPimpleFoam}\label{sec:sweep-pimple}
+
+\file{sweepPimple.txt} has the whole sweep, nine Mach numbers at two angles of attack,
+with \cmd{rhoPimpleFoam}. It runs $h_0$ and $h_1$ in one file. \file{sweepPimpleH2.txt}
+and \file{sweepPimpleH3.txt} have the $h_2$ runs and the $h_3$ runs. Run them after
+\file{sweepPimple.txt}, in the same run directory, one file at a time. Each $h_2$ run
+starts from the $h_1$ run of the same condition, and each $h_3$ run from the $h_2$ run.
+These two files need the corrected \cmd{mapFields} (\cref{sec:ts-mapfields}):
+
+\begin{shell}
+PATH=<dir-with-corrected-mapFields>:$PATH ./runCase.sh sweepPimpleH2.txt
+\end{shell}
+
+Do not edit a sweep file, \file{runCase.sh}, \file{newCase.sh} or \file{Allrun}
+while a sweep runs.
 
 \subsection{Mesh series for the convergence study}\label{sec:mesh-convergence-setup}
 

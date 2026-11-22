@@ -12,10 +12,9 @@
 # Each Mach number and angle of attack is a chain h0 -> h1 -> h2 -> h3, each
 # run started from the previous one (--init).  h0 only starts the chains.
 # --alpha turns the free stream in the x-y plane; the mesh does not change.
-# M < 1 runs rhoPimpleFoam.  M > 1 runs rhoCentralFoam, started on h0 from a
-# rhoPimpleFoam run at the same Mach (docs/guide, Start of the supersonic cases).
-# M 1.0 runs rhoPimpleFoam only: 0.orig/p sets the supersonic boundary
-# conditions for Minf > 1, so Minf = 1 keeps the subsonic ones.
+# All Mach numbers run rhoPimpleFoam (docs/guide, Two solvers).
+# M 1.0 keeps the subsonic boundary conditions: 0.orig/p sets the supersonic ones
+# for Minf > 1 only.
 #
 # pInf and Tinf: the atmosphere of the flight at the height where the vehicle
 # passed each Mach number in the coast (flightData/cdFlight.py prints them).

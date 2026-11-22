@@ -30,13 +30,27 @@ A script continues after a failed application. & \cmd{runApplication} returns 0 
 \bottomrule
 \end{longtable}
 
-\section{mapFields on the same mesh}\label{sec:ts-mapfields}
+\section{mapFields stops with a segmentation fault}\label{sec:ts-mapfields}
 
-\cmd{mapFields} can stop with a segmentation fault when the source and the target are
-the same mesh. Between different meshes it works. \file{Allrun} stops the run if the
-log of \cmd{mapFields} or \cmd{changeDictionary} does not end with \val{End}; a check
-for \val{FOAM FATAL} only does not detect a segmentation fault. On the same mesh, a copy
-of the fields of the source run is an alternative that does not interpolate.
+\cmd{mapFields -consistent} of OpenFOAM v2412 can stop with a segmentation fault right
+after \val{interpolating Ma}. The cause is a null-pointer read in
+\ent{meshToMesh0::calculateInverseDistanceWeights()}: when the centre of a target cell
+is within 1e-5~m of a neighbour of its nearest source cell, the function leaves the
+list of weights of that cell empty. The fault depends on the pair of meshes. It
+occurred from $h_1$ to $h_2$ and not from $h_0$ to $h_1$ or from $h_0$ to $h_2$.
+\file{Allrun} stops the run if the log of \cmd{mapFields} or \cmd{changeDictionary}
+does not end with \val{End}; a check for \val{FOAM FATAL} only does not detect a
+segmentation fault.
+
+Two remedies are available:
+
+\begin{itemize}
+\item Start the finer mesh from the $h_0$ run. This needs no change, but the start
+  solution is worse.
+\item Use a \cmd{mapFields} with the corrected function. Put it first in \ent{PATH}
+  for the sweep that needs it (\cref{sec:sweep-pimple}). The \cmd{mapFields} of the
+  system does not change.
+\end{itemize}
 
 \section{The Courant number with a local time step}\label{sec:ts-courant}
 

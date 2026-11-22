@@ -10,7 +10,7 @@ where each value is. Read the values in the files.
  & \file{case-pimple/}: \cmd{rhoPimpleFoam} & \file{case-central/}: \cmd{rhoCentralFoam} \\
 \midrule
 Formulation & Pressure-based, \ent{transonic} pressure equation & Density-based, explicit, central-upwind flux \\
-Use & $M < 1$; start of each $M > 1$ chain & $M > 1$ \\
+Use & All Mach numbers of the sweeps & Not in the sweeps (\cref{sec:central-friction}) \\
 \bottomrule
 \end{tabularx}
 
@@ -19,12 +19,36 @@ The numerical dissipation of a central-upwind flux scales with the speed of soun
 with the flow speed. At low Mach numbers it is thus large compared with the convective
 flux, and the drag error grows. A pressure-based solver does not have this problem, but
 it loses accuracy where strong shocks occur. The OpenFOAM ToolChain report
-\citep[§6]{toolchain2026} measured both effects on rockets. The workflow therefore
-changes solver at $M = 1$.
+\citep[§6]{toolchain2026} measured both effects on rockets.
+
+The sweeps use the pimple template at all Mach numbers, also at $M > 1$, because the
+central template does not give the wall friction on the wall-function meshes
+(\cref{sec:central-friction}). One template for all Mach numbers also removes the step
+in $C_D(M)$ at $M = 1$ that a change of discretization can cause.
+
+\subsection{Wall friction of the central template}\label{sec:central-friction}
+
+Before you use \file{case-central/} for a drag value, measure its wall friction on a
+flat plate with the near-wall spacing of the mesh:
+
+\begin{steps}
+\item Make a two-dimensional plate at the free-stream conditions of the case. Use the
+  first-layer thickness that \file{post/firstLayer.py} gives for the body, the same
+  layer count and ratio, and the streamwise cell size of the body.
+\item Copy the boundary conditions, the schemes and the solver settings of both
+  templates into the plate cases. Run the plate with both templates to a constant
+  wall force.
+\item Compare the skin-friction coefficient $c_f(x)$ with a compressible flat-plate
+  correlation \citep[§7]{white2006}, and with turbulence off, with the compressible
+  Blasius value.
+\item Use a template for drag only where its $c_f$ agrees with the correlation.
+\end{steps}
 
 \begin{caution}
-The change of discretization at $M = 1$ can cause a step in $C_D(M)$ that is not
-physical. To measure it, run one Mach number with both solvers on the same mesh.
+A run of \cmd{rhoCentralFoam} with \ent{localEuler} can converge to a constant force
+that is wrong: its steady state on the wall-function mesh does not change with the
+Courant number, the reconstruction or the solver tolerance. A constant force is not a
+proof of a correct solution.
 \end{caution}
 
 The models, the gas, the boundary conditions, the function objects and the flight
@@ -308,7 +332,8 @@ Bounded gradients and TVD convection & Second order away from the local shocks o
 From a uniform free stream, the flow behind the base starts at the free-stream speed:
 the base acts as a piston and empties the region behind it. The pressure and the
 temperature there fall towards zero before the wake fills. The pimple template has a
-temperature limit and survives this transient. \cmd{rhoCentralFoam} reads no
-\file{fvOptions} in v2412, has no such limit, and fails with a floating point
-exception in the thermophysical model. Therefore each supersonic chain starts with a
-pimple run on the coarsest mesh, and the central run starts from it (\cref{fig:mach}).
+temperature limit and survives this transient, so the supersonic pimple runs start
+from a uniform free stream as the subsonic ones (\cref{fig:mach}). \cmd{rhoCentralFoam}
+reads no \file{fvOptions} in v2412, has no such limit, and fails with a floating point
+exception in the thermophysical model. A central run must therefore start from a pimple
+run at the same Mach number on the same or a coarser mesh.

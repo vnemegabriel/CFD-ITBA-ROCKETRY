@@ -31,8 +31,9 @@ for p in $(pgrep -x rhoPimpleFoam); do taskset -cp $p; done
 \section{Run names}
 
 \texttt{m<M>-a<alpha>-h<n>[-pimple]}: Mach number times ten, angle of attack in
-degrees, mesh. \texttt{-pimple} marks the \cmd{rhoPimpleFoam} start run of a supersonic
-chain.
+degrees, mesh. \texttt{-pimple} marks a \cmd{rhoPimpleFoam} run that starts a
+\cmd{rhoCentralFoam} run (\file{sweepFlutter.txt}). The runs of \file{sweepPimple*.txt}
+have no suffix.
 
 \section{Where each value is}
 

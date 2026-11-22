@@ -1,8 +1,9 @@
 # CLAUDE.md — Aconcagua CFD
 
 Aerodynamics of the Aconcagua rocket with OpenFOAM v2412. cfMesh meshes, a
-`rhoPimpleFoam` template for M < 1 and a `rhoCentralFoam` template for M > 1
-that starts from a pimple run at the same Mach number, Mach sweeps in series.
+`rhoPimpleFoam` template used at all Mach numbers, Mach sweeps in series. The
+`rhoCentralFoam` template is not used for drag: on the wall-function meshes its
+wall friction is 2.6 times the flat-plate value (report, flat-plate test).
 
 Reply in the language of the person who asks; the maintainers use Rioplatense
 Spanish. CFD jargon stays in English (mesh, solver, y+, wall function,
@@ -50,8 +51,8 @@ the real y+ on each run.
 ```
 flightModel/mesh/         makeRocket.py, stl/, Allmesh, meshInfo, system/
 flightModel/common/       Allrun, Allrefine, machineLog.py
-flightModel/case-central/ rhoCentralFoam template, M > 1
-flightModel/case-pimple/  rhoPimpleFoam template, M < 1 and start of M > 1: only what differs from central
+flightModel/case-central/ rhoCentralFoam template, base of the others; not used for drag
+flightModel/case-pimple/  rhoPimpleFoam template, all Mach numbers: only what differs from central
 flightModel/newCase.sh    template + mesh + conditions -> one run
 flightModel/runMesh.sh    meshes.txt: builds the meshes that are missing
 flightModel/runCase.sh    one sweep*.txt in series, on existing meshes; --np and --socket

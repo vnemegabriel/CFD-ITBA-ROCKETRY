@@ -96,6 +96,10 @@ if [ -n "$SOCKET" ] && [ "$NP" -gt 1 ]; then
     OMPI_MCA_rmaps_rank_file_path=$PWD/rankfile; export OMPI_MCA_rmaps_rank_file_path
     MPIOPTS="--bind-to core"
     BINDING="socket $SOCKET, one process per core"
+elif [ -z "$SOCKET" ] && [ "$NP" -gt 1 ] &&
+     [ "$NP" -le "$(lscpu -p=SOCKET,CORE | grep -v '^#' | sort -u | wc -l)" ]; then
+    MPIOPTS="--map-by core --bind-to core"
+    BINDING="one process per core"
 fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 START=$(date +%s)

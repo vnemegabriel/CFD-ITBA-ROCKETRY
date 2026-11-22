@@ -1,7 +1,4 @@
 flowchart LR
-  subgraph sub["M 0.3, 0.6, 0.8 (rhoPimpleFoam)"]
+  subgraph sub["Each Mach number, M 0.3 to 1.8, and angle of attack (rhoPimpleFoam)"]
     s0["h0"] --> s1["h1"] --> s2["h2"] --> s3["h3"]
-  end
-  subgraph sup["M 1.2, 1.8"]
-    p0["h0 pimple"] --> c0["h0 central"] --> c1["h1 central"] --> c2["h2 central"] --> c3["h3 central"]
   end

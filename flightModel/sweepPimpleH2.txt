@@ -1,0 +1,28 @@
+# One run per line:  <name> <newCase.sh options>.  Blank lines and # are ignored.
+#
+#     ./runCase.sh [--np <N>] sweepPimpleH2.txt [runs-dir] [meshes-dir]
+#
+# The h2 runs of sweepPimple.txt, each started from the h1 run of the same Mach
+# number and angle.  Run it after sweepPimple.txt, in the same runs-dir, with the
+# patched mapFields first in PATH: the stock v2412 mapFields crashes in
+# meshToMesh0 when the source mesh is h1 or finer (CFS_SVV/reports/OpenFOAM
+# mapFields segfault.md).
+#
+m18-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a00-h1
+m15-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 1.5 --pInf 69024 --Tinf 288.01  --init m15-a00-h1
+m12-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a00-h1
+m11-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a00-h1
+m10-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 1.0 --pInf 55150 --Tinf 274.68  --init m10-a00-h1
+m09-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 0.9 --pInf 51464 --Tinf 270.70  --init m09-a00-h1
+m08-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 0.8 --pInf 47509 --Tinf 266.17  --init m08-a00-h1
+m06-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 0.6 --pInf 40911 --Tinf 257.90  --init m06-a00-h1
+m03-a00-h2         --mesh h2 --solver pimple  --alpha 0  --Minf 0.3 --pInf 34613 --Tinf 248.96  --init m03-a00-h1
+m18-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 1.8 --pInf 78354 --Tinf 295.82  --init m18-a02-h1
+m15-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 1.5 --pInf 69024 --Tinf 288.01  --init m15-a02-h1
+m12-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 1.2 --pInf 60547 --Tinf 280.15  --init m12-a02-h1
+m11-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 1.1 --pInf 57837 --Tinf 277.45  --init m11-a02-h1
+m10-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 1.0 --pInf 55150 --Tinf 274.68  --init m10-a02-h1
+m09-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 0.9 --pInf 51464 --Tinf 270.70  --init m09-a02-h1
+m08-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 0.8 --pInf 47509 --Tinf 266.17  --init m08-a02-h1
+m06-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 0.6 --pInf 40911 --Tinf 257.90  --init m06-a02-h1
+m03-a02-h2         --mesh h2 --solver pimple  --alpha 2  --Minf 0.3 --pInf 34613 --Tinf 248.96  --init m03-a02-h1

@@ -94,8 +94,9 @@ centre).
 
 \subsection{Solvers and flight conditions}
 
-$M < 1$: \texttt{rhoPimpleFoam} with the transonic pressure equation; $M > 1$:
-\texttt{rhoCentralFoam} (Kurganov flux, van Leer reconstruction). Both use local time
+$M < 1$: \texttt{rhoPimpleFoam} with the transonic pressure equation; $M > 1$ in the
+first sweeps: \texttt{rhoCentralFoam} (Kurganov flux, van Leer reconstruction), replaced
+by \texttt{rhoPimpleFoam} after the flat-plate test (\cref{sec:flatplate}). Both use local time
 stepping, $k$--$\omega$ SST with Spalding wall functions, and air as a perfect gas with
 Sutherland viscosity ($Pr = 0.690$ from the Eucken correction). The runs stop when the
 1000-iteration moving mean of $C_D$ is within 0.007 of the current value.
@@ -259,11 +260,52 @@ Mean \yplus{} on the body & 16.6 & 33.7 \\
 The central run started from the converged pimple solution increased $C_D$ without
 limit, mostly through the wall shear stress, which tripled (\cref{tab:central}). The run
 was stopped by a hardware failure at iteration 584, not by the solver. The flight value
-at this Mach number is 0.39. The cause is open; the candidates are the transfer of the
-turbulence fields, the wall treatment of the central template and the limiter at the
-wall. Two numerical defects found during this work are corrected: \texttt{mapFields}
-can fail with a segmentation fault when source and target are the same mesh, which
+at this Mach number is 0.39. The cause was found with a flat plate (\cref{sec:flatplate}). Two numerical defects found during this work are corrected: \texttt{mapFields}
+can fail with a segmentation fault for some pairs of meshes (\cref{sec:sweep3}), which
 earlier went undetected; and under Open MPI 5 the process binding was silently ignored.
+
+\subsection{Flat-plate test of the wall friction}\label{sec:flatplate}
+
+The converged central runs of the sweep (20\,000 iterations) had 2.4 to 3 times the
+viscous drag of the pimple runs at $M = 1.1$ to 1.8 on $h_0$. The wall shear on the
+cylinder was \unit{830}{Pa} against \unit{300}{Pa} in the pimple run. Changes of the
+Courant number, the gradient limiter and the reconstruction on the rocket did not remove
+it, and the mesh quality of the body cells, where the excess is largest, is the best of
+the mesh. A two-dimensional plate at $M = 1.8$, $p_\infty = \unit{78\,354}{Pa}$,
+$T_\infty = \unit{295.82}{K}$, with the near-wall spacing of $h_0$ (first layer
+\unit{0.097}{mm}, 12 layers, ratio 1.19, cells of \unit{5}{mm} along the wall) and the
+settings of both templates, isolates the solver (\cref{tab:flatplate}).
+
+\begin{table}[htbp]
+\centering
+\caption{Skin friction $c_f \times 1000$ on the flat plate, $M = 1.8$, against the
+compressible correlation of White \citep[§7]{white2006}, adiabatic wall.}\label{tab:flatplate}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+ & $x = \unit{0.1}{m}$ & 0.5 & 1.0 & 1.5 & 2.4 \\
+\midrule
+White & 2.55 & 1.96 & 1.77 & 1.67 & 1.56 \\
+Pimple, wall functions, $y^+ \approx 37$ & 2.55 & 2.00 & 1.82 & 1.74 & 1.64 \\
+Pimple, $y^+ \approx 0.8$ & 2.37 & 1.90 & 1.74 & 1.66 & 1.57 \\
+Central, local time step & 5.48 & 4.68 & 4.36 & 4.20 & 4.03 \\
+Central, global time step & 1.78 & 1.39 & 1.25 & 1.18 & 1.12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The pimple template is within 0 to 7\,\% of the correlation with and without wall
+functions, and with turbulence off it gives the compressible Blasius value
+($c_f = 0.093 \times 10^{-3}$ at \unit{1.5}{m}). The central template converges to a
+friction 2.5 to 2.7 times the correlation, the ratio of the rocket runs. Its result does
+not change, to four digits, with the reconstruction (upwind, van Leer or linear), with
+forced iterations of the viscous correction, with the smoothing of the local time step
+or with a Courant number of 0.05 instead of 0.5. With a global, time-accurate step the
+same solver converges to 0.7 times the correlation; with turbulence off, to 2.5 times
+the Blasius value. The central run with $y^+ \approx 1$ failed with a floating point
+exception. The term of \texttt{rhoCentralFoam} that makes the converged state depend on
+the time stepping was not found. The sweeps therefore use \texttt{rhoPimpleFoam} at all
+Mach numbers. The pimple wall temperature, \unit{352}{K} against \unit{466}{K} for an
+adiabatic wall, is too low; it does not change the friction and is not investigated.
 
 \section{Computational cost}
 
@@ -317,6 +359,48 @@ its \unit{85}{\textdegree C} rating. The effective clock varied from 3.5 to
 \unit{4.4}{GHz} between runs with the same CPU profile, so the wall time of these runs
 is not a comparable cost without the cycle counts.
 
+\section{Third sweep: rhoPimpleFoam at all Mach numbers}\label{sec:sweep3}
+
+The third sweep runs nine Mach numbers at $\alpha = 0$ and $2^\circ$ on $h_0$ to $h_3$,
+with \texttt{rhoPimpleFoam} and the fitted atmosphere (\cref{tab:conditions}). Each run
+stops at 2000 iterations. The runs are in \texttt{runs-1116} on the workstation.
+$h_1$ starts from $h_0$, $h_2$ from $h_1$ and $h_3$ from $h_2$.
+
+The first attempt to start $h_2$ from $h_1$ failed: all 18 $h_2$ runs of the earlier
+sweep stopped in \texttt{mapFields} with a segmentation fault. The cause is a
+null-pointer read in \texttt{meshToMesh0::calculateInverseDistanceWeights()} when the
+centre of a target cell is within $10^{-5}$\,m of a neighbour of its nearest source
+cell. The fault depends on the pair of meshes: $h_0$ to $h_2$ and $h_0$ to $h_1$ work.
+A corrected copy of \texttt{mapFields} maps $h_1$ to $h_2$ in 21 minutes. The
+$h_2$ and $h_3$ runs of this sweep use it.
+
+\begin{table}[htbp]
+\centering
+\caption{$C_D$ of the third sweep at the last iteration. ``--'': not finished on 22 November.}\label{tab:sweep3}
+\begin{tabular}{@{}c cccc cccc@{}}
+\toprule
+ & \multicolumn{4}{c}{$\alpha = 0^\circ$} & \multicolumn{4}{c}{$\alpha = 2^\circ$} \\
+\cmidrule(lr){2-5}\cmidrule(l){6-9}
+$M$ & $h_0$ & $h_1$ & $h_2$ & $h_3$ & $h_0$ & $h_1$ & $h_2$ & $h_3$ \\
+\midrule
+0.3 & 0.376 & 0.351 & 0.335 & 0.327 & 0.412 & 0.365 & 0.352 & -- \\
+0.6 & 0.363 & 0.329 & 0.316 & 0.306 & 0.368 & 0.344 & 0.331 & -- \\
+0.8 & 0.360 & 0.345 & 0.329 & 0.311 & 0.382 & 0.363 & 0.346 & -- \\
+0.9 & 0.379 & 0.377 & 0.379 & 0.373 & 0.401 & 0.390 & 0.395 & -- \\
+1.0 & 0.439 & 0.436 & 0.456 & 0.479 & 0.459 & 0.457 & 0.475 & -- \\
+1.1 & 0.478 & 0.476 & 0.496 & 0.514 & 0.498 & 0.499 & 0.516 & -- \\
+1.2 & 0.537 & 0.506 & 0.512 & 0.520 & 0.559 & 0.527 & 0.533 & -- \\
+1.5 & 0.524 & 0.487 & 0.472 & 0.463 & 0.542 & 0.505 & 0.490 & 0.479 \\
+1.8 & 0.462 & 0.433 & 0.419 & 0.412 & 0.480 & 0.453 & 0.437 & 0.430 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For $M \le 0.8$ and $M \ge 1.2$, $C_D$ decreases when the mesh is refined. At $M = 1.0$
+and 1.1 it increases from $h_1$ to $h_3$ (at $\alpha = 0$: 0.436 to 0.479 and 0.476 to
+0.514). The mesh convergence and the grid convergence index are not calculated yet; they
+need the $h_3$ runs at $\alpha = 2^\circ$.
+
 \section{Reference values for verification}\label{sec:verification}
 
 A replication of the first run of the guide (mesh $h_0$, $M = 0.8$, $\alpha = 0$,
@@ -348,8 +432,8 @@ version of cfMesh.
 \item The second sweep (\cref{sec:sweep2}): repeat the five $h_1$ runs at incidence
   with the corrected \texttt{Allrun}, then $h_2$; $h_3$ waits for the workstation.
 \item Mesh convergence and grid convergence index for $C_D$ at each condition.
-\item Diagnosis and correction of the central-run divergence, then the supersonic sweep
-  and the transonic drag rise.
+\item The third sweep (\cref{sec:sweep3}): the $h_3$ runs at $\alpha = 2^\circ$, then the
+  grid convergence index and the transonic drag rise.
 \item The same cases with Nektar++, with $h$ and $p$ refinement, and the comparison of
   accuracy against cost.
 \end{enumerate}
